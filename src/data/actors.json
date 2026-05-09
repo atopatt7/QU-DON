@@ -1,0 +1,272 @@
+{
+  "_comment": "QU-DON | actors.json — All stats are data-driven. Edit here, not in code.",
+
+  "actors": [
+    {
+      "id": "qu_don",
+      "name": "瞿董",
+      "name_en": "Qu Don",
+      "role": "protagonist",
+      "archetype": "Fixer",
+      "portrait": "assets/images/actors/qu_don.png",
+      "sprite": "assets/images/sprites/qu_don.png",
+      "description": "前黑道協調人，以資訊和談判見長。在洛城地下社會以「公正仲裁者」聞名。",
+
+      "stats": {
+        "hp":          85,
+        "maxHp":       85,
+        "ap":          4,
+        "maxAp":       4,
+        "moveRange":   4,
+        "attack":      12,
+        "defense":     8,
+        "accuracy":    70,
+        "evasion":     15,
+        "strength":    10,
+        "intelligence":14,
+        "streetwise":  16,
+        "luck":        12
+      },
+
+      "reputation": {
+        "the_code":  50,
+        "chaos":     10,
+        "law":        5
+      },
+
+      "startInventory": [
+        { "itemId": "lead_pipe",    "qty": 1 },
+        { "itemId": "9mm_rounds",   "qty": 12 },
+        { "itemId": "stolen_meds",  "qty": 1 }
+      ],
+
+      "equippedWeapon": "lead_pipe",
+
+      "passives": [
+        {
+          "id": "street_network",
+          "label": "Street Network",
+          "effect": "Once per district, spend 0 AP to learn enemy positions."
+        }
+      ],
+
+      "levelProgression": {
+        "xpPerLevel": 100,
+        "statGrowth": {
+          "hp":          5,
+          "attack":      1,
+          "defense":     1,
+          "streetwise":  2
+        }
+      }
+    },
+
+    {
+      "id": "raymond",
+      "name": "Raymond",
+      "name_en": "Raymond 'Ray' Vega",
+      "role": "ally",
+      "archetype": "Brawler",
+      "portrait": "assets/images/actors/raymond.png",
+      "sprite": "assets/images/sprites/raymond.png",
+      "description": "前拳擊手，因打假拳欠債。擅長近戰壓制與封鎖走廊。",
+
+      "stats": {
+        "hp":          110,
+        "maxHp":       110,
+        "ap":          3,
+        "maxAp":       3,
+        "moveRange":   3,
+        "attack":      20,
+        "defense":     14,
+        "accuracy":    55,
+        "evasion":     8,
+        "strength":    18,
+        "intelligence": 6,
+        "streetwise":   9,
+        "luck":         7
+      },
+
+      "reputation": {
+        "the_code":  30,
+        "chaos":     25,
+        "law":        0
+      },
+
+      "startInventory": [
+        { "itemId": "lead_pipe", "qty": 1 }
+      ],
+
+      "equippedWeapon": "lead_pipe",
+
+      "passives": [
+        {
+          "id": "haymaker",
+          "label": "Haymaker",
+          "effect": "Adjacent melee attack deals +8 damage. Cannot be used while Flanked."
+        },
+        {
+          "id": "immovable",
+          "label": "Immovable",
+          "effect": "Knockback effects on Raymond are ignored."
+        }
+      ],
+
+      "ai": {
+        "behavior": "aggressive",
+        "priority": "nearest_enemy",
+        "flankBonus": false
+      },
+
+      "levelProgression": {
+        "xpPerLevel": 100,
+        "statGrowth": {
+          "hp":      8,
+          "attack":  3,
+          "defense": 2
+        }
+      }
+    },
+
+    {
+      "id": "lina",
+      "name": "Lina",
+      "name_en": "Lina Castillo",
+      "role": "ally",
+      "archetype": "Shooter",
+      "portrait": "assets/images/actors/lina.png",
+      "sprite": "assets/images/sprites/lina.png",
+      "description": "前警察線人，狙擊手身手。彈藥匱乏是她最大的弱點。",
+
+      "stats": {
+        "hp":          70,
+        "maxHp":       70,
+        "ap":          4,
+        "maxAp":       4,
+        "moveRange":   4,
+        "attack":      16,
+        "defense":     6,
+        "accuracy":    88,
+        "evasion":     18,
+        "strength":    7,
+        "intelligence":11,
+        "streetwise":  10,
+        "luck":        14
+      },
+
+      "reputation": {
+        "the_code":  20,
+        "chaos":     10,
+        "law":       30
+      },
+
+      "startInventory": [
+        { "itemId": "9mm_rounds", "qty": 8 }
+      ],
+
+      "equippedWeapon": "9mm_handgun",
+
+      "passives": [
+        {
+          "id": "overwatch",
+          "label": "Overwatch",
+          "effect": "After moving ≤1 tile, gain a free reaction shot (costs 1 ammo) if enemy enters line of sight."
+        },
+        {
+          "id": "ammo_scavenge",
+          "label": "Ammo Scavenge",
+          "effect": "50% chance to recover 1 spent round after each combat encounter."
+        }
+      ],
+
+      "ai": {
+        "behavior": "support",
+        "priority": "highest_threat",
+        "preferredRange": 4
+      },
+
+      "levelProgression": {
+        "xpPerLevel": 100,
+        "statGrowth": {
+          "hp":       4,
+          "attack":   2,
+          "accuracy": 3,
+          "evasion":  1
+        }
+      }
+    },
+
+    {
+      "id": "eddie",
+      "name": "Eddie",
+      "name_en": "Eddie 'Ears' Huang",
+      "role": "ally",
+      "archetype": "Intel",
+      "portrait": "assets/images/actors/eddie.png",
+      "sprite": "assets/images/sprites/eddie.png",
+      "description": "唐人街情報掮客。一身是膽全靠消息。上了戰場就是累贅——除非他先知道敵人在哪。",
+
+      "stats": {
+        "hp":          55,
+        "maxHp":       55,
+        "ap":          5,
+        "maxAp":       5,
+        "moveRange":   5,
+        "attack":       8,
+        "defense":      5,
+        "accuracy":    60,
+        "evasion":     22,
+        "strength":     5,
+        "intelligence":20,
+        "streetwise":  18,
+        "luck":        16
+      },
+
+      "reputation": {
+        "the_code":  40,
+        "chaos":      5,
+        "law":        5
+      },
+
+      "startInventory": [
+        { "itemId": "stolen_meds", "qty": 2 }
+      ],
+
+      "equippedWeapon": null,
+
+      "passives": [
+        {
+          "id": "wire_tap",
+          "label": "Wire Tap",
+          "effect": "At start of each district, reveal all enemy spawn points on the map."
+        },
+        {
+          "id": "escape_artist",
+          "label": "Escape Artist",
+          "effect": "Once per battle, teleport to any adjacent unoccupied tile (no AP cost)."
+        },
+        {
+          "id": "bribe",
+          "label": "Bribe",
+          "effect": "Spend 1 AP + $50 to reduce one enemy's threat level by 1 tier."
+        }
+      ],
+
+      "ai": {
+        "behavior": "evasive",
+        "priority": "stay_behind_allies",
+        "fleeHpThreshold": 0.4
+      },
+
+      "levelProgression": {
+        "xpPerLevel": 100,
+        "statGrowth": {
+          "hp":           3,
+          "intelligence": 3,
+          "streetwise":   2,
+          "evasion":      1
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,202 @@
+{
+  "_comment": "QU-DON 全域 Tile 定義表 — MapManager 載入後作為繪製 / 碰撞 / 音效的單一來源",
+  "version": "1.1",
+
+  "tiles": {
+
+    "0": {
+      "name":     "void",
+      "group":    "special",
+      "walkable": false,
+      "collides": true,
+      "draw":     "void",
+      "color":    "0x000000",
+      "desc":     "地圖邊界外 / 建築內部不可見區域"
+    },
+
+    "1": {
+      "name":     "asphalt",
+      "group":    "road",
+      "walkable": true,
+      "collides": false,
+      "draw":     "asphalt",
+      "color":    "0x1c1c1c",
+      "sfx":      "footstep_asphalt",
+      "desc":     "正常瀝青路面"
+    },
+    "2": {
+      "name":     "asphalt_cracked",
+      "group":    "road",
+      "walkable": true,
+      "collides": false,
+      "draw":     "cracked",
+      "color":    "0x141414",
+      "sfx":      "footstep_asphalt",
+      "desc":     "龜裂瀝青（老舊路段）"
+    },
+    "3": {
+      "name":     "asphalt_centerline",
+      "group":    "road",
+      "walkable": true,
+      "collides": false,
+      "draw":     "centerline",
+      "color":    "0x1c1c1c",
+      "sfx":      "footstep_asphalt",
+      "desc":     "瀝青 + 黃色雙中心線（雙向行車分界）"
+    },
+    "4": {
+      "name":     "asphalt_puddle",
+      "group":    "road",
+      "walkable": true,
+      "collides": false,
+      "draw":     "puddle",
+      "color":    "0x0c1018",
+      "sfx":      "footstep_puddle",
+      "desc":     "積水路面（反射霓虹燈光）"
+    },
+    "5": {
+      "name":     "asphalt_debris",
+      "group":    "road",
+      "walkable": true,
+      "collides": false,
+      "draw":     "asphalt",
+      "color":    "0x181818",
+      "sfx":      "footstep_asphalt",
+      "desc":     "碎玻璃 / 殘骸（保留備用）"
+    },
+
+    "10": {
+      "name":     "sidewalk",
+      "group":    "sidewalk",
+      "walkable": true,
+      "collides": false,
+      "draw":     "sidewalk",
+      "color":    "0x2a2620",
+      "sfx":      "footstep_concrete",
+      "desc":     "混凝土人行道"
+    },
+    "11": {
+      "name":     "sidewalk_trash",
+      "group":    "sidewalk",
+      "walkable": true,
+      "collides": false,
+      "draw":     "sidewalk_trash",
+      "color":    "0x2a2620",
+      "sfx":      "footstep_concrete",
+      "desc":     "人行道 + 垃圾袋 / 廢紙（裝飾，不阻擋）"
+    },
+    "12": {
+      "name":     "sidewalk_lamppost",
+      "group":    "sidewalk",
+      "walkable": false,
+      "collides": true,
+      "draw":     "lamppost",
+      "color":    "0x1e1a12",
+      "desc":     "人行道 + 路燈柱（阻擋通行）",
+      "_light":   { "radius": 4, "color": "0xffaa44", "intensity": 0.45 }
+    },
+    "13": {
+      "name":     "sidewalk_hydrant",
+      "group":    "sidewalk",
+      "walkable": false,
+      "collides": true,
+      "draw":     "sidewalk",
+      "color":    "0x2a2620",
+      "desc":     "人行道 + 消防栓（保留備用）"
+    },
+    "14": {
+      "name":     "sidewalk_trashcan",
+      "group":    "sidewalk",
+      "walkable": false,
+      "collides": true,
+      "draw":     "sidewalk",
+      "color":    "0x2a2620",
+      "desc":     "人行道 + 鐵製垃圾桶（保留備用）"
+    },
+    "15": {
+      "name":     "sidewalk_cracked",
+      "group":    "sidewalk",
+      "walkable": true,
+      "collides": false,
+      "draw":     "sidewalk",
+      "color":    "0x221e18",
+      "sfx":      "footstep_concrete",
+      "desc":     "破損人行道（保留備用）"
+    },
+
+    "20": {
+      "name":     "wall_redbrick",
+      "group":    "wall",
+      "walkable": false,
+      "collides": true,
+      "draw":     "brick_wall",
+      "color":    "0x2a1510",
+      "desc":     "標準紅磚牆（建築外牆主體）"
+    },
+    "21": {
+      "name":     "wall_graffiti",
+      "group":    "wall",
+      "walkable": false,
+      "collides": true,
+      "draw":     "graffiti",
+      "color":    "0x1e1830",
+      "desc":     "塗鴉牆（幫派領地標記 / 藝術）"
+    },
+    "22": {
+      "name":     "wall_metalgate",
+      "group":    "wall",
+      "walkable": false,
+      "collides": true,
+      "draw":     "metalgate",
+      "color":    "0x1a2018",
+      "desc":     "金屬捲門 / 鐵絲網（倉庫 / 停車場）"
+    },
+    "23": {
+      "name":     "wall_concrete",
+      "group":    "wall",
+      "walkable": false,
+      "collides": true,
+      "draw":     "brick_wall",
+      "color":    "0x222220",
+      "desc":     "混凝土牆（保留備用）"
+    },
+    "24": {
+      "name":     "wall_boarded",
+      "group":    "wall",
+      "walkable": false,
+      "collides": true,
+      "draw":     "crate",
+      "color":    "0x1c1408",
+      "desc":     "釘板窗 / 廢棄建築（保留備用）"
+    },
+    "25": {
+      "name":     "wall_neon_sign",
+      "group":    "wall",
+      "walkable": false,
+      "collides": true,
+      "draw":     "brick_wall",
+      "color":    "0x1a0a1a",
+      "_light":   { "radius": 3, "color": "0xff00aa", "intensity": 0.6 },
+      "desc":     "霓虹招牌牆（保留備用）"
+    },
+
+    "30": {
+      "name":     "warp_door",
+      "group":    "warp",
+      "walkable": true,
+      "collides": false,
+      "draw":     "warp_door",
+      "color":    "0x1a1208",
+      "sfx":      "door_open",
+      "desc":     "傳送門 — 步入觸發 transitionTo()"
+    }
+  },
+
+  "_comment_groups": {
+    "special":  "0",
+    "road":     "1–5",
+    "sidewalk": "10–15",
+    "wall":     "20–25",
+    "warp":     "30"
+  }
+}

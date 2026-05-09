@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#1a0a2e">
+  <title>QU-DON 瞿董默示錄</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: 100%; height: 100%;
+      background: #1a0a2e;
+      overflow: hidden;
+      touch-action: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    body {
+      padding-top:    env(safe-area-inset-top);
+      padding-bottom: env(safe-area-inset-bottom);
+      padding-left:   env(safe-area-inset-left);
+      padding-right:  env(safe-area-inset-right);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    #game-container {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    /* 虛擬搖桿 UI（Mobile Only） */
+    #touch-controls {
+      display: none;
+      position: fixed;
+      bottom: calc(env(safe-area-inset-bottom) + 20px);
+      left: 0; right: 0;
+      pointer-events: none;
+      z-index: 100;
+    }
+    #dpad {
+      position: absolute;
+      left: 30px;
+      bottom: 0;
+      width: 130px;
+      height: 130px;
+      pointer-events: all;
+    }
+    #dpad-btn {
+      position: absolute;
+      width: 40px; height: 40px;
+      background: rgba(255,255,255,0.15);
+      border: 2px solid rgba(255,255,255,0.3);
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      color: white; font-size: 18px;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    .dpad-up    { top: 0;   left: 45px; }
+    .dpad-down  { bottom: 0; left: 45px; }
+    .dpad-left  { top: 45px; left: 0; }
+    .dpad-right { top: 45px; right: 0; }
+    #action-btns {
+      position: absolute;
+      right: 30px;
+      bottom: 0;
+      display: flex;
+      gap: 12px;
+      pointer-events: all;
+    }
+    .action-btn {
+      width: 52px; height: 52px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.15);
+      border: 2px solid rgba(255,255,255,0.3);
+      color: white; font-size: 13px; font-weight: bold;
+      display: flex; align-items: center; justify-content: center;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    @media (pointer: coarse) {
+      #touch-controls { display: block; }
+    }
+  </style>
+</head>
+<body>
+  <div id="game-container"></div>
+
+  <!-- Mobile Touch Controls -->
+  <div id="touch-controls">
+    <div id="dpad">
+      <div class="dpad-btn dpad-up"    data-dir="up">▲</div>
+      <div class="dpad-btn dpad-down"  data-dir="down">▼</div>
+      <div class="dpad-btn dpad-left"  data-dir="left">◀</div>
+      <div class="dpad-btn dpad-right" data-dir="right">▶</div>
+    </div>
+    <div id="action-btns">
+      <div class="action-btn" data-action="confirm">確認</div>
+      <div class="action-btn" data-action="cancel">取消</div>
+    </div>
+  </div>
+
+  <!-- Pixi.js v8 (latest stable) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/8.2.6/pixi.min.js"></script>
+
+  <!-- Game Modules -->
+  <script type="module" src="main.js"></script>
+
+  <!-- Service Worker Registration -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('./sw.js')
+        .then(r => console.log('[QU-DON] SW registered:', r.scope))
+        .catch(e => console.warn('[QU-DON] SW failed:', e));
+    }
+  </script>
+</body>
+</html>

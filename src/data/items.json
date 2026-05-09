@@ -1,0 +1,199 @@
+{
+  "_comment": "QU-DON | items.json — Item definitions. All game balance lives here.",
+
+  "items": [
+
+    {
+      "id": "9mm_rounds",
+      "name": "9mm Rounds",
+      "name_zh": "九釐米彈匣",
+      "category": "ammo",
+      "subtype": "handgun_ammo",
+      "icon": "assets/images/items/9mm_rounds.png",
+      "description": "Standard 9mm hollow-point. Scarce on the street. Every shot counts.",
+      "description_zh": "標準九釐米空尖彈。街上難找。每一發都要算清楚。",
+
+      "stackable": true,
+      "maxStack":  30,
+      "weight":    0.1,
+
+      "usable": false,
+      "consumedOnUse": false,
+
+      "ammoProps": {
+        "caliber":       "9mm",
+        "damageBonus":    0,
+        "accuracyBonus":  0,
+        "armorPierce":    2,
+        "rangeOverride":  null,
+        "compatibleWeapons": ["9mm_handgun", "9mm_smg"]
+      },
+
+      "loottable": {
+        "baseDropChance": 0.25,
+        "dropQuantity":   { "min": 2, "max": 6 }
+      },
+
+      "value":      8,
+      "rarity":     "uncommon",
+      "legalStatus":"illegal"
+    },
+
+    {
+      "id": "lead_pipe",
+      "name": "Lead Pipe",
+      "name_zh": "鉛管",
+      "category": "weapon",
+      "subtype": "melee_blunt",
+      "icon": "assets/images/items/lead_pipe.png",
+      "description": "A length of pipe ripped from a Chinatown alley wall. Crude. Effective.",
+      "description_zh": "從唐人街後巷扯下來的一截水管。粗糙，管用。",
+
+      "stackable": false,
+      "maxStack":  1,
+      "weight":    2.5,
+
+      "usable": false,
+      "consumedOnUse": false,
+
+      "weaponProps": {
+        "weaponType":    "melee",
+        "damageMin":     8,
+        "damageMax":     14,
+        "damageType":    "blunt",
+        "attackRange":   1,
+        "apCost":        2,
+        "accuracyMod":   0,
+        "critChance":    0.10,
+        "critMultiplier":1.5,
+        "ammoRequired":  false,
+        "durability":    30,
+        "maxDurability": 30,
+        "specialEffects": [
+          {
+            "id": "stagger",
+            "label": "Stagger",
+            "chance": 0.25,
+            "description": "Target loses 1 AP on their next turn."
+          }
+        ]
+      },
+
+      "loottable": {
+        "baseDropChance": 0.40,
+        "dropQuantity":   { "min": 1, "max": 1 }
+      },
+
+      "value":      15,
+      "rarity":     "common",
+      "legalStatus":"grey"
+    },
+
+    {
+      "id": "stolen_meds",
+      "name": "Stolen Meds",
+      "name_zh": "偷來的藥",
+      "category": "consumable",
+      "subtype": "medical",
+      "icon": "assets/images/items/stolen_meds.png",
+      "description": "Antibiotics and painkillers lifted from a clinic raid. No questions asked.",
+      "description_zh": "從診所搶來的抗生素和止痛藥。不問來路。",
+
+      "stackable": true,
+      "maxStack":  5,
+      "weight":    0.3,
+
+      "usable": true,
+      "consumedOnUse": true,
+
+      "useProps": {
+        "apCost":    1,
+        "targetSelf": true,
+        "targetAlly": true,
+        "range":      1,
+        "effects": [
+          {
+            "type":    "heal_hp",
+            "value":   25,
+            "variance": 5
+          },
+          {
+            "type":    "remove_status",
+            "statusId":"bleeding"
+          }
+        ],
+        "cooldown":  0,
+        "combatOnly":false
+      },
+
+      "reputationEffect": {
+        "the_code":  1,
+        "chaos":    -1
+      },
+
+      "loottable": {
+        "baseDropChance": 0.15,
+        "dropQuantity":   { "min": 1, "max": 2 }
+      },
+
+      "value":       35,
+      "rarity":     "uncommon",
+      "legalStatus":"illegal"
+    },
+
+    {
+      "id": "9mm_handgun",
+      "name": ".38 Street Special",
+      "name_zh": ".38 街頭特製",
+      "category": "weapon",
+      "subtype": "ranged_handgun",
+      "icon": "assets/images/items/9mm_handgun.png",
+      "description": "A battered revolver, serial number filed off. Standard LA street hardware.",
+      "description_zh": "一把磨掉序號的舊左輪。洛城街頭標配。",
+
+      "stackable": false,
+      "maxStack":  1,
+      "weight":    0.9,
+
+      "usable": false,
+      "consumedOnUse": false,
+
+      "weaponProps": {
+        "weaponType":    "ranged",
+        "damageMin":     12,
+        "damageMax":     18,
+        "damageType":    "pierce",
+        "attackRange":   5,
+        "apCost":        2,
+        "accuracyMod":   0,
+        "critChance":    0.12,
+        "critMultiplier":2.0,
+        "ammoRequired":  true,
+        "ammoId":        "9mm_rounds",
+        "ammoPerShot":   1,
+        "magazineSize":  6,
+        "reloadApCost":  1,
+        "durability":    50,
+        "maxDurability": 50,
+        "specialEffects": [
+          {
+            "id":    "suppress",
+            "label": "Suppress",
+            "chance":0.15,
+            "description": "Target must spend 1 extra AP to move on their next turn."
+          }
+        ]
+      },
+
+      "loottable": {
+        "baseDropChance": 0.08,
+        "dropQuantity":   { "min": 1, "max": 1 }
+      },
+
+      "value":      120,
+      "rarity":     "rare",
+      "legalStatus":"illegal"
+    }
+
+  ]
+}
