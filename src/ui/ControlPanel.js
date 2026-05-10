@@ -112,6 +112,8 @@ export class ControlPanel extends PIXI.Container {
     this.addChild(this._buildTopDivider(W));            // 金邊分隔線
     this.addChild(this._buildDPad(btnSize, gap, panelH)); // D-Pad
     this.addChild(this._buildActionCluster(actSize, panelH, W)); // 右側按鈕
+    const menuBtn = this._buildMenuBtn(panelH, W, actSize);
+    if (menuBtn) this.addChild(menuBtn);
     this._clock = this._buildClock(panelH);
     this.addChild(this._clock);
     this.addChild(this._buildScanlines(W, panelH));     // 最頂層（不攔截事件）
@@ -338,7 +340,73 @@ export class ControlPanel extends PIXI.Container {
     return c;
   }
 
-  // ── 5. VFD 時鐘 ────────────────────────────────────────────────────────────
+  // ── 5. 選單按鈕（右側 Action 按鈕下方）─────────────────────────────────────
+
+  _buildMenuBtn(panelH, W, actSize) {
+    const clusterY = Math.floor((panelH - actSize) / 2);
+    const clusterW = Math.min(Math.floor(panelH * 0.31) * 2 + 14, 150);
+    const btnW     = clusterW;
+    const btnH     = Math.max(26, Math.min(Math.floor(panelH * 0.115), 34));
+    const btnX     = W - btnW - ACT_MARGIN_R;
+    const btnY     = clusterY + actSize + Math.floor(panelH * 0.04);
+
+    // 若空間不足則不顯示
+    if (btnY + btnH > panelH - 6) return null;
+
+    const c = new PIXI.Container();
+    c.eventMode = 'static';
+    c.cursor    = 'pointer';
+    c.hitArea   = new PIXI.Rectangle(0, 0, btnW, btnH);
+
+    const r = 3;
+
+    const up = new PIXI.Graphics();
+    up.roundRect(0, 0, btnW, btnH, r).fill({ color: 0x1A1208 });
+    up.roundRect(0, 0, btnW, btnH, r).stroke({ color: 0x5A4820, width: 1.5 });
+    up.moveTo(r, 1).lineTo(btnW - r, 1)
+      .stroke({ color: 0xFFFFFF, width: 0.8, alpha: 0.07 });
+    up.moveTo(r, btnH - 1).lineTo(btnW - r, btnH - 1)
+      .stroke({ color: 0x000000, width: 1, alpha: 0.4 });
+
+    const dn = new PIXI.Graphics();
+    dn.roundRect(0, 0, btnW, btnH, r).fill({ color: 0x120D05 });
+    dn.roundRect(0, 0, btnW, btnH, r).stroke({ color: 0x3A2C10, width: 1.5 });
+    dn.visible = false;
+
+    const fontSize = Math.max(9, Math.floor(btnH * 0.40));
+    const txt = new PIXI.Text({
+      text: '≡  選單',
+      style: new PIXI.TextStyle({
+        fontFamily: '"Noto Sans TC","Microsoft JhengHei",sans-serif',
+        fontSize, fontWeight: 'bold', fill: 0xB8A060,
+      }),
+    });
+    txt.anchor.set(0.5);
+    txt.x = btnW / 2;
+    txt.y = btnH / 2;
+
+    c.addChild(up, dn, txt);
+
+    const setState = (p) => {
+      up.visible = !p; dn.visible = p;
+      txt.y = btnH / 2 + (p ? 1 : 0);
+    };
+    c.on('pointerdown', (e) => {
+      e.stopPropagation();
+      setState(true);
+      this._playThump();
+    });
+    c.on('pointerup', () => { setState(false); this.emit('menu'); });
+    c.on('pointerupoutside', () => setState(false));
+    c.on('pointercancel',    () => setState(false));
+
+    c.x = btnX;
+    c.y = btnY;
+
+    return c;
+  }
+
+  // ── 6. VFD 時鐘 ────────────────────────────────────────────────────────────
 
   _buildClock(panelH) {
     const fontSize = Math.max(14, Math.floor(panelH * 0.13));

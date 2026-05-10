@@ -1,23 +1,32 @@
 /**
- * QU-DON 瞿董默示錄 | main.js  v3
- * Entry point — 整合 Pixi App、InputManager、ControlPanel、MapManager
+ * QU-DON 瞿董默示錄 | main.js  v4
+ * Entry point — 整合所有系統
  *
- * 螢幕分區：
- *   上方 66% → 遊戲視野（MapManager / EntityManager）
- *   下方 34% → ControlPanel（D-Pad、Action、VFD 時鐘）
+ * 狀態機流程：
+ *   HOME  ──新遊戲──▶  WORLD  ──選單──▶  INVENTORY
+ *                        │                   │
+ *                       觸發               關閉
+ *                        ▼                   ▼
+ *                     DIALOGUE  ──結束──▶  WORLD
+ *                     BATTLE    ──結束──▶  WORLD
  */
 
-import { InputManager }  from './src/core/Input.js';
-import { ControlPanel }  from './src/ui/ControlPanel.js';
+import { InputManager }       from './src/core/Input.js';
+import { ControlPanel }       from './src/ui/ControlPanel.js';
 import { MapManager, DIR_DELTA } from './src/modules/MapManager.js';
+import { GameStateManager, GameState } from './src/core/GameStateManager.js';
+import { HomeScreen }         from './src/ui/HomeScreen.js';
+import { BattleUI }           from './src/ui/BattleUI.js';
+import { DialogueOverlay }    from './src/ui/DialogueOverlay.js';
+import { InventoryScreen }    from './src/ui/InventoryScreen.js';
 
-// ─── VT323 字型（VFD 時鐘用）───────────────────────────────────────────────
+// ─── VT323 字型（VFD 時鐘 / 復古文字用）───────────────────────────────────
 const fontLink = document.createElement('link');
 fontLink.rel  = 'stylesheet';
 fontLink.href = 'https://fonts.googleapis.com/css2?family=VT323&display=swap';
 document.head.appendChild(fontLink);
 
-// ─── Safe Area ─────────────────────────────────────────────────────────────
+// ─── Safe Area / Viewport ──────────────────────────────────────────────────
 function getSafeArea() {
   const s = getComputedStyle(document.body);
   return {
@@ -35,27 +44,26 @@ function getViewport() {
   };
 }
 
-// ─── Pixi App 初始化 ─────────────────────────────────────────────────────────
+// ─── Pixi App 初始化 ────────────────────────────────────────────────────────
 async function initPixi() {
   const { W, H } = getViewport();
   const app = new PIXI.Application();
   await app.init({
-    width:        W,
-    height:       H,
+    width:           W,
+    height:          H,
     backgroundColor: 0x080610,
-    resolution:   window.devicePixelRatio || 1,
-    autoDensity:  true,
-    antialias:    false,
-    eventMode:    'static',
+    resolution:      window.devicePixelRatio || 1,
+    autoDensity:     true,
+    antialias:       false,
+    eventMode:       'static',
   });
   document.getElementById('game-container').appendChild(app.canvas);
-  // HTML 版觸控 UI 由 Pixi ControlPanel 取代
   const htmlCtrl = document.getElementById('touch-controls');
   if (htmlCtrl) htmlCtrl.style.display = 'none';
   return app;
 }
 
-// ─── 視窗縮放 ───────────────────────────────────────────────────────────────
+// ─── 視窗縮放 ──────────────────────────────────────────────────────────────
 function bindResize(app) {
   window.addEventListener('resize', () => {
     const { W, H } = getViewport();
@@ -64,16 +72,15 @@ function bindResize(app) {
   });
 }
 
-// ─── 遊戲層（上方 66%）─────────────────────────────────────────────────────
+// ─── 遊戲圖層（上方 66%，帶遮罩）──────────────────────────────────────────
 function buildGameLayer(app) {
   const layer = new PIXI.Container();
   layer.label = 'gameLayer';
-  // 遮罩：限制渲染區域不超出遊戲視野（防止滲入 ControlPanel）
   const mask = new PIXI.Graphics();
   const drawMask = () => {
-    const H = app.screen.height;
     mask.clear();
-    mask.rect(0, 0, app.screen.width, Math.floor(H * 0.66)).fill({ color: 0xffffff });
+    mask.rect(0, 0, app.screen.width, Math.floor(app.screen.height * 0.66))
+        .fill({ color: 0xffffff });
   };
   drawMask();
   app.stage.addChild(mask);
@@ -83,89 +90,316 @@ function buildGameLayer(app) {
   return layer;
 }
 
-// ─── 玩家佔位精靈 ─────────────────────────────────────────────────────────
+// ─── 玩家精靈 ──────────────────────────────────────────────────────────────
 function buildPlayerSprite(tileSize) {
   const r   = Math.floor(tileSize * 0.34);
   const spr = new PIXI.Graphics();
-  // 身體
   spr.circle(0, 0, r).fill({ color: 0xd8c8f0 });
   spr.circle(0, 0, r).stroke({ color: 0xf0e8ff, width: 1.5 });
-  // 方向指示點
   spr.circle(0, -Math.floor(r * 0.5), Math.floor(r * 0.28))
-    .fill({ color: 0x9070c0 });
+     .fill({ color: 0x9070c0 });
   return spr;
 }
 
-// ─── 方向指示器動畫（移動時閃爍一下）──────────────────────────────────────
 function flashPlayer(playerSpr, duration = 80) {
   playerSpr.alpha = 0.5;
   setTimeout(() => { playerSpr.alpha = 1; }, duration);
 }
 
-// ─── 主程式 ─────────────────────────────────────────────────────────────────
+// ─── 對話序列資料 ──────────────────────────────────────────────────────────
+const DIALOGUE_DATA = {
+  evt_laundry_door: [
+    {
+      speaker: '瞿董',
+      text: '廢棄洗衣店。門鎖老早就壞了，但裡面不安全——上次進去的人沒出來過。',
+      choices: [],
+    },
+    {
+      speaker: '瞿董',
+      text: '今晚還是算了。',
+      choices: [],
+    },
+  ],
+  evt_clinic_door: [
+    {
+      speaker: '???',
+      text: '暗黃的燈光從門縫滲出，夾雜著消毒水的氣味。有人在裡面。',
+      choices: [],
+    },
+    {
+      speaker: '瞿董',
+      text: '怎麼辦？',
+      choices: [
+        { label: '敲門' },
+        { label: '離開' },
+      ],
+    },
+  ],
+};
+
+// ─── 主程式 ────────────────────────────────────────────────────────────────
 async function main() {
-  const app       = await initPixi();
+  const app = await initPixi();
   bindResize(app);
 
-  // InputManager：傳入 canvas 以啟用 tile-click 座標轉換
+  // ── 狀態機 ────────────────────────────────────────────────────────────────
+  const gsm   = new GameStateManager();
   const input = new InputManager(app.canvas);
 
-  // 遊戲層
+  // ── 遊戲圖層（地圖）─── 初始隱藏，HOME 畫面先顯示 ─────────────────────
   const gameLayer = buildGameLayer(app);
+  gameLayer.visible = false;
 
-  // ── MapManager：載入地圖 ─────────────────────────────────────────────────
+  // ── MapManager ────────────────────────────────────────────────────────────
   const mapManager = await MapManager.create(app, gameLayer);
   await mapManager.loadMap('map_01');
 
-  // ── 玩家初始位置（從 spawnPoints 取得）────────────────────────────────────
   const spawn  = mapManager.mapData.spawnPoints.find(s => s.id === 'player_start');
   const player = { gx: spawn?.gx ?? 3, gy: spawn?.gy ?? 2 };
 
-  // ── 玩家精靈 ──────────────────────────────────────────────────────────────
   const playerSpr = buildPlayerSprite(mapManager.tileSize);
   mapManager.entityLayer.addChild(playerSpr);
 
-  // ── 同步玩家位置 + 鏡頭 + InputManager 格子點擊 ──────────────────────────
   const syncPlayer = () => {
     const px = mapManager.gridToPixel(player.gx, player.gy);
     playerSpr.x = px.x;
     playerSpr.y = px.y;
     mapManager.centerOn(player.gx, player.gy);
-    // 每次鏡頭移動後更新 tile-click 座標轉換
     input.setGridConfig(mapManager.tileSize, mapManager.rootX, mapManager.rootY);
   };
-
-  // 初始化
   syncPlayer();
   mapManager.updateFog(player.gx, player.gy, mapManager.visionRadius);
 
-  // ── 視窗縮放：重建 tile 尺寸 + 重新置中 ──────────────────────────────────
   app.stage.on('resize', () => {
     mapManager.onResize(player.gx, player.gy);
     syncPlayer();
   });
 
-  // ── 觸發點回調表（之後連接 DialogueEngine） ─────────────────────────────
-  const TRIGGER_HANDLERS = {
-    evt_laundry_door: () => console.log('[Trigger] 廢棄洗衣店：門鎖已壞，但不安全。'),
-    evt_clinic_door:  () => console.log('[Trigger] 無牌診所：燈光從門縫滲出。'),
-  };
-
-  // ── ControlPanel ─────────────────────────────────────────────────────────
+  // ── ControlPanel（初始隱藏）─────────────────────────────────────────────
   const panel = await ControlPanel.create(app, input);
+  panel.visible = false;
   app.stage.addChild(panel);
 
-  // ── 主遊戲迴圈 ────────────────────────────────────────────────────────────
+  // ── 覆蓋層（BattleUI / DialogueOverlay / InventoryScreen）──────────────
+  const overlayContainer = new PIXI.Container();
+  overlayContainer.label = 'overlayContainer';
+  app.stage.addChild(overlayContainer);
+
+  // ── HomeScreen（最頂層，初始可見）──────────────────────────────────────
+  const homeScreen = new HomeScreen(app);
+  app.stage.addChild(homeScreen);
+
+  // ════════════════════════════════════════════════════════════════════════
+  //  對話系統
+  // ════════════════════════════════════════════════════════════════════════
+
+  let dialogueOverlay = null;
+
+  function _closeDialogue() {
+    if (dialogueOverlay) {
+      overlayContainer.removeChild(dialogueOverlay);
+      dialogueOverlay.destroy({ children: true });
+      dialogueOverlay = null;
+    }
+  }
+
+  function showDialogue(seqId, onEnd = null) {
+    const seq = DIALOGUE_DATA[seqId];
+    if (!seq || seq.length === 0) { onEnd?.(); return; }
+
+    input.lock();
+    gsm.transition(GameState.DIALOGUE);
+
+    let step = 0;
+
+    const nextStep = (choiceIdx = -1) => {
+      _closeDialogue();
+
+      if (choiceIdx !== -1) {
+        console.log(`[Dialogue] "${seqId}" 選擇 ${choiceIdx}: ${seq[step - 1]?.choices[choiceIdx]?.label}`);
+        // 分支邏輯預留位（之後可接 seqId + '_choice_' + choiceIdx）
+      }
+
+      if (step >= seq.length) {
+        // 對話序列結束
+        gsm.transition(GameState.WORLD);
+        input.unlock();
+        onEnd?.();
+        return;
+      }
+
+      const { speaker, text, choices } = seq[step++];
+      dialogueOverlay = new DialogueOverlay(app, { speaker, text, choices });
+
+      dialogueOverlay.once('next',   ()  => nextStep());
+      dialogueOverlay.once('choice', (i) => nextStep(i));
+
+      overlayContainer.addChild(dialogueOverlay);
+    };
+
+    nextStep();
+  }
+
+  // ── 觸發點處理表 ─────────────────────────────────────────────────────────
+  const TRIGGER_HANDLERS = {
+    evt_laundry_door: () => showDialogue('evt_laundry_door'),
+    evt_clinic_door:  () => showDialogue('evt_clinic_door'),
+  };
+
+  // ════════════════════════════════════════════════════════════════════════
+  //  背包系統
+  // ════════════════════════════════════════════════════════════════════════
+
+  let inventoryScreen = null;
+
+  function openInventory() {
+    if (!gsm.is(GameState.WORLD)) return;
+    gsm.transition(GameState.INVENTORY);
+    input.lock();
+
+    inventoryScreen = new InventoryScreen(app, {
+      player: {
+        name: '瞿董', level: 8,
+        hp: 204, maxHp: 240,
+        sp: 144, maxSp: 240,
+        weight: 18.4, maxWeight: 30,
+        money: 340,
+      },
+    });
+
+    inventoryScreen.once('close', () => {
+      overlayContainer.removeChild(inventoryScreen);
+      inventoryScreen.destroy({ children: true });
+      inventoryScreen = null;
+      gsm.transition(GameState.WORLD);
+      input.unlock();
+    });
+
+    inventoryScreen.on('use', (itemId) => {
+      console.log(`[Inventory] 使用道具: ${itemId}`);
+    });
+
+    overlayContainer.addChild(inventoryScreen);
+  }
+
+  // 監聽 ControlPanel 選單鍵
+  panel.on('menu', openInventory);
+
+  // ════════════════════════════════════════════════════════════════════════
+  //  戰鬥系統（架構預留，可由觸發點啟動）
+  // ════════════════════════════════════════════════════════════════════════
+
+  let battleUI = null;
+
+  function startBattle(enemyData) {
+    if (battleUI || !gsm.is(GameState.WORLD)) return;
+    gsm.transition(GameState.BATTLE);
+    input.lock();
+
+    battleUI = new BattleUI(app, {
+      player: { name: '瞿董', level: 8, hp: 204, maxHp: 240, sp: 144, maxSp: 240 },
+      enemy:  enemyData ?? { name: '街頭老大', level: 12, hp: 156, maxHp: 240 },
+    });
+
+    battleUI.on('action', (actionId) => {
+      console.log(`[Battle] 行動: ${actionId}`);
+      // TODO: 接 BattleEngine 計算
+      battleUI.pushLog(actionIdLabel(actionId) + '！');
+
+      // 示範：逃跑結束戰鬥
+      if (actionId === 'escape') {
+        setTimeout(() => endBattle(), 600);
+      }
+    });
+
+    overlayContainer.addChild(battleUI);
+  }
+
+  function endBattle() {
+    if (!battleUI) return;
+    overlayContainer.removeChild(battleUI);
+    battleUI.destroy({ children: true });
+    battleUI = null;
+    gsm.transition(GameState.WORLD);
+    input.unlock();
+  }
+
+  function actionIdLabel(id) {
+    const map = { attack: '攻擊', skill: '使用技能', item: '使用道具', escape: '嘗試逃跑' };
+    return map[id] ?? id;
+  }
+
+  // 公開給 trigger handler 使用（未來擴充）
+  window.__QU_startBattle = startBattle;
+
+  // ════════════════════════════════════════════════════════════════════════
+  //  GameStateManager — 狀態變化監聽
+  // ════════════════════════════════════════════════════════════════════════
+
+  gsm.on('change', ({ from, to }) => {
+    console.log(`[GSM] ${from} → ${to}`);
+    switch (to) {
+      case GameState.WORLD:
+        homeScreen.visible = false;
+        gameLayer.visible  = true;
+        panel.visible      = true;
+        break;
+
+      case GameState.HOME:
+        homeScreen.visible = true;
+        gameLayer.visible  = false;
+        panel.visible      = false;
+        break;
+
+      case GameState.BATTLE:
+        // gameLayer 與 panel 在 BATTLE 中隱藏（BattleUI 全螢幕）
+        gameLayer.visible = false;
+        panel.visible     = false;
+        break;
+
+      case GameState.DIALOGUE:
+      case GameState.INVENTORY:
+        // gameLayer + panel 繼續顯示，overlay 疊在上方
+        gameLayer.visible = true;
+        panel.visible     = true;
+        break;
+    }
+  });
+
+  // ════════════════════════════════════════════════════════════════════════
+  //  HomeScreen 按鍵
+  // ════════════════════════════════════════════════════════════════════════
+
+  homeScreen.on('action', (actionId) => {
+    switch (actionId) {
+      case 'new_game':
+        gsm.transition(GameState.WORLD);
+        break;
+      case 'load_game':
+        console.log('[Home] 載入遊戲（未實作）');
+        break;
+      case 'settings':
+        console.log('[Home] 設定（未實作）');
+        break;
+    }
+  });
+
+  // ════════════════════════════════════════════════════════════════════════
+  //  主遊戲迴圈
+  // ════════════════════════════════════════════════════════════════════════
+
   app.ticker.add(() => {
+    // 僅在 WORLD 狀態處理地圖輸入
+    if (!gsm.is(GameState.WORLD)) return;
+
     const state = input.update();
     let moved   = false;
 
-    // ── 1. 方向鍵 / D-Pad 格子移動 ──────────────────────────────────────
+    // ── 1. D-Pad 方向移動 ───────────────────────────────────────────────
     if (state.justMoved && state.justDir) {
       const { dx, dy } = DIR_DELTA[state.justDir];
       const nx = player.gx + dx;
       const ny = player.gy + dy;
-
       if (mapManager.isWalkable(nx, ny)) {
         player.gx = nx;
         player.gy = ny;
@@ -174,58 +408,47 @@ async function main() {
       }
     }
 
-    // ── 2. Tile 點擊移動（相鄰 1 格直接走，遠端留給未來 Pathfinding）──────
+    // ── 2. Tile 點擊移動 ────────────────────────────────────────────────
     if (state.tileTarget) {
       const { gx, gy } = state.tileTarget;
-      const dist = Math.hypot(gx - player.gx, gy - player.gy);
-
-      if (dist <= 1.5 && mapManager.isWalkable(gx, gy)) {
-        // 相鄰格：直接移動
+      if (mapManager.isWalkable(gx, gy)) {
         player.gx = gx;
         player.gy = gy;
         moved = true;
         flashPlayer(playerSpr);
-      } else if (mapManager.isWalkable(gx, gy)) {
-        // 遠端格：目前直接傳送（BattleEngine 路徑計算未實作時的佔位）
-        player.gx = gx;
-        player.gy = gy;
-        moved = true;
-        flashPlayer(playerSpr);
-        console.log(`[PathFind] TODO: 計算 (${player.gx},${player.gy}) → (${gx},${gy})`);
+        const dist = Math.hypot(gx - player.gx, gy - player.gy);
+        if (dist > 1.5) {
+          console.log(`[PathFind] TODO: (${player.gx},${player.gy}) → (${gx},${gy})`);
+        }
       }
     }
 
-    // ── 3. 移動後同步鏡頭 + 霧視野 + 傳送點 + 觸發點 ──────────────────
+    // ── 3. 移動後更新：鏡頭 / 霧 / Warp / Trigger ──────────────────────
     if (moved) {
       syncPlayer();
       mapManager.updateFog(player.gx, player.gy, mapManager.visionRadius);
 
-      // ── 3a. Warp 傳送點（優先於 trigger，避免同格衝突）─────────────────
+      // Warp 傳送點
       const warp = mapManager.checkWarp(player.gx, player.gy);
       if (warp) {
         input.lock();
-        console.log(`[Warp] "${warp.label ?? warp.id}" → ${warp.targetMap} (${warp.targetGx}, ${warp.targetGy})`);
+        console.log(`[Warp] "${warp.label ?? warp.id}" → ${warp.targetMap}`);
 
         mapManager.transitionTo(warp.targetMap, () => {
           player.gx = warp.targetGx;
           player.gy = warp.targetGy;
-          // preserveEntities = true 確保 playerSpr 仍在 entityLayer，
-          // 但若 entityLayer 被意外清除時以下行可補救：
           if (!mapManager.entityLayer.children.includes(playerSpr)) {
             mapManager.entityLayer.addChild(playerSpr);
           }
           syncPlayer();
           mapManager.updateFog(player.gx, player.gy, mapManager.visionRadius);
-        }).then(() => {
-          input.unlock();
-        }).catch(err => {
-          console.error('[Warp] 轉場失敗:', err);
-          input.unlock();
-        });
+        }).then(() => input.unlock())
+          .catch(err => { console.error('[Warp] 轉場失敗:', err); input.unlock(); });
+
         return; // 本幀不繼續處理 trigger
       }
 
-      // ── 3b. Trigger 觸發點（對話 / 事件）──────────────────────────────
+      // Trigger 觸發點
       const trigger = mapManager.getTriggerAt(player.gx, player.gy);
       if (trigger) {
         console.log(`[Trigger] (${trigger.gx},${trigger.gy}) "${trigger.label}"`);
@@ -234,7 +457,7 @@ async function main() {
       }
     }
 
-    // ── 4. Confirm 鍵：互動（靜止時也可觸發觸發點）────────────────────
+    // ── 4. Confirm 鍵：靜止時也可觸發觸發點 ────────────────────────────
     if (state.confirmJust && !moved) {
       const trigger = mapManager.getTriggerAt(player.gx, player.gy);
       if (trigger) {
@@ -242,15 +465,12 @@ async function main() {
         if (handler) handler();
       }
     }
-
-    // TODO: BattleEngine.update(state)
-    // TODO: EntityManager.update(state)
-    // TODO: DialogueEngine.update(state)
   });
 
   const renderer = app.renderer.type === 1 ? 'WebGL' : 'WebGPU';
-  console.log(`[QU-DON] Ready — ${renderer} @ ${app.screen.width}×${app.screen.height}`);
+  console.log(`[QU-DON] v4 Ready — ${renderer} @ ${app.screen.width}×${app.screen.height}`);
   console.log(`[QU-DON] 玩家起點: (${player.gx}, ${player.gy})`);
+  console.log(`[QU-DON] 狀態: HOME（點擊「新遊戲」開始）`);
 }
 
 main().catch(console.error);
