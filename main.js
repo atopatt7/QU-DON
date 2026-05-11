@@ -91,14 +91,92 @@ function buildGameLayer(app) {
 }
 
 // ─── 玩家精靈 ──────────────────────────────────────────────────────────────
-function buildPlayerSprite(tileSize) {
+
+/**
+ * 嘗試載入玩家精靈圖（4 方向並排：FRONT / BACK / SIDE-R / SIDE-L）。
+ * 找不到時回傳 null，由 buildPlayerSprite 降級為圓形佔位。
+ */
+async function loadPlayerSheet() {
+  try {
+    const tex = await PIXI.Assets.load('./assets/sprites/player_sheet.png');
+    console.log(`[QU-DON] 玩家精靈圖載入成功 ${tex.width}×${tex.height}`);
+    return tex;
+  } catch (e) {
+    console.warn('[QU-DON] 找不到 assets/sprites/player_sheet.png，使用預設圓形精靈');
+    return null;
+  }
+}
+
+/**
+ * 建立玩家精靈。
+ *
+ * 若提供 sheetTex（4 格並排 spritesheet）→ 回傳 PIXI.Sprite，支援 setDir(dir)。
+ * 否則回傳 PIXI.Graphics 圓形佔位，setDir() 以旋轉指示點模擬方向。
+ *
+ * 錨點：(0.5, 1.0) — 底部中央對齊格子底邊（腳踩地）
+ * syncPlayer 中需以  y = px.y + tileSize * 0.5  補偏移。
+ *
+ * @param {number}           tileSize
+ * @param {PIXI.Texture|null} sheetTex
+ */
+function buildPlayerSprite(tileSize, sheetTex = null) {
+
+  if (sheetTex) {
+    // ── Spritesheet 模式 ────────────────────────────────────────────────────
+    const fw  = Math.floor(sheetTex.width / 4); // 前三幀寬
+    const fw3 = sheetTex.width - fw * 3;         // 最後一幀（可能多 1px）
+    const fh  = sheetTex.height;
+
+    // 裁切 4 個方向貼圖（FRONT / BACK / SIDE-R / SIDE-L）
+    const DIR_FRAMES = {
+      down:  new PIXI.Texture({ source: sheetTex.source, frame: new PIXI.Rectangle(0,      0, fw,  fh) }),
+      up:    new PIXI.Texture({ source: sheetTex.source, frame: new PIXI.Rectangle(fw,     0, fw,  fh) }),
+      right: new PIXI.Texture({ source: sheetTex.source, frame: new PIXI.Rectangle(fw * 2, 0, fw,  fh) }),
+      left:  new PIXI.Texture({ source: sheetTex.source, frame: new PIXI.Rectangle(fw * 3, 0, fw3, fh) }),
+    };
+
+    const spr = new PIXI.Sprite(DIR_FRAMES.down);
+
+    // 顯示尺寸：高 = 2.0 倍 tile，寬依原始比例縮放
+    const dispH = Math.floor(tileSize * 2.0);
+    const dispW = Math.floor(dispH * (fw / fh));
+    spr.width  = dispW;
+    spr.height = dispH;
+    spr.anchor.set(0.5, 1.0); // 底部中央
+
+    // 方向切換
+    spr.setDir = (dir) => {
+      const tex = DIR_FRAMES[dir] ?? DIR_FRAMES.down;
+      if (spr.texture !== tex) spr.texture = tex;
+    };
+
+    // 縮放更新（resize 時呼叫）
+    spr.resizeTo = (newTileSize) => {
+      const h = Math.floor(newTileSize * 2.0);
+      const w = Math.floor(h * (fw / fh));
+      spr.width  = w;
+      spr.height = h;
+    };
+
+    return spr;
+  }
+
+  // ── 圓形佔位模式（spritesheet 未就位時的 fallback）──────────────────────
   const r   = Math.floor(tileSize * 0.34);
-  const spr = new PIXI.Graphics();
-  spr.circle(0, 0, r).fill({ color: 0xd8c8f0 });
-  spr.circle(0, 0, r).stroke({ color: 0xf0e8ff, width: 1.5 });
-  spr.circle(0, -Math.floor(r * 0.5), Math.floor(r * 0.28))
-     .fill({ color: 0x9070c0 });
-  return spr;
+  const gfx = new PIXI.Graphics();
+  gfx.circle(0, 0, r).fill({ color: 0xd8c8f0 });
+  gfx.circle(0, 0, r).stroke({ color: 0xf0e8ff, width: 1.5 });
+  // 方向指示點（北方）
+  const dot = new PIXI.Graphics();
+  dot.circle(0, -Math.floor(r * 0.5), Math.floor(r * 0.28)).fill({ color: 0x9070c0 });
+  gfx.addChild(dot);
+  gfx.anchor = { x: 0.5, y: 0.5 }; // 模擬 anchor（Graphics 無原生 anchor）
+
+  const DIR_ANGLES = { down: 0, up: Math.PI, right: Math.PI / 2, left: -Math.PI / 2 };
+  gfx.setDir = (dir) => { gfx.rotation = DIR_ANGLES[dir] ?? 0; };
+  gfx.resizeTo = () => {}; // Graphics 不需縮放（固定像素）
+
+  return gfx;
 }
 
 function flashPlayer(playerSpr, duration = 80) {
@@ -150,28 +228,41 @@ async function main() {
   const gameLayer = buildGameLayer(app);
   gameLayer.visible = false;
 
-  // ── MapManager ────────────────────────────────────────────────────────────
+  // ── MapManager + 玩家精靈 ────────────────────────────────────────────────
   const mapManager = await MapManager.create(app, gameLayer);
   await mapManager.loadMap('map_01');
 
   const spawn  = mapManager.mapData.spawnPoints.find(s => s.id === 'player_start');
   const player = { gx: spawn?.gx ?? 3, gy: spawn?.gy ?? 2 };
 
-  const playerSpr = buildPlayerSprite(mapManager.tileSize);
+  // 載入 spritesheet（失敗時降級為圓形佔位）
+  const sheetTex  = await loadPlayerSheet();
+  const playerSpr = buildPlayerSprite(mapManager.tileSize, sheetTex);
+
+  // 玩家面向（初始從 spawnPoint 取得，預設向下）
+  let facing = spawn?.facing ?? 'down';
+  playerSpr.setDir(facing);
+
   mapManager.entityLayer.addChild(playerSpr);
 
+  // ── syncPlayer：對齊格子座標 ────────────────────────────────────────────
+  // anchor(0.5, 1.0) → 底部中央對齊，y 需加 tileSize/2 使腳踩在格子底邊
   const syncPlayer = () => {
+    const s  = mapManager.tileSize;
     const px = mapManager.gridToPixel(player.gx, player.gy);
     playerSpr.x = px.x;
-    playerSpr.y = px.y;
+    playerSpr.y = sheetTex
+      ? px.y + s * 0.5   // spritesheet：腳踩格子底邊
+      : px.y;             // 圓形：保持圓心在格子中心
     mapManager.centerOn(player.gx, player.gy);
-    input.setGridConfig(mapManager.tileSize, mapManager.rootX, mapManager.rootY);
+    input.setGridConfig(s, mapManager.rootX, mapManager.rootY);
   };
   syncPlayer();
   mapManager.updateFog(player.gx, player.gy, mapManager.visionRadius);
 
   app.stage.on('resize', () => {
     mapManager.onResize(player.gx, player.gy);
+    playerSpr.resizeTo?.(mapManager.tileSize); // 更新精靈顯示尺寸
     syncPlayer();
   });
 
@@ -397,6 +488,10 @@ async function main() {
 
     // ── 1. D-Pad 方向移動 ───────────────────────────────────────────────
     if (state.justMoved && state.justDir) {
+      // 先更新面向（即使撞牆也要轉向，符合 RPG 慣例）
+      facing = state.justDir;
+      playerSpr.setDir(facing);
+
       const { dx, dy } = DIR_DELTA[state.justDir];
       const nx = player.gx + dx;
       const ny = player.gy + dy;
@@ -408,17 +503,25 @@ async function main() {
       }
     }
 
-    // ── 2. Tile 點擊移動 ────────────────────────────────────────────────
+    // ── 2. Tile 點擊移動（推算面向）────────────────────────────────────
     if (state.tileTarget) {
       const { gx, gy } = state.tileTarget;
       if (mapManager.isWalkable(gx, gy)) {
+        // 根據點擊目標推算面向
+        const ddx = gx - player.gx;
+        const ddy = gy - player.gy;
+        if      (Math.abs(ddx) >= Math.abs(ddy)) facing = ddx > 0 ? 'right' : 'left';
+        else                                      facing = ddy > 0 ? 'down'  : 'up';
+        playerSpr.setDir(facing);
+
+        const prevGx = player.gx;
+        const prevGy = player.gy;
         player.gx = gx;
         player.gy = gy;
         moved = true;
         flashPlayer(playerSpr);
-        const dist = Math.hypot(gx - player.gx, gy - player.gy);
-        if (dist > 1.5) {
-          console.log(`[PathFind] TODO: (${player.gx},${player.gy}) → (${gx},${gy})`);
+        if (Math.hypot(gx - prevGx, gy - prevGy) > 1.5) {
+          console.log(`[PathFind] TODO: (${prevGx},${prevGy}) → (${gx},${gy})`);
         }
       }
     }
