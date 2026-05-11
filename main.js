@@ -230,26 +230,7 @@ async function main() {
       }
     }
 
-    // ── 2. Tile 點擊移動 ─────────────────────────────────────────────────
-    if (state.tileTarget) {
-      const { gx, gy } = state.tileTarget;
-      if (mapManager.isWalkable(gx, gy)) {
-        // 推算面向
-        const ddx = gx - player.gx;
-        const ddy = gy - player.gy;
-        facing = Math.abs(ddx) >= Math.abs(ddy)
-          ? (ddx > 0 ? 'right' : 'left')
-          : (ddy > 0 ? 'down'  : 'up');
-        playerSpr.setDir(facing);
-
-        player.gx = gx;
-        player.gy = gy;
-        moved     = true;
-        flashPlayer(playerSpr);
-      }
-    }
-
-    // ── 3. 移動後：鏡頭 / 霧視野 / Warp ─────────────────────────────────
+    // ── 2. 移動後：鏡頭 / 霧視野 / Warp ─────────────────────────────────
     if (moved) {
       syncPlayer();
       mapManager.updateFog(player.gx, player.gy, mapManager.visionRadius);

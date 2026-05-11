@@ -176,43 +176,8 @@ export class InputManager {
 
   _handleCanvasRelease(e) {
     if (!this._pointerDownPos) return;
-    const dx = e.clientX - this._touchStart.x;
-    const dy = e.clientY - this._touchStart.y;
-    const absDx = Math.abs(dx), absDy = Math.abs(dy);
-
-    // ── Swipe → 方向輸入 ──────────────────────────────────────────────────
-    if (Math.max(absDx, absDy) >= this._swipeThreshold) {
-      let dir;
-      if (absDx > absDy) dir = dx > 0 ? 'right' : 'left';
-      else                dir = dy > 0 ? 'down'  : 'up';
-      this._justPressed['__swipe__']   = true;
-      this._justPressed['__swipeDir__'] = dir;
-      this._pointerDownPos = null;
-      return;
-    }
-
-    // ── Tap → Grid 座標轉換 ──────────────────────────────────────────────
-    if (!this._pointerMoved) {
-      const rect = this._canvas.getBoundingClientRect();
-      const scaleX = this._canvas.width  / rect.width;
-      const scaleY = this._canvas.height / rect.height;
-
-      // Canvas 邏輯像素座標
-      const cx = (e.clientX - rect.left)  * scaleX / (window.devicePixelRatio || 1);
-      const cy = (e.clientY - rect.top)   * scaleY / (window.devicePixelRatio || 1);
-
-      // 減去 Camera offset 得到地圖座標，再除以 tileSize
-      const gx = Math.floor((cx - this._offsetX) / this._tileSize);
-      const gy = Math.floor((cy - this._offsetY) / this._tileSize);
-
-      // 只接受非負格座標（點擊到地圖外忽略）
-      if (gx >= 0 && gy >= 0) {
-        this._tileClickQueue = { gx, gy };
-        this._justPressed['__tileClick__'] = true;
-      }
-    }
-
     this._pointerDownPos = null;
+    // Tile-click 移動已停用：僅透過方向鍵 / D-Pad 控制移動
   }
 
   // ─── 主更新（每幀呼叫）───────────────────────────────────────────────────
@@ -253,7 +218,7 @@ export class InputManager {
       this._justPressed['ArrowDown']  || this._justPressed['KeyS']    ? 'down'  :
       this._justPressed['ArrowLeft']  || this._justPressed['KeyA']    ? 'left'  :
       this._justPressed['ArrowRight'] || this._justPressed['KeyD']    ? 'right' :
-      this._justPressed['__dpad__']                                   ? dpadDir :
+      this._justPressed['__dpad__'] || this._justPressed['__inject__'] ? dpadDir :
       swipeDir
     ) || null;
 
