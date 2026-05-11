@@ -1,21 +1,39 @@
 /**
  * QU-DON | src/ui/HomeScreen.js
- * 首頁主選單 — 對應 Figma Screen 1
+ * 首頁主選單
  *
  * 視覺：
- *   • 深黑背景 + 1980 年代建築輪廓
- *   • 霓虹光條（紅 #FF0040 / 綠 #00FF41）
- *   • 主標題「瞿董默示錄」鉻金屬 + 紅色輝光
+ *   • 全螢幕背景照片（assets/images/home_bg.jpg）
+ *   • 深色遮罩 + CRT 掃描線
+ *   • 主標題「瞿董默示錄」紅色輝光
  *   • 三個薄膜按鍵：新遊戲 / 載入遊戲 / 設定
  *
+ * 使用：
+ *   const hs = await HomeScreen.create(app);
+ *   app.stage.addChild(hs);
+ *   hs.on('action', (id) => { ... });
+ *
  * 事件：
- *   'action'  (actionId: string)  按鍵被點擊
+ *   'action'  (actionId: string)
  *     actionId: 'new_game' | 'load_game' | 'settings'
  */
 export class HomeScreen extends PIXI.Container {
-  constructor(app) {
+
+  /** 非同步工廠（預先載入背景圖）*/
+  static async create(app) {
+    let bgTex = null;
+    try {
+      bgTex = await PIXI.Assets.load('./assets/images/home_bg.jpg');
+    } catch {
+      console.warn('[HomeScreen] home_bg.jpg 載入失敗，使用純色背景');
+    }
+    return new HomeScreen(app, bgTex);
+  }
+
+  constructor(app, bgTex = null) {
     super();
-    this._app = app;
+    this._app   = app;
+    this._bgTex = bgTex;
     this._build();
     this._bindResize();
   }
@@ -34,59 +52,44 @@ export class HomeScreen extends PIXI.Container {
     this._buildFooter(W, H);
   }
 
-  // ── 背景 + 建築輪廓 ──────────────────────────────────────────────────────
+  // ── 背景照片 + 遮罩 ─────────────────────────────────────────────────────
 
   _buildBackground(W, H) {
-    const bg = new PIXI.Graphics();
-    bg.rect(0, 0, W, H).fill({ color: 0x0A0507 });
-    this.addChild(bg);
+    // 底色（圖片載入失敗時的 fallback）
+    const base = new PIXI.Graphics();
+    base.rect(0, 0, W, H).fill({ color: 0x0A0507 });
+    this.addChild(base);
 
-    // 夜空漸層（上方）
-    const sky = new PIXI.Graphics();
-    sky.rect(0, 0, W, Math.floor(H * 0.6)).fill({ color: 0x06040A, alpha: 0.7 });
-    this.addChild(sky);
+    if (this._bgTex) {
+      // 全螢幕 cover：等比縮放後置中裁切
+      const spr = new PIXI.Sprite(this._bgTex);
+      const scaleX = W / this._bgTex.width;
+      const scaleY = H / this._bgTex.height;
+      const scale  = Math.max(scaleX, scaleY);
+      spr.scale.set(scale);
+      spr.x = (W - this._bgTex.width  * scale) / 2;
+      spr.y = (H - this._bgTex.height * scale) / 2;
 
-    // 建築輪廓 - 左
-    const bL = new PIXI.Graphics();
-    bL.rect(0, Math.floor(H * 0.19), Math.floor(W * 0.22), Math.floor(H * 0.48))
-       .fill({ color: 0x090912 });
-    this.addChild(bL);
+      // 遮罩：裁切到螢幕範圍
+      const clipMask = new PIXI.Graphics();
+      clipMask.rect(0, 0, W, H).fill({ color: 0xffffff });
+      this.addChild(clipMask);
+      spr.mask = clipMask;
 
-    // 建築輪廓 - 右
-    const bR = new PIXI.Graphics();
-    bR.rect(Math.floor(W * 0.78), Math.floor(H * 0.14), Math.floor(W * 0.22), Math.floor(H * 0.53))
-       .fill({ color: 0x080910 });
-    this.addChild(bR);
-
-    // 地面反光（雨夜）
-    const ground = new PIXI.Graphics();
-    ground.rect(0, Math.floor(H * 0.60), W, Math.floor(H * 0.40))
-          .fill({ color: 0x08030E });
-    this.addChild(ground);
-
-    // 建築小窗格（亮點）
-    const lcg = (s) => (s * 1664525 + 1013904223) & 0x7fffffff;
-    let seed = 137;
-    for (let i = 0; i < 14; i++) {
-      seed = lcg(seed);
-      const wx = (seed / 0x7fffffff) * W * 0.18;
-      seed = lcg(seed);
-      const wy = Math.floor(H * 0.2) + (seed / 0x7fffffff) * Math.floor(H * 0.35);
-      seed = lcg(seed);
-      const ww = 3 + (seed / 0x7fffffff) * 5;
-      seed = lcg(seed);
-      const wh = 4 + (seed / 0x7fffffff) * 8;
-      seed = lcg(seed);
-      const wa = 0.1 + (seed / 0x7fffffff) * 0.3;
-      const win = new PIXI.Graphics();
-      win.rect(wx, wy, ww, wh).fill({ color: 0xFFEE88, alpha: wa });
-      this.addChild(win);
-
-      // 右側建築
-      const win2 = new PIXI.Graphics();
-      win2.rect(W - wx - ww, wy, ww, wh).fill({ color: 0xFFEE88, alpha: wa });
-      this.addChild(win2);
+      this.addChild(spr);
+      this.addChild(clipMask); // mask 必須在 stage 上
     }
+
+    // 深色遮罩：讓文字可讀
+    const dim = new PIXI.Graphics();
+    dim.rect(0, 0, W, H).fill({ color: 0x000000, alpha: 0.58 });
+    this.addChild(dim);
+
+    // 底部漸層（加強選單可讀性）
+    const grad = new PIXI.Graphics();
+    grad.rect(0, Math.floor(H * 0.45), W, Math.floor(H * 0.55))
+        .fill({ color: 0x000000, alpha: 0.45 });
+    this.addChild(grad);
   }
 
   // ── 霓虹燈條 ──────────────────────────────────────────────────────────────

@@ -1,15 +1,15 @@
 /**
- * QU-DON 瞿董默示錄 | main.js  v5 — walk-only
+ * QU-DON 瞿董默示錄 | main.js  v6
  *
- * 目標：角色在地圖上正常行走
- * 包含：地圖渲染 / 碰撞 / 霧視野 / D-Pad + 鍵盤 + Tile 點擊移動
- *       方向性精靈 / 場景轉場 (Warp) / ControlPanel
- * 移除：HomeScreen / BattleUI / DialogueOverlay / InventoryScreen（日後逐步加回）
+ * 流程：HomeScreen → 新遊戲 → 地圖行走
+ * 包含：HomeScreen（照片背景）/ 地圖渲染 / 碰撞 / 霧視野
+ *       D-Pad + 鍵盤 / 方向性精靈 / 場景轉場 (Warp) / ControlPanel
  */
 
 import { InputManager }          from './src/core/Input.js';
 import { ControlPanel }          from './src/ui/ControlPanel.js';
 import { MapManager, DIR_DELTA } from './src/modules/MapManager.js';
+import { HomeScreen }            from './src/ui/HomeScreen.js';
 
 // ─── VT323 字型 ────────────────────────────────────────────────────────────
 const fontLink = document.createElement('link');
@@ -94,18 +94,10 @@ async function loadPlayerSheet() {
 }
 
 // ─── 建立玩家精靈 ──────────────────────────────────────────────────────────
-/**
- * sheetTex 存在 → 4 方向 PIXI.Sprite（FRONT/BACK/SIDE-R/SIDE-L 並排）
- * sheetTex 為 null → PIXI.Graphics 圓形佔位（方向點旋轉）
- *
- * 錨點：(0.5, 1.0) 底部中央
- * 定位：syncPlayer 中 y = tileCenter.y + tileSize * 0.5（腳踩格子底邊）
- */
 function buildPlayerSprite(tileSize, sheetTex = null) {
-
   if (sheetTex) {
-    const fw  = Math.floor(sheetTex.width / 4);   // 前三幀寬
-    const fw3 = sheetTex.width - fw * 3;           // 第四幀（可能多 1px）
+    const fw  = Math.floor(sheetTex.width / 4);
+    const fw3 = sheetTex.width - fw * 3;
     const fh  = sheetTex.height;
 
     const DIR_FRAMES = {
@@ -157,16 +149,56 @@ function flashPlayer(spr, ms = 80) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+//  首頁 → 遊戲 淡出過場
+// ═══════════════════════════════════════════════════════════════════════════
+function fadeOut(app, duration = 600) {
+  return new Promise(resolve => {
+    const overlay = new PIXI.Graphics();
+    overlay.rect(0, 0, app.screen.width, app.screen.height)
+           .fill({ color: 0x000000 });
+    overlay.alpha = 0;
+    app.stage.addChild(overlay);
+
+    const start = performance.now();
+    const tick = () => {
+      const t = Math.min((performance.now() - start) / duration, 1);
+      overlay.alpha = t;
+      if (t < 1) {
+        requestAnimationFrame(tick);
+      } else {
+        resolve(overlay);
+      }
+    };
+    requestAnimationFrame(tick);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 //  主程式
 // ═══════════════════════════════════════════════════════════════════════════
 async function main() {
   const app = await initPixi();
   bindResize(app);
 
+  // ── 1. 顯示首頁 ──────────────────────────────────────────────────────────
+  const homeScreen = await HomeScreen.create(app);
+  app.stage.addChild(homeScreen);
+
+  // 等待玩家點「新遊戲」
+  await new Promise(resolve => {
+    homeScreen.on('action', (id) => {
+      if (id === 'new_game') resolve();
+    });
+  });
+
+  // 淡出首頁
+  const overlay = await fadeOut(app, 500);
+  homeScreen.destroy({ children: true });
+
+  // ── 2. 建立遊戲世界 ────────────────────────────────────────────────────
   const input     = new InputManager(app.canvas);
   const gameLayer = buildGameLayer(app);
 
-  // ── MapManager：載入 Black Rock Street ──────────────────────────────────
   const mapManager = await MapManager.create(app, gameLayer);
   await mapManager.loadMap('map_black_rock_street');
 
@@ -174,19 +206,15 @@ async function main() {
   const player = { gx: spawn?.gx ?? 19, gy: spawn?.gy ?? 12 };
   let   facing = spawn?.facing ?? 'down';
 
-  // ── 玩家精靈 ─────────────────────────────────────────────────────────────
   const sheetTex  = await loadPlayerSheet();
   const playerSpr = buildPlayerSprite(mapManager.tileSize, sheetTex);
   playerSpr.setDir(facing);
   mapManager.entityLayer.addChild(playerSpr);
 
-  // ── syncPlayer：同步座標 + 鏡頭 + InputManager ──────────────────────────
   const syncPlayer = () => {
     const s  = mapManager.tileSize;
     const px = mapManager.gridToPixel(player.gx, player.gy);
     playerSpr.x = px.x;
-    // sheetTex: 錨點在底部，y += s/2 讓腳踩格子底邊
-    // 圓形:     錨點在圓心，y 不偏移
     playerSpr.y = sheetTex ? px.y + s * 0.5 : px.y;
     mapManager.centerOn(player.gx, player.gy);
     input.setGridConfig(s, mapManager.rootX, mapManager.rootY);
@@ -195,27 +223,24 @@ async function main() {
   syncPlayer();
   mapManager.updateFog(player.gx, player.gy, mapManager.visionRadius);
 
-  // ── Resize ───────────────────────────────────────────────────────────────
   app.stage.on('resize', () => {
     mapManager.onResize(player.gx, player.gy);
     playerSpr.resizeTo?.(mapManager.tileSize);
     syncPlayer();
   });
 
-  // ── ControlPanel ─────────────────────────────────────────────────────────
   const panel = await ControlPanel.create(app, input);
   app.stage.addChild(panel);
 
-  // ═══════════════════════════════════════════════════════════════════════
-  //  主遊戲迴圈
-  // ═══════════════════════════════════════════════════════════════════════
+  // 移除淡出遮罩（讓遊戲顯現）
+  overlay.destroy();
+
+  // ── 3. 主遊戲迴圈 ────────────────────────────────────────────────────────
   app.ticker.add(() => {
     const state = input.update();
     let moved   = false;
 
-    // ── 1. D-Pad / 方向鍵移動 ────────────────────────────────────────────
     if (state.justMoved && state.justDir) {
-      // 先轉向（即使撞牆也轉，符合 RPG 慣例）
       facing = state.justDir;
       playerSpr.setDir(facing);
 
@@ -230,7 +255,6 @@ async function main() {
       }
     }
 
-    // ── 2. 移動後：鏡頭 / 霧視野 / Warp ─────────────────────────────────
     if (moved) {
       syncPlayer();
       mapManager.updateFog(player.gx, player.gy, mapManager.visionRadius);
@@ -251,18 +275,17 @@ async function main() {
         })
           .then(() => input.unlock())
           .catch(() => {
-            // 目標地圖尚未建立 → 取消轉場，原地解鎖
             console.warn(`[Warp] 目標地圖 "${warp.targetMap}" 尚未建立，略過轉場`);
             input.unlock();
           });
 
-        return; // 本幀不繼續處理
+        return;
       }
     }
   });
 
   const renderer = app.renderer.type === 1 ? 'WebGL' : 'WebGPU';
-  console.log(`[QU-DON] v5 walk-only — ${renderer} @ ${app.screen.width}×${app.screen.height}`);
+  console.log(`[QU-DON] v6 — ${renderer} @ ${app.screen.width}×${app.screen.height}`);
   console.log(`[QU-DON] 玩家起點 (${player.gx}, ${player.gy}) 面向: ${facing}`);
 }
 
