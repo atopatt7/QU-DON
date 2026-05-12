@@ -64,6 +64,16 @@
       "sfx":      "footstep_asphalt",
       "desc":     "碎玻璃 / 殘骸（保留備用）"
     },
+    "9": {
+      "name":     "asphalt_hline",
+      "group":    "road",
+      "walkable": true,
+      "collides": false,
+      "draw":     "hline",
+      "color":    "0x1c1c1c",
+      "sfx":      "footstep_asphalt",
+      "desc":     "瀝青 + 水平雙黃線（東西向行車分界）"
+    },
 
     "10": {
       "name":     "sidewalk",
@@ -178,6 +188,47 @@
       "color":    "0x1a0a1a",
       "_light":   { "radius": 3, "color": "0xff00aa", "intensity": 0.6 },
       "desc":     "霓虹招牌牆（保留備用）"
+    },
+
+    "34": {
+      "name":     "asphalt_corner_tl",
+      "group":    "road",
+      "walkable": true,
+      "collides": false,
+      "draw":     "corner_tl",
+      "color":    "0x1c1c1c",
+      "sfx":      "footstep_asphalt",
+      "desc":     "路口轉角標線 — 左上（垂直→水平，往左）"
+    },
+    "35": {
+      "name":     "asphalt_corner_tr",
+      "group":    "road",
+      "walkable": true,
+      "collides": false,
+      "draw":     "corner_tr",
+      "color":    "0x1c1c1c",
+      "sfx":      "footstep_asphalt",
+      "desc":     "路口轉角標線 — 右上（垂直→水平，往右）"
+    },
+    "36": {
+      "name":     "asphalt_corner_bl",
+      "group":    "road",
+      "walkable": true,
+      "collides": false,
+      "draw":     "corner_bl",
+      "color":    "0x1c1c1c",
+      "sfx":      "footstep_asphalt",
+      "desc":     "路口轉角標線 — 左下（水平→垂直，往左）"
+    },
+    "37": {
+      "name":     "asphalt_corner_br",
+      "group":    "road",
+      "walkable": true,
+      "collides": false,
+      "draw":     "corner_br",
+      "color":    "0x1c1c1c",
+      "sfx":      "footstep_asphalt",
+      "desc":     "路口轉角標線 — 右下（水平→垂直，往右）"
     },
 
     "30": {

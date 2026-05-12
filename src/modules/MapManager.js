@@ -46,9 +46,15 @@ const TILE_PALETTE = {
   // ── Road (ground layer, IDs 1-5) ─────────────────────────────────────────
   1:  { base: 0x1c1c1c, hi: 0x242424, lo: 0x101010 }, // asphalt
   2:  { base: 0x161616, hi: 0x1c1c1c, lo: 0x080808 }, // cracked asphalt
-  3:  { base: 0x1c1c1c, hi: 0x242424, lo: 0x101010 }, // asphalt + yellow center line
+  3:  { base: 0x1c1c1c, hi: 0x242424, lo: 0x101010 }, // asphalt + vertical center line
   4:  { base: 0x0c1018, hi: 0x141820, lo: 0x080c12 }, // asphalt + rain puddle
   5:  { base: 0x181818, hi: 0x202020, lo: 0x0c0c0c }, // asphalt + debris
+  9:  { base: 0x1c1c1c, hi: 0x242424, lo: 0x101010 }, // asphalt + horizontal center line
+  // ── Corner centerlines (IDs 34-37) ───────────────────────────────────────
+  34: { base: 0x1c1c1c, hi: 0x242424, lo: 0x101010 }, // corner TL
+  35: { base: 0x1c1c1c, hi: 0x242424, lo: 0x101010 }, // corner TR
+  36: { base: 0x1c1c1c, hi: 0x242424, lo: 0x101010 }, // corner BL
+  37: { base: 0x1c1c1c, hi: 0x242424, lo: 0x101010 }, // corner BR
   // ── Sidewalk (ground layer, IDs 10-12) ───────────────────────────────────
   10: { base: 0x2a2620, hi: 0x322e28, lo: 0x1e1a16 }, // concrete sidewalk
   11: { base: 0x2a2620, hi: 0x322e28, lo: 0x1e1a16 }, // sidewalk + scattered trash
@@ -224,6 +230,12 @@ export class MapManager {
       case 3:  this._drawCenterLine(gfx, s, pal, rng);   break;
       case 4:  this._drawPuddle(gfx, s, pal, rng);       break;
       case 5:  this._drawDebris(gfx, s, pal, rng);       break;
+      case 9:  this._drawHorizontalLine(gfx, s, pal, rng); break;
+      // ── Corner centerlines ────────────────────────────────────────────────
+      case 34: this._drawCornerLine(gfx, s, 'TL', pal, rng); break;
+      case 35: this._drawCornerLine(gfx, s, 'TR', pal, rng); break;
+      case 36: this._drawCornerLine(gfx, s, 'BL', pal, rng); break;
+      case 37: this._drawCornerLine(gfx, s, 'BR', pal, rng); break;
       // ── Sidewalk ──────────────────────────────────────────────────────────
       case 10: this._drawSidewalk(gfx, s, pal, rng);     break;
       case 11: this._drawSidewalkTrash(gfx, s, pal, rng); break;
@@ -401,6 +413,85 @@ export class MapManager {
     const skipY = Math.floor(rng.next() * s * 0.5);
     gfx.rect(cx - gap - lw, skipY, lw, Math.floor(s * 0.12))
       .fill({ color: pal.base, alpha: 0.55 });
+  }
+
+  // ── 水平雙黃線（東西向行車分道）────────────────────────────────────────────
+  _drawHorizontalLine(gfx, s, pal, rng) {
+    this._drawAsphalt(gfx, s, pal, rng);
+    const cy  = Math.floor(s / 2);
+    const gap = Math.max(2, Math.floor(s * 0.08));
+    const lw  = Math.max(1, Math.floor(s * 0.045));
+    gfx.rect(0, cy - gap - lw, s, lw).fill({ color: 0xc8a000, alpha: 0.88 });
+    gfx.rect(0, cy + gap,      s, lw).fill({ color: 0xc8a000, alpha: 0.88 });
+    // 磨損缺口（隨機短段褪色）
+    const skipX = Math.floor(rng.next() * s * 0.5);
+    gfx.rect(skipX, cy - gap - lw, Math.floor(s * 0.12), lw)
+       .fill({ color: pal.base, alpha: 0.55 });
+  }
+
+  // ── 路口轉角雙黃線 ────────────────────────────────────────────────────────
+  /**
+   * type: 'TL' | 'TR' | 'BL' | 'BR'
+   * 命名邏輯：垂直道路（上或下）與水平道路（左或右）相接的那個象限。
+   *   TL = 垂直從上接、水平往左出 （曲線曲率中心在右下）
+   *   TR = 垂直從上接、水平往右出 （曲率中心在左下）
+   *   BL = 垂直從下接、水平往左出 （曲率中心在右上）
+   *   BR = 垂直從下接、水平往右出 （曲率中心在左上）
+   *
+   * 實作採「兩個 L 形矩形對」，間距與直線一致，
+   * 每對的端點因矩形重疊而自然形成 90° 銳角接頭。
+   */
+  _drawCornerLine(gfx, s, type, pal, rng) {
+    this._drawAsphalt(gfx, s, pal, rng);
+
+    const cx  = Math.floor(s / 2);
+    const cy  = Math.floor(s / 2);
+    const gap = Math.max(2, Math.floor(s * 0.08));
+    const lw  = Math.max(1, Math.floor(s * 0.045));
+    const col = 0xc8a000;
+    const alp = 0.88;
+
+    // 每個角落由兩對矩形組成：
+    //   A = 內弧那條線 (半徑較小的那側，需要角落填方)
+    //   B = 外弧那條線 (自然 L 接頭)
+    switch (type) {
+      case 'TL': {
+        // A: 上半垂直(左) + 左半水平(上)  ← 內弧
+        gfx.rect(0,           cy - gap - lw, cx - gap,       lw  ).fill({ color: col, alpha: alp });
+        gfx.rect(cx - gap - lw, 0,           lw,             cy - gap).fill({ color: col, alpha: alp });
+        // B: 上半垂直(右) + 左半水平(下)  ← 外弧（自然 L）
+        gfx.rect(0,           cy + gap,       cx + gap + lw, lw  ).fill({ color: col, alpha: alp });
+        gfx.rect(cx + gap,    0,              lw,            cy + gap + lw).fill({ color: col, alpha: alp });
+        break;
+      }
+      case 'TR': {
+        // A: 上半垂直(右) + 右半水平(上)
+        gfx.rect(cx + gap,    cy - gap - lw, s - (cx + gap),     lw  ).fill({ color: col, alpha: alp });
+        gfx.rect(cx + gap,    0,             lw,                cy - gap).fill({ color: col, alpha: alp });
+        // B: 上半垂直(左) + 右半水平(下)（自然 L）
+        gfx.rect(cx - gap - lw, cy + gap,   s - (cx - gap - lw), lw  ).fill({ color: col, alpha: alp });
+        gfx.rect(cx - gap - lw, 0,          lw,                cy + gap + lw).fill({ color: col, alpha: alp });
+        break;
+      }
+      case 'BL': {
+        // A: 下半垂直(左) + 左半水平(下)
+        gfx.rect(0,           cy + gap,       cx - gap,       lw  ).fill({ color: col, alpha: alp });
+        gfx.rect(cx - gap - lw, cy + gap,     lw,             s - (cy + gap)).fill({ color: col, alpha: alp });
+        // B: 下半垂直(右) + 左半水平(上)（自然 L）
+        gfx.rect(0,           cy - gap - lw, cx + gap + lw,  lw  ).fill({ color: col, alpha: alp });
+        gfx.rect(cx + gap,    cy - gap - lw, lw,             s - (cy - gap - lw)).fill({ color: col, alpha: alp });
+        break;
+      }
+      case 'BR': {
+        // A: 下半垂直(右) + 右半水平(下)
+        gfx.rect(cx + gap,    cy + gap,       s - (cx + gap),      lw  ).fill({ color: col, alpha: alp });
+        gfx.rect(cx + gap,    cy + gap,       lw,                  s - (cy + gap)).fill({ color: col, alpha: alp });
+        // B: 下半垂直(左) + 右半水平(上)（自然 L）
+        gfx.rect(cx - gap - lw, cy - gap - lw, s - (cx - gap - lw), lw  ).fill({ color: col, alpha: alp });
+        gfx.rect(cx - gap - lw, cy - gap - lw, lw,                  s - (cy - gap - lw)).fill({ color: col, alpha: alp });
+        break;
+      }
+    }
   }
 
   // ── 積水路面（反射霓虹燈光）──────────────────────────────────────────────
