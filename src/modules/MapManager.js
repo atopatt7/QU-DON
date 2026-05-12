@@ -63,6 +63,12 @@ const TILE_PALETTE = {
   6:  { base: 0x0e1a10, hi: 0x142018, lo: 0x080e0a }, // metal dumpster / bar counter
   7:  { base: 0x1c1408, hi: 0x241a0c, lo: 0x100e06 }, // interior door
   8:  { base: 0x0c0c0c, hi: 0x141414, lo: 0x040404 }, // storm gutter
+  // ── Indoor (IDs 40-44) — 瞿董的房間 ────────────────────────────────────────
+  40: { base: 0x1a1610, hi: 0x221e16, lo: 0x100e08 }, // dirty carpet floor
+  41: { base: 0x1a1820, hi: 0x24222c, lo: 0x100e14 }, // old bed
+  42: { base: 0x1c1208, hi: 0x241a0c, lo: 0x100c04 }, // junk table with bottles
+  43: { base: 0x0c0e14, hi: 0x14161e, lo: 0x06080e }, // old TV (faint blue)
+  44: { base: 0x181c1c, hi: 0x202828, lo: 0x0e1414 }, // sink & mold
 };
 
 // ─── 確定性偽隨機（LCG，以 tile 位置為種子，保證重複渲染一致）─────────────────────
@@ -232,6 +238,12 @@ export class MapManager {
       case 6:  this._drawDumpster(gfx, s, pal);           break;
       case 7:  this._drawDoor(gfx, s, pal);               break;
       case 8:  this._drawGutter(gfx, s, pal);             break;
+      // ── Indoor (map_qu_don_room) ───────────────────────────────────────────
+      case 40: this._drawIndoorFloor(gfx, s, pal, rng);  break;
+      case 41: this._drawIndoorBed(gfx, s, pal, rng);    break;
+      case 42: this._drawIndoorTable(gfx, s, pal, rng);  break;
+      case 43: this._drawIndoorTV(gfx, s, pal);           break;
+      case 44: this._drawIndoorSink(gfx, s, pal);         break;
       default:
         gfx.rect(0, 0, s, s).fill({ color: pal.base });
     }
@@ -582,6 +594,132 @@ export class MapManager {
     // 門把（金色）
     gfx.circle(s * 0.74, s * 0.50, 3).fill({ color: 0xb89040 });
     gfx.circle(s * 0.74, s * 0.50, 3).stroke({ color: 0xdbb050, width: 0.8 });
+  }
+
+  // ── 室內地板（髒污地毯）─────────────────────────────────────────────────
+  _drawIndoorFloor(gfx, s, pal, rng) {
+    // 基底地毯色
+    gfx.rect(0, 0, s, s).fill({ color: pal.base });
+    // 細紋（橫向纖維感）
+    for (let y = 2; y < s; y += 4) {
+      gfx.rect(0, y, s, 1).fill({ color: pal.lo, alpha: 0.18 });
+    }
+    // 污漬 / 菸頭燙痕（3–5 個隨機深色斑點）
+    const spots = 3 + Math.floor(rng.next() * 3);
+    for (let i = 0; i < spots; i++) {
+      const sx = Math.floor(rng.next() * (s - 4)) + 2;
+      const sy = Math.floor(rng.next() * (s - 4)) + 2;
+      const sr = 1 + rng.next() * 2.5;
+      gfx.circle(sx, sy, sr).fill({ color: 0x080604, alpha: 0.45 + rng.next() * 0.3 });
+    }
+    // 邊緣暗影
+    gfx.rect(0, 0, s, 1).fill({ color: 0x000000, alpha: 0.25 });
+    gfx.rect(0, 0, 1, s).fill({ color: 0x000000, alpha: 0.20 });
+  }
+
+  // ── 破舊的床 ─────────────────────────────────────────────────────────────
+  _drawIndoorBed(gfx, s, pal, rng) {
+    // 床框（深木色）
+    gfx.rect(0, 0, s, s).fill({ color: 0x120e08 });
+    // 床墊
+    const mx = 4, my = 4, mw = s - 8, mh = s - 8;
+    gfx.rect(mx, my, mw, mh).fill({ color: pal.base });
+    // 皺折線（橫向 2 條）
+    const lineY1 = my + Math.floor(mh * 0.35);
+    const lineY2 = my + Math.floor(mh * 0.65);
+    gfx.moveTo(mx + 4, lineY1).lineTo(mx + mw - 4, lineY1 + 2)
+       .stroke({ color: pal.lo, width: 1.2, alpha: 0.55 });
+    gfx.moveTo(mx + 4, lineY2).lineTo(mx + mw - 4, lineY2 - 1)
+       .stroke({ color: pal.lo, width: 1.2, alpha: 0.45 });
+    // 枕頭（淡灰色矩形，上方）
+    const pw = Math.floor(mw * 0.72), ph = Math.floor(mh * 0.28);
+    const px = mx + Math.floor((mw - pw) / 2);
+    gfx.rect(px, my + 2, pw, ph).fill({ color: 0x2a2830 });
+    gfx.rect(px, my + 2, pw, ph).stroke({ color: 0x181620, width: 1 });
+    // 污漬
+    gfx.circle(mx + mw * 0.3, my + mh * 0.6, 3).fill({ color: 0x0a0806, alpha: 0.4 });
+  }
+
+  // ── 雜物桌（酒瓶堆）─────────────────────────────────────────────────────
+  _drawIndoorTable(gfx, s, pal, rng) {
+    // 桌面
+    gfx.rect(0, 0, s, s).fill({ color: pal.lo });
+    const tw = s - 6, th = Math.floor(s * 0.55);
+    gfx.rect(3, Math.floor(s * 0.3), tw, th).fill({ color: pal.base });
+    gfx.rect(3, Math.floor(s * 0.3), tw, th).stroke({ color: pal.lo, width: 1 });
+    // 桌腳（左右下角）
+    gfx.rect(5, s - 10, 4, 10).fill({ color: 0x0e0c06 });
+    gfx.rect(s - 9, s - 10, 4, 10).fill({ color: 0x0e0c06 });
+    // 酒瓶（3 個細長矩形 + 圓頂）
+    const bottles = [
+      { x: s * 0.22, c: 0x1a3010 },
+      { x: s * 0.45, c: 0x2a1808 },
+      { x: s * 0.68, c: 0x102818 },
+    ];
+    bottles.forEach(({ x, c }) => {
+      const bx = Math.floor(x);
+      const by = Math.floor(s * 0.08);
+      const bw = Math.floor(s * 0.12);
+      const bh = Math.floor(s * 0.30);
+      gfx.rect(bx, by, bw, bh).fill({ color: c });
+      gfx.circle(bx + bw / 2, by, bw * 0.4).fill({ color: c });
+      // 高光
+      gfx.rect(bx + 1, by + 2, 2, bh - 4).fill({ color: 0xffffff, alpha: 0.07 });
+    });
+  }
+
+  // ── 老電視（微弱藍光）───────────────────────────────────────────────────
+  _drawIndoorTV(gfx, s, pal) {
+    // 電視外殼（深灰）
+    gfx.rect(0, 0, s, s).fill({ color: pal.lo });
+    const ox = 4, oy = 6, ow = s - 8, oh = Math.floor(s * 0.62);
+    gfx.rect(ox, oy, ow, oh).fill({ color: 0x181820 });
+    gfx.rect(ox, oy, ow, oh).stroke({ color: 0x080810, width: 2 });
+    // 螢幕（藍色靜態雜訊感）
+    const sx2 = ox + 4, sy2 = oy + 4, sw = ow - 8, sh = oh - 8;
+    gfx.rect(sx2, sy2, sw, sh).fill({ color: 0x0c1428 });
+    // 靜態線條
+    for (let ly = sy2 + 2; ly < sy2 + sh - 2; ly += 3) {
+      const alpha = 0.05 + (Math.sin(ly * 0.8) * 0.5 + 0.5) * 0.12;
+      gfx.rect(sx2 + 2, ly, sw - 4, 1).fill({ color: 0x4466cc, alpha });
+    }
+    // 中央微弱發光點
+    gfx.circle(sx2 + sw / 2, sy2 + sh / 2, sw * 0.25)
+       .fill({ color: 0x2244aa, alpha: 0.25 });
+    // 控制旋鈕（右側）
+    const kx = ox + ow - 6;
+    gfx.circle(kx, oy + oh * 0.35, 3).fill({ color: 0x2a2a2a });
+    gfx.circle(kx, oy + oh * 0.65, 3).fill({ color: 0x2a2a2a });
+    // 底座
+    const stW = Math.floor(ow * 0.5);
+    gfx.rect(ox + (ow - stW) / 2, oy + oh, stW, Math.floor(s * 0.12))
+       .fill({ color: 0x141414 });
+  }
+
+  // ── 洗手台（發霉牆角）───────────────────────────────────────────────────
+  _drawIndoorSink(gfx, s, pal) {
+    // 牆角瓷磚底
+    gfx.rect(0, 0, s, s).fill({ color: pal.lo });
+    // 發霉污漬（深綠色斑塊）
+    gfx.circle(s * 0.15, s * 0.2,  s * 0.12).fill({ color: 0x0a1008, alpha: 0.55 });
+    gfx.circle(s * 0.28, s * 0.1,  s * 0.08).fill({ color: 0x0c1408, alpha: 0.45 });
+    gfx.circle(s * 0.1,  s * 0.38, s * 0.10).fill({ color: 0x081208, alpha: 0.50 });
+    // 洗手台盆（白瓷，偏黃）
+    const bx = Math.floor(s * 0.08), by = Math.floor(s * 0.38);
+    const bw = Math.floor(s * 0.84), bh = Math.floor(s * 0.46);
+    gfx.rect(bx, by, bw, bh).fill({ color: 0x282420 });
+    gfx.rect(bx, by, bw, bh).stroke({ color: 0x1a1610, width: 1.5 });
+    // 盆內（空洞）
+    const ix = bx + 6, iy = by + 6, iw = bw - 12, ih = bh - 12;
+    gfx.rect(ix, iy, iw, ih).fill({ color: 0x141010 });
+    // 排水孔
+    gfx.circle(ix + iw / 2, iy + ih / 2, 3).fill({ color: 0x0a0808 });
+    // 水龍頭
+    const fx = Math.floor(s * 0.5);
+    gfx.rect(fx - 3, by - 8, 6, 10).fill({ color: 0x242220 });
+    gfx.rect(fx - 7, by - 9, 14, 3).fill({ color: 0x242220 });
+    // 水垢痕跡
+    gfx.rect(ix + iw / 2 - 1, iy + 2, 2, ih - 4).fill({ color: 0x1c1614, alpha: 0.4 });
   }
 
   // ─── 渲染層 ────────────────────────────────────────────────────────────────

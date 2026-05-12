@@ -189,6 +189,54 @@
       "color":    "0x1a1208",
       "sfx":      "door_open",
       "desc":     "傳送門 — 步入觸發 transitionTo()"
+    },
+
+    "40": {
+      "name":     "indoor_floor",
+      "group":    "indoor",
+      "walkable": true,
+      "collides": false,
+      "draw":     "indoor_floor",
+      "color":    "0x1a1610",
+      "sfx":      "footstep_carpet",
+      "desc":     "室內地毯 — 菸頭燙痕與污漬"
+    },
+    "41": {
+      "name":     "indoor_bed",
+      "group":    "indoor",
+      "walkable": false,
+      "collides": true,
+      "draw":     "indoor_bed",
+      "color":    "0x1a1820",
+      "desc":     "破舊的床（不可通行）"
+    },
+    "42": {
+      "name":     "indoor_table",
+      "group":    "indoor",
+      "walkable": false,
+      "collides": true,
+      "draw":     "indoor_table",
+      "color":    "0x1c1208",
+      "desc":     "堆滿酒瓶的雜物桌（不可通行）"
+    },
+    "43": {
+      "name":     "indoor_tv",
+      "group":    "indoor",
+      "walkable": false,
+      "collides": true,
+      "draw":     "indoor_tv",
+      "color":    "0x0c0e14",
+      "_light":   { "radius": 2, "color": "0x4466cc", "intensity": 0.35 },
+      "desc":     "收不到訊號的老電視（不可通行，藍光）"
+    },
+    "44": {
+      "name":     "indoor_sink",
+      "group":    "indoor",
+      "walkable": false,
+      "collides": true,
+      "draw":     "indoor_sink",
+      "color":    "0x181c1c",
+      "desc":     "洗手台與發霉的牆角（不可通行）"
     }
   },
 
