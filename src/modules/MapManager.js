@@ -41,6 +41,10 @@ const FOG_ALPHA = {
   [FOG.VISIBLE]:  0.00,
 };
 
+// ─── 位置變體快取：這些 tile 每格使用不同亂數種子，視覺多樣 ───────────────────────
+const VARIANT_IDS   = new Set([1, 2, 4, 5, 10, 11, 40]);
+const VARIANT_COUNT = 4;
+
 // ─── 程式繪製 Tile 調色盤（Noir 低飽和深色系）────────────────────────────────────
 const TILE_PALETTE = {
   // ── Road (ground layer, IDs 1-5) ─────────────────────────────────────────
@@ -124,6 +128,10 @@ export class MapManager {
 
     // 轉場 Overlay（全螢幕淡黑遮罩）
     this._overlay   = null;
+
+    // 霧視野移動守衛（座標未變時跳過 updateFog）
+    this._lastFogGx = -1;
+    this._lastFogGy = -1;
   }
 
   // ─── 工廠 ─────────────────────────────────────────────────────────────────
@@ -150,6 +158,16 @@ export class MapManager {
     this._W        = data.width;
     this._H        = data.height;
     this._tileSize = this._adaptTileSize(data.tileSize ?? 48);
+
+    // 建立碰撞 Uint8Array（支援 collisions:[{gx,gy}] 與舊式 collision:[] 兩種格式）
+    const total = this._W * this._H;
+    const col   = new Uint8Array(total);
+    if (Array.isArray(data.collisions)) {
+      for (const { gx, gy } of data.collisions) col[gy * this._W + gx] = 1;
+    } else if (Array.isArray(data.collision)) {
+      for (let i = 0; i < data.collision.length; i++) col[i] = data.collision[i] ? 1 : 0;
+    }
+    data.collision = col; // isWalkable 讀取此欄位
 
     console.log(`[MapManager] 載入 "${data.name}"  ${this._W}×${this._H}  tile=${this._tileSize}px  visionR=${this.visionRadius}`);
 
@@ -178,12 +196,17 @@ export class MapManager {
     if (!preserveEntities) this.entityLayer.removeChildren();
     this._fogLayer.removeChildren();
 
-    this._texCache.forEach(t => t.destroy(true));
+    this._texCache.forEach(t => {
+      if (Array.isArray(t)) t.forEach(v => v.destroy(true));
+      else t.destroy(true);
+    });
     this._texCache.clear();
     if (this._fogTex) { this._fogTex.destroy(true); this._fogTex = null; }
 
     this._fogState   = null;
     this._fogSprites = null;
+    this._lastFogGx  = -1;
+    this._lastFogGy  = -1;
   }
 
   // ─── 貼圖快取建置 ─────────────────────────────────────────────────────────
@@ -203,10 +226,21 @@ export class MapManager {
 
     for (const id of ids) {
       if (this._texCache.has(id)) continue;
-      const gfx = this._drawTileGraphics(id, s);
-      const tex = this._app.renderer.generateTexture({ target: gfx });
-      this._texCache.set(id, tex);
-      gfx.destroy();
+
+      if (VARIANT_IDS.has(id)) {
+        // 多變體：每個 variant 用不同種子，_renderLayer 依位置挑選
+        const variants = [];
+        for (let v = 0; v < VARIANT_COUNT; v++) {
+          const gfx = this._drawTileVariant(id, s, v);
+          variants.push(this._app.renderer.generateTexture({ target: gfx }));
+          gfx.destroy();
+        }
+        this._texCache.set(id, variants);
+      } else {
+        const gfx = this._drawTileGraphics(id, s);
+        this._texCache.set(id, this._app.renderer.generateTexture({ target: gfx }));
+        gfx.destroy();
+      }
     }
 
     // 霧用純黑貼圖
@@ -214,6 +248,24 @@ export class MapManager {
     fogGfx.rect(0, 0, s, s).fill({ color: 0x000000 });
     this._fogTex = this._app.renderer.generateTexture({ target: fogGfx });
     fogGfx.destroy();
+  }
+
+  /** 以指定 variant 種子繪製同一 tile ID 的另一個隨機圖案。 */
+  _drawTileVariant(id, s, variant) {
+    const gfx = new PIXI.Graphics();
+    const pal = TILE_PALETTE[id] ?? { base: 0x202020, hi: 0x303030, lo: 0x101010 };
+    const rng = new TileRng(id + variant * 9973, id * 31 + variant * 7919);
+    switch (id) {
+      case 1:  this._drawAsphalt(gfx, s, pal, rng);       break;
+      case 2:  this._drawCracked(gfx, s, pal, rng);       break;
+      case 4:  this._drawPuddle(gfx, s, pal, rng);        break;
+      case 5:  this._drawDebris(gfx, s, pal, rng);        break;
+      case 10: this._drawSidewalk(gfx, s, pal, rng);      break;
+      case 11: this._drawSidewalkTrash(gfx, s, pal, rng); break;
+      case 40: this._drawIndoorFloor(gfx, s, pal, rng);   break;
+      default: gfx.rect(0, 0, s, s).fill({ color: pal.base });
+    }
+    return gfx;
   }
 
   // ─── 程式繪製 Tile 圖形 ────────────────────────────────────────────────────
@@ -824,8 +876,13 @@ export class MapManager {
         const id = tileArray[y * this._W + x];
         if (id === 0) continue;
 
-        const tex = this._texCache.get(id);
-        if (!tex) continue;
+        const cached = this._texCache.get(id);
+        if (!cached) continue;
+
+        // 陣列 = 多變體，依格子座標穩定挑選
+        const tex = Array.isArray(cached)
+          ? cached[(x * 31 + y * 17) % cached.length]
+          : cached;
 
         const spr = new PIXI.Sprite(tex);
         spr.x = x * s;
@@ -885,6 +942,10 @@ export class MapManager {
    */
   updateFog(playerGx, playerGy, range = 5) {
     if (!this._fogSprites) return;
+    // 玩家格子座標未變化時跳過（省去每幀 W×H 次遍歷）
+    if (playerGx === this._lastFogGx && playerGy === this._lastFogGy) return;
+    this._lastFogGx = playerGx;
+    this._lastFogGy = playerGy;
 
     for (let y = 0; y < this._H; y++) {
       for (let x = 0; x < this._W; x++) {
@@ -1112,8 +1173,11 @@ export class MapManager {
 
     this._tileSize = newSize;
 
-    // 清除舊貼圖快取
-    this._texCache.forEach(t => t.destroy(true));
+    // 清除舊貼圖快取（支援單一貼圖與變體陣列）
+    this._texCache.forEach(t => {
+      if (Array.isArray(t)) t.forEach(v => v.destroy(true));
+      else t.destroy(true);
+    });
     this._texCache.clear();
     if (this._fogTex) { this._fogTex.destroy(true); this._fogTex = null; }
 
