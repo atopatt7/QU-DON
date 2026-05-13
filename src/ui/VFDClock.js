@@ -41,6 +41,12 @@ export class VFDClock extends PIXI.Container {
 
     // ── 字型樣式 ────────────────────────────────────────────────────────
     const fontFamily = '"VT323", "Share Tech Mono", "Courier New", monospace';
+    this._fontFamily = fontFamily;
+    this._fontSize   = fontSize;
+
+    // ── 地圖名稱最大顯示字數（超出加省略號）────────────────────────────
+    this._maxNameLen = 18;
+    this._locCached  = null; // 防止相同名稱重複更新
 
     // Layer 3：暗段底色（模擬 VFD 未亮起的段落）
     this._dimText = new PIXI.Text({
@@ -81,11 +87,32 @@ export class VFDClock extends PIXI.Container {
     });
     this.addChild(this._mainText);
 
+    // ── 地圖位置顯示（時鐘右側，同 VFD 三層架構）──────────────────────
+    this._locContainer = new PIXI.Container();
+    this.addChild(this._locContainer);
+
+    const locTemplate = `[ LOC: ${'·'.repeat(this._maxNameLen)} ]`;
+    const locStyle    = new PIXI.TextStyle({ fontFamily, fontSize, fill: this._theme.dim, letterSpacing: 1 });
+    const locStyleBrt = new PIXI.TextStyle({ fontFamily, fontSize, fill: this._theme.bright, letterSpacing: 1 });
+    const locStyleGlw = new PIXI.TextStyle({ fontFamily, fontSize, fill: this._theme.glow, letterSpacing: 1 });
+
+    this._locDimText = new PIXI.Text({ text: locTemplate, style: locStyle });
+    this._locContainer.addChild(this._locDimText);
+
+    this._locGlowText = new PIXI.Text({ text: '', style: locStyleGlw });
+    this._locGlowText.filters = [new PIXI.BlurFilter({ strength: 6, quality: 3 })];
+    this._locGlowText.alpha   = 0.45;
+    this._locContainer.addChild(this._locGlowText);
+
+    this._locMainText = new PIXI.Text({ text: '[ LOC: --- ]', style: locStyleBrt });
+    this._locContainer.addChild(this._locMainText);
+
     // ── 秒數閃爍冒號（可選裝飾）────────────────────────────────────────
     this._colonVisible = true;
 
     // ── 開始計時 ────────────────────────────────────────────────────────
     this._update();
+    this._positionLocContainer(); // 時鐘寬度確定後再定位
     this._interval = setInterval(() => this._update(), 1000);
   }
 
@@ -115,7 +142,35 @@ export class VFDClock extends PIXI.Container {
     this._dimText.text = this._showSeconds ? '88:88:88' : '88:88';
   }
 
+  // ─── 私有：定位地圖文字容器 ───────────────────────────────────────────────
+
+  _positionLocContainer() {
+    // 時鐘 dim 層寬度（固定為 '88:88:88' 或 '88:88'，不隨閃爍改變）
+    this._locContainer.x = this._dimText.width + 20;
+    this._locContainer.y = 0;
+  }
+
   // ─── 公開 API ─────────────────────────────────────────────────────────────
+
+  /**
+   * 更新地圖位置顯示。相同名稱重複呼叫時直接跳過（省渲染）。
+   * @param {string} mapName  地圖 JSON 中的 name 欄位
+   */
+  updateLocation(mapName) {
+    const raw = String(mapName ?? '---');
+    if (raw === this._locCached) return; // 名稱未變，不重繪
+    this._locCached = raw;
+
+    // 超出最大長度時截斷加省略號
+    const name = raw.length > this._maxNameLen
+      ? raw.slice(0, this._maxNameLen - 1) + '…'
+      : raw;
+
+    const formatted = `[ LOC: ${name} ]`;
+    this._locMainText.text = formatted;
+    this._locGlowText.text = formatted;
+    // _locDimText 保持固定寬度模板，不更新
+  }
 
   /** 切換燈色（'green' | 'amber'） */
   setColor(color) {
@@ -125,9 +180,12 @@ export class VFDClock extends PIXI.Container {
     };
     this._theme = THEMES[color] ?? THEMES.green;
 
-    this._mainText.style.fill  = this._theme.bright;
-    this._glowText.style.fill  = this._theme.glow;
-    this._dimText.style.fill   = this._theme.dim;
+    this._mainText.style.fill    = this._theme.bright;
+    this._glowText.style.fill    = this._theme.glow;
+    this._dimText.style.fill     = this._theme.dim;
+    this._locMainText.style.fill = this._theme.bright;
+    this._locGlowText.style.fill = this._theme.glow;
+    this._locDimText.style.fill  = this._theme.dim;
   }
 
   /** 取得目前顯示寬度（用於外部對齊） */

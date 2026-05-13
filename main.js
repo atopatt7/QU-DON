@@ -10,6 +10,7 @@ import { InputManager }          from './src/core/Input.js';
 import { ControlPanel }          from './src/ui/ControlPanel.js';
 import { MapManager, DIR_DELTA } from './src/modules/MapManager.js';
 import { HomeScreen }            from './src/ui/HomeScreen.js';
+import { VFDClock }              from './src/ui/VFDClock.js';
 
 // ─── VT323 字型 ────────────────────────────────────────────────────────────
 const fontLink = document.createElement('link');
@@ -264,6 +265,22 @@ async function main() {
   const panel = await ControlPanel.create(app, input);
   app.stage.addChild(panel);
 
+  // ── VFD 時鐘（左下角，遊戲區底部）────────────────────────────────────────
+  const clock = new VFDClock({ color: 'green', fontSize: 18, showSeconds: false });
+  app.stage.addChild(clock);
+
+  const positionClock = () => {
+    const safe  = getSafeArea();
+    const gameH = Math.floor(app.screen.height * 0.66);
+    clock.x = 12 + safe.left;
+    clock.y = gameH - clock.displayHeight - 8;
+  };
+  positionClock();
+  app.stage.on('resize', positionClock);
+
+  // 初始地圖名稱
+  clock.updateLocation(mapManager.mapData?.name);
+
   // 移除淡出遮罩（讓遊戲顯現）
   overlay.destroy();
 
@@ -318,6 +335,7 @@ async function main() {
       if (!mapManager.entityLayer.children.includes(playerSpr)) {
         mapManager.entityLayer.addChild(playerSpr);
       }
+      clock.updateLocation(mapManager.mapData?.name); // [修改] 切換地圖時同步顯示名稱
       requestUpdate(); // 黑畫面期間同步新地圖的鏡頭 + 霧視野
     })
       .then(() => input.unlock())
