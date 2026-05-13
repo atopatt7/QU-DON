@@ -19,11 +19,13 @@ export class DialogueOverlay extends PIXI.Container {
    */
   constructor(app, opts = {}) {
     super();
-    this._app     = app;
-    this._opts    = opts;
-    this._charIdx = 0;
-    this._typing  = false;
-    this._ticker  = null;
+    this._app       = app;
+    this._opts      = opts;
+    this._charIdx   = 0;
+    this._typing    = false;
+    this._ticker    = null;       // 保留欄位，destroy() 時清除舊訂閱
+    this._typeTimer  = null;       // setTimeout handle（取代 ticker 打字機）
+    this._isFrozen   = false;      // ⚡ 防護：cacheAsBitmap = true 只執行一次
     this._build();
     this._bindResize();
   }
@@ -33,7 +35,14 @@ export class DialogueOverlay extends PIXI.Container {
   _build() {
     const { width: W, height: H } = this._app.screen;
     this.removeChildren();
-    if (this._ticker) { this._ticker.destroy(); this._ticker = null; }
+
+    // ── 重置舊打字機 ──────────────────────────────────────────────────────────
+    if (this._typeTimer) { clearTimeout(this._typeTimer); this._typeTimer = null; }
+    if (this._ticker)    { this._ticker.destroy(); this._ticker = null; }
+
+    // ── 解除 bitmap 快取（rebuild 期間容器內容會變動）───────────────────────
+    this._isFrozen     = false;  // 重置凍結旗標
+    this.cacheAsBitmap = false;
 
     const boxH  = Math.floor(H * 0.31);
     const boxY  = H - boxH - Math.floor(H * 0.018);
@@ -178,38 +187,59 @@ export class DialogueOverlay extends PIXI.Container {
     this._startTypewriter();
   }
 
-  // ─── 打字機 ────────────────────────────────────────────────────────────────
+  // ─── 打字機（setTimeout 版）─────────────────────────────────────────────────
+  //
+  //  ⚡ 效能重點：
+  //    - 不再掛入 app.ticker（告別每幀 callback）
+  //    - 改用 setTimeout，每 67ms 觸發一次（≤ 15 次/秒）
+  //    - 每次推進 2 個字元，維持與原版（40ms/字）相近的閱讀速度
+  //    - 打字完成後設 cacheAsBitmap = true，Pixi 將整個容器烘成一張靜態貼圖
 
   _startTypewriter() {
     this._charIdx = 0;
     this._typing  = true;
-    const CHAR_MS = 40;
-    let   elapsed = 0;
 
-    this._ticker = this._app.ticker.add((dt) => {
+    const UPDATE_MS   = 67;   // ≈ 15 updates/sec 上限
+    const CHARS_BATCH = 2;    // 每次推進字元數，感知速度 ≈ 30 字/秒
+
+    const tick = () => {
       if (!this._typing || !this._textNode) return;
-      elapsed += dt.deltaMS;
-      if (elapsed >= CHAR_MS) {
-        elapsed -= CHAR_MS;
-        if (this._charIdx < this._textFull.length) {
-          this._charIdx++;
-          this._textNode.text = this._textFull.slice(0, this._charIdx);
-        } else {
-          this._typing = false;
-          if (this._prompt) this._prompt.alpha = 1;
-          if (this._ticker) { this._ticker.destroy(); this._ticker = null; }
+
+      const next = Math.min(this._charIdx + CHARS_BATCH, this._textFull.length);
+      this._charIdx = next;
+      this._textNode.text = this._textFull.slice(0, next);
+
+      if (next < this._textFull.length) {
+        // 繼續：排程下次更新
+        this._typeTimer = setTimeout(tick, UPDATE_MS);
+      } else {
+        // 打字完成
+        this._typing    = false;
+        this._typeTimer = null;
+        if (this._prompt) this._prompt.alpha = 1;
+        // ★ 凍結：只執行一次（_isFrozen 防止重複設定）
+        if (!this._isFrozen) {
+          this._isFrozen     = true;
+          this.cacheAsBitmap = true;
         }
       }
-    });
+    };
+
+    this._typeTimer = setTimeout(tick, UPDATE_MS);
   }
 
   _skipOrNext() {
     if (this._typing) {
-      // 跳過打字機
+      // 跳過打字機：立即顯示全文
+      if (this._typeTimer) { clearTimeout(this._typeTimer); this._typeTimer = null; }
       this._typing = false;
       if (this._textNode) this._textNode.text = this._textFull;
       if (this._prompt)   this._prompt.alpha  = 1;
-      if (this._ticker)   { this._ticker.destroy(); this._ticker = null; }
+      // ★ 凍結（同樣只執行一次）
+      if (!this._isFrozen) {
+        this._isFrozen     = true;
+        this.cacheAsBitmap = true;
+      }
       // 再次綁定點擊（等待 next）
       this.eventMode = 'static';
       this.once('pointerdown', () => this._skipOrNext());
@@ -280,7 +310,51 @@ export class DialogueOverlay extends PIXI.Container {
   }
 
   destroy(opts) {
-    if (this._ticker)  { this._ticker.destroy(); this._ticker = null; }
+    if (this._typeTimer) { clearTimeout(this._typeTimer); this._typeTimer = null; }
+    if (this._ticker)    { this._ticker.destroy(); this._ticker = null; }
+    if (this._rh) this._app.stage.off('resize', this._rh);
+    super.destroy(opts);
+  }
+}
+lse;
+
+    const txt = new PIXI.Text({
+      text: (active ? '▶  ' : '　') + label,
+      style: new PIXI.TextStyle({
+        fontFamily: '"Noto Sans TC","Microsoft JhengHei",sans-serif',
+        fontSize: 12, fontWeight: active ? 'bold' : 'normal',
+        fill: active ? 0xE6B200 : 0x555555,
+      }),
+    });
+    txt.x = 12;
+    txt.y = Math.max(0, (H - txt.style.fontSize - 4) / 2);
+
+    c.addChild(bg, dn, txt);
+
+    c.on('pointerdown', (e) => {
+      e.stopPropagation();
+      bg.visible = false; dn.visible = true;
+    });
+    c.on('pointerup', () => {
+      bg.visible = true; dn.visible = false;
+      c.emit('_tap');
+    });
+    c.on('pointerupoutside', () => { bg.visible = true; dn.visible = false; });
+    c.on('pointercancel',    () => { bg.visible = true; dn.visible = false; });
+
+    return c;
+  }
+
+  // ─── Resize ───────────────────────────────────────────────────────────────
+
+  _bindResize() {
+    this._rh = () => this._build();
+    this._app.stage.on('resize', this._rh);
+  }
+
+  destroy(opts) {
+    if (this._typeTimer) { clearTimeout(this._typeTimer); this._typeTimer = null; }
+    if (this._ticker)    { this._ticker.destroy(); this._ticker = null; }
     if (this._rh) this._app.stage.off('resize', this._rh);
     super.destroy(opts);
   }

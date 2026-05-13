@@ -123,8 +123,9 @@ export class MapManager {
     this._fogSprites = null;   // Array[y][x] → PIXI.Sprite
 
     // 貼圖快取（每種 tileId 一張 RenderTexture）
-    this._texCache  = new Map();
-    this._fogTex    = null;    // 霧用純黑貼圖
+    this._texCache    = new Map();
+    this._fogTex      = null;  // 霧用純黑貼圖
+    this._defaultTex  = null;  // 快取 miss 備援（預設深灰格）
 
     // 轉場 Overlay（全螢幕淡黑遮罩）
     this._overlay   = null;
@@ -132,6 +133,12 @@ export class MapManager {
     // 霧視野移動守衛（座標未變時跳過 updateFog）
     this._lastFogGx = -1;
     this._lastFogGy = -1;
+
+    // ── 渲染凍結旗標 ──────────────────────────────────────────────────────────
+    // 僅在鏡頭確實需要移動時才為 true，render() 若偵測到 false 直接返回
+    this._isDirty = true;
+    this._camGx   = 0;
+    this._camGy   = 0;
   }
 
   // ─── 工廠 ─────────────────────────────────────────────────────────────────
@@ -158,6 +165,7 @@ export class MapManager {
     this._W        = data.width;
     this._H        = data.height;
     this._tileSize = this._adaptTileSize(data.tileSize ?? 48);
+    this._isDirty  = true; // 地圖切換後強制重新渲染鏡頭
 
     // 建立碰撞 Uint8Array（支援 collisions:[{gx,gy}] 與舊式 collision:[] 兩種格式）
     const total = this._W * this._H;
@@ -201,7 +209,8 @@ export class MapManager {
       else t.destroy(true);
     });
     this._texCache.clear();
-    if (this._fogTex) { this._fogTex.destroy(true); this._fogTex = null; }
+    if (this._fogTex)     { this._fogTex.destroy(true);     this._fogTex     = null; }
+    if (this._defaultTex) { this._defaultTex.destroy(true); this._defaultTex = null; }
 
     this._fogState   = null;
     this._fogSprites = null;
@@ -248,6 +257,12 @@ export class MapManager {
     fogGfx.rect(0, 0, s, s).fill({ color: 0x000000 });
     this._fogTex = this._app.renderer.generateTexture({ target: fogGfx });
     fogGfx.destroy();
+
+    // ── 預設材質（快取 miss 時的安全備援，永不在每幀動態生成）─────────────────
+    const defGfx = new PIXI.Graphics();
+    defGfx.rect(0, 0, s, s).fill({ color: 0x1a1a1a });
+    this._defaultTex = this._app.renderer.generateTexture({ target: defGfx });
+    defGfx.destroy();
   }
 
   /** 以指定 variant 種子繪製同一 tile ID 的另一個隨機圖案。 */
@@ -867,6 +882,9 @@ export class MapManager {
 
   // ─── 渲染層 ────────────────────────────────────────────────────────────────
 
+  // ⚠️  此方法只在 loadMap / onResize 期間呼叫，絕對不在每幀執行。
+  //     所有貼圖均來自 _texCache（loadMap 預先生成），
+  //     快取 miss 時使用 _defaultTex 備援，永不在此處呼叫 generateTexture。
   _renderLayer(container, tileArray, layerType) {
     container.removeChildren();
     const s = this._tileSize;
@@ -876,8 +894,9 @@ export class MapManager {
         const id = tileArray[y * this._W + x];
         if (id === 0) continue;
 
-        const cached = this._texCache.get(id);
-        if (!cached) continue;
+        // 快取查詢：miss 時使用預設材質（絕不在此 generateTexture）
+        const cached = this._texCache.get(id) ?? this._defaultTex;
+        if (!cached) continue;  // 極端情況：連 defaultTex 都未建置時跳過
 
         // 陣列 = 多變體，依格子座標穩定挑選
         const tex = Array.isArray(cached)
@@ -1012,27 +1031,54 @@ export class MapManager {
   /**
    * 將鏡頭置中到指定格，並限制在地圖邊界內（不留黑邊）。
    * 呼叫後必須同步更新 InputManager.setGridConfig()。
+   * ⚡ 僅記錄目標座標 + 標記 dirty，實際位移在 render() 執行。
    *
    * @param {number} gx
    * @param {number} gy
    */
   centerOn(gx, gy) {
+    // ⚡ 雙重守衛：只有座標「真正改變」才標記 dirty。
+    //   不帶 !_isDirty 的條件，避免 loadMap 已設 dirty 時被意外覆蓋清除。
+    if (this._camGx === gx && this._camGy === gy) return;
+    this._camGx   = gx;
+    this._camGy   = gy;
+    this._isDirty = true;
+  }
+
+  /**
+   * 由 main.js 的 requestUpdate() 主動呼叫（**不在 ticker 每幀執行**）。
+   * 若 _isDirty 為 false，直接返回，不修改任何 Pixi 物件。
+   *
+   * ⚠️  此方法內絕對不能呼叫 generateTexture 或 removeChildren/addChild。
+   *     所有這類操作必須在 loadMap 階段完成。
+   */
+  render() {
+    if (!this._isDirty) return;
+    this._isDirty = false;
+
     const s     = this._tileSize;
     const W     = this._app.screen.width;
     const H     = this._app.screen.height;
     const gameH = Math.floor(H * 0.66);
 
-    // 玩家永遠置中於遊戲視野，不限制在地圖邊界內
-    // 超出地圖範圍的區域顯示黑色（void tile / 霧視野遮蓋）
-    this._root.x = W     / 2 - (gx + 0.5) * s;
-    this._root.y = gameH / 2 - (gy + 0.5) * s;
+    // 僅更新鏡頭位置（兩個屬性賦值，是 render 內唯一允許的 Pixi 操作）
+    this._root.x = W     / 2 - (this._camGx + 0.5) * s;
+    this._root.y = gameH / 2 - (this._camGy + 0.5) * s;
   }
 
   // ─── Getter ────────────────────────────────────────────────────────────────
 
   get tileSize()      { return this._tileSize; }
-  get rootX()         { return this._root.x; }
-  get rootY()         { return this._root.y; }
+  // rootX/Y 從 _camGx/_camGy 即時計算，確保 render() 尚未執行時也能回傳正確值
+  get rootX() {
+    const s = this._tileSize;
+    return this._app.screen.width  / 2 - (this._camGx + 0.5) * s;
+  }
+  get rootY() {
+    const s     = this._tileSize;
+    const gameH = Math.floor(this._app.screen.height * 0.66);
+    return gameH / 2 - (this._camGy + 0.5) * s;
+  }
   get mapWidth()      { return this._W; }
   get mapHeight()     { return this._H; }
   get mapData()       { return this._mapData; }
@@ -1172,6 +1218,7 @@ export class MapManager {
     if (newSize === this._tileSize) return;   // 大小未變，不重建
 
     this._tileSize = newSize;
+    this._isDirty  = true; // tileSize 改變，強制鏡頭重算（即使 camGx/Gy 未變）
 
     // 清除舊貼圖快取（支援單一貼圖與變體陣列）
     this._texCache.forEach(t => {

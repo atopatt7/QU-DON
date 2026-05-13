@@ -35,8 +35,31 @@ function getViewport() {
   };
 }
 
+// ─── 單一 App 實例守衛 ────────────────────────────────────────────────────────
+let _appInstance = null;
+
+// ─── Pixi 全域設定（必須在第一個 Application 建立前執行）──────────────────────
+function applyPixiGlobalSettings() {
+  // 降低 Fragment Shader 精度（Pixi v7 有效；v8 由 renderer 內部控制）
+  if (typeof PIXI.settings !== 'undefined') {
+    PIXI.settings.PRECISION_FRAGMENT = 'lowp';
+  }
+  // 縮短貼圖 GC 週期（預設 3600 幀，改為 600 幀 ≈ 20 秒 @ 30fps）
+  if (PIXI.TextureGCSystem) {
+    PIXI.TextureGCSystem.defaultMaxIdle = 600;
+  }
+}
+
 // ─── Pixi App ──────────────────────────────────────────────────────────────
 async function initPixi() {
+  // 防止重複初始化（熱重載或多次呼叫 main() 的保險）
+  if (_appInstance) {
+    console.warn('[QU-DON] PIXI.Application 已存在，略過重複初始化');
+    return _appInstance;
+  }
+
+  applyPixiGlobalSettings();
+
   const { W, H } = getViewport();
   const app = new PIXI.Application();
   await app.init({
@@ -48,6 +71,11 @@ async function initPixi() {
     antialias:       false,
     eventMode:       'static',
   });
+
+  // ⚡ Stage 3/4 效能：30fps 上限，減半 ticker 喚醒次數
+  app.ticker.maxFPS = 30;
+
+  _appInstance = app;
   document.getElementById('game-container').appendChild(app.canvas);
   const htmlCtrl = document.getElementById('touch-controls');
   if (htmlCtrl) htmlCtrl.style.display = 'none';
@@ -220,13 +248,17 @@ async function main() {
     input.setGridConfig(s, mapManager.rootX, mapManager.rootY);
   };
 
+  // ── 初始狀態：同步玩家位置 + 霧視野，並立即渲染鏡頭（不等 ticker）──────────
   syncPlayer();
   mapManager.updateFog(player.gx, player.gy, mapManager.visionRadius);
+  mapManager.render(); // ← 初始 render：確保鏡頭在第一幀就正確
 
+  // ── resize 處理：重建貼圖 + 重新置中，立即渲染（不依賴 ticker）──────────────
   app.stage.on('resize', () => {
     mapManager.onResize(player.gx, player.gy);
     playerSpr.resizeTo?.(mapManager.tileSize);
     syncPlayer();
+    mapManager.render(); // ← resize 後立即刷新鏡頭
   });
 
   const panel = await ControlPanel.create(app, input);
@@ -235,58 +267,68 @@ async function main() {
   // 移除淡出遮罩（讓遊戲顯現）
   overlay.destroy();
 
+  // ── requestUpdate：所有「狀態改變後的渲染更新」都集中在此 ──────────────────
+  //
+  //  ⚡ Stage 4 核心：render() 完全脫離 ticker，只由此函式主動觸發。
+  //     畫面靜止時 ticker 內不執行任何 Pixi 物件修改。
+  //
+  function requestUpdate() {
+    syncPlayer();                                                    // 精靈位置 + centerOn（標記 dirty）
+    mapManager.updateFog(player.gx, player.gy, mapManager.visionRadius); // 霧視野（有守衛，座標不變則跳過）
+    mapManager.render();                                             // 鏡頭（有守衛，!dirty 則跳過）
+  }
+
   // ── 3. 主遊戲迴圈 ────────────────────────────────────────────────────────
+  //
+  //  ⚡ Stage 4：ticker 內部只做輸入採樣 + 移動判斷。
+  //     玩家靜止時，整個 ticker callback 不觸碰任何 Pixi 物件，CPU ≈ 0。
+  //
   app.ticker.add(() => {
     const state = input.update();
-    let moved   = false;
 
-    if (state.justMoved && state.justDir) {
-      facing = state.justDir;
-      playerSpr.setDir(facing);
+    // 玩家靜止時直接返回——不執行任何 Pixi 操作
+    if (!state.justMoved || !state.justDir) return;
 
-      const { dx, dy } = DIR_DELTA[state.justDir];
-      const nx = player.gx + dx;
-      const ny = player.gy + dy;
-      if (mapManager.isWalkable(nx, ny)) {
-        player.gx = nx;
-        player.gy = ny;
-        moved     = true;
-        flashPlayer(playerSpr);
+    facing = state.justDir;
+    playerSpr.setDir(facing);
+
+    const { dx, dy } = DIR_DELTA[state.justDir];
+    const nx = player.gx + dx;
+    const ny = player.gy + dy;
+
+    if (!mapManager.isWalkable(nx, ny)) return; // 撞牆：不移動，不渲染
+
+    player.gx = nx;
+    player.gy = ny;
+    flashPlayer(playerSpr);
+
+    // ── 移動後：一次性更新所有狀態（精靈 + 霧 + 鏡頭）──────────────────────
+    requestUpdate();
+
+    // ── 傳送門檢查 ───────────────────────────────────────────────────────────
+    const warp = mapManager.checkWarp(player.gx, player.gy);
+    if (!warp) return;
+
+    input.lock();
+    console.log(`[Warp] "${warp.label ?? warp.id}" → ${warp.targetMap}`);
+
+    mapManager.transitionTo(warp.targetMap, () => {
+      player.gx = warp.targetGx;
+      player.gy = warp.targetGy;
+      if (!mapManager.entityLayer.children.includes(playerSpr)) {
+        mapManager.entityLayer.addChild(playerSpr);
       }
-    }
-
-    if (moved) {
-      syncPlayer();
-      mapManager.updateFog(player.gx, player.gy, mapManager.visionRadius);
-
-      const warp = mapManager.checkWarp(player.gx, player.gy);
-      if (warp) {
-        input.lock();
-        console.log(`[Warp] "${warp.label ?? warp.id}" → ${warp.targetMap}`);
-
-        mapManager.transitionTo(warp.targetMap, () => {
-          player.gx = warp.targetGx;
-          player.gy = warp.targetGy;
-          if (!mapManager.entityLayer.children.includes(playerSpr)) {
-            mapManager.entityLayer.addChild(playerSpr);
-          }
-          syncPlayer();
-          mapManager.updateFog(player.gx, player.gy, mapManager.visionRadius);
-        })
-          .then(() => input.unlock())
-          .catch(() => {
-            console.warn(`[Warp] 目標地圖 "${warp.targetMap}" 尚未建立，略過轉場`);
-            input.unlock();
-          });
-
-        return;
-      }
-    }
+      requestUpdate(); // 黑畫面期間同步新地圖的鏡頭 + 霧視野
+    })
+      .then(() => input.unlock())
+      .catch(() => {
+        console.warn(`[Warp] 目標地圖 "${warp.targetMap}" 尚未建立，略過轉場`);
+        input.unlock();
+      });
   });
 
   const renderer = app.renderer.type === 1 ? 'WebGL' : 'WebGPU';
   console.log(`[QU-DON] v6 — ${renderer} @ ${app.screen.width}×${app.screen.height}`);
   console.log(`[QU-DON] 玩家起點 (${player.gx}, ${player.gy}) 面向: ${facing}`);
 }
-
 main().catch(console.error);
