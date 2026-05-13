@@ -25,14 +25,12 @@
  */
 
 import { MembraneButton } from './MembraneButton.js';
-import { VFDClock }       from './VFDClock.js';
 
 // ─── 常數 ──────────────────────────────────────────────────────────────────────
 
 const PANEL_RATIO   = 0.34;   // 面板佔螢幕高度比例
 const DPAD_MARGIN_L = 28;     // D-Pad 左邊距（px）
 const ACT_MARGIN_R  = 28;     // Action 按鈕右邊距（px）
-const CLOCK_MARGIN  = { x: 14, bottom: 10 }; // VFD 時鐘邊距
 
 // D-Pad 方向定義
 const DPAD_DIRS = [
@@ -114,8 +112,6 @@ export class ControlPanel extends PIXI.Container {
     this.addChild(this._buildActionCluster(actSize, panelH, W)); // 右側按鈕
     const menuBtn = this._buildMenuBtn(panelH, W, actSize);
     if (menuBtn) this.addChild(menuBtn);
-    this._clock = this._buildClock(panelH);
-    this.addChild(this._clock);
     this.addChild(this._buildScanlines(W, panelH));     // 最頂層（不攔截事件）
   }
 
@@ -404,16 +400,6 @@ export class ControlPanel extends PIXI.Container {
     c.y = btnY;
 
     return c;
-  }
-
-  // ── 6. VFD 時鐘 ────────────────────────────────────────────────────────────
-
-  _buildClock(panelH) {
-    const fontSize = Math.max(14, Math.floor(panelH * 0.13));
-    const clock    = new VFDClock({ color: 'green', fontSize });
-    clock.x = CLOCK_MARGIN.x;
-    clock.y = panelH - clock.displayHeight - CLOCK_MARGIN.bottom;
-    return clock;
   }
 
   // ── 6. CRT 掃描線疊加 ────────────────────────────────────────────────────
