@@ -142,6 +142,8 @@ export class MapManager {
     this._isDirty = true;
     this._camGx   = 0;
     this._camGy   = 0;
+    this._camVx   = 0; // 視覺浮點相機座標（lerp 期間逐幀更新）
+    this._camVy   = 0;
   }
 
   // ─── 工廠 ─────────────────────────────────────────────────────────────────
@@ -1050,20 +1052,33 @@ export class MapManager {
    * @param {number} gy
    */
   centerOn(gx, gy) {
-    // ⚡ 雙重守衛：只有座標「真正改變」才標記 dirty。
-    //   不帶 !_isDirty 的條件，避免 loadMap 已設 dirty 時被意外覆蓋清除。
-    if (this._camGx === gx && this._camGy === gy) return;
+    // ⚡ 初始化 / resize / 傳送 — 直接對齊視覺座標（強制 snap）
+    if (this._camGx === gx && this._camGy === gy &&
+        this._camVx === gx && this._camVy === gy) return;
     this._camGx   = gx;
     this._camGy   = gy;
+    this._camVx   = gx; // snap 視覺座標到邏輯座標
+    this._camVy   = gy;
     this._isDirty = true;
   }
 
   /**
-   * 由 main.js 的 requestUpdate() 主動呼叫（**不在 ticker 每幀執行**）。
+   * 由 main.js lerp 迴圈每幀呼叫，傳入玩家的浮點視覺座標。
+   * 相機位置從此同步，確保地圖移動與精靈完全同步。
+   * @param {number} vx  player.vx
+   * @param {number} vy  player.vy
+   */
+  setCameraVisual(vx, vy) {
+    this._camVx   = vx;
+    this._camVy   = vy;
+    this._isDirty = true;
+  }
+
+  /**
+   * 由 main.js 主動呼叫（lerp 每幀 or init/resize/warp 後）。
    * 若 _isDirty 為 false，直接返回，不修改任何 Pixi 物件。
    *
    * ⚠️  此方法內絕對不能呼叫 generateTexture 或 removeChildren/addChild。
-   *     所有這類操作必須在 loadMap 階段完成。
    */
   render() {
     if (!this._isDirty) return;
@@ -1074,23 +1089,23 @@ export class MapManager {
     const H     = this._app.screen.height;
     const gameH = Math.floor(H * 0.66);
 
-    // 僅更新鏡頭位置（兩個屬性賦值，是 render 內唯一允許的 Pixi 操作）
-    this._root.x = W     / 2 - (this._camGx + 0.5) * s;
-    this._root.y = gameH / 2 - (this._camGy + 0.5) * s;
+    // 使用視覺浮點座標 (_camVx/_camVy)：lerp 期間平滑，snap 時與邏輯座標相同
+    this._root.x = W     / 2 - (this._camVx + 0.5) * s;
+    this._root.y = gameH / 2 - (this._camVy + 0.5) * s;
   }
 
   // ─── Getter ────────────────────────────────────────────────────────────────
 
   get tileSize()      { return this._tileSize; }
-  // rootX/Y 從 _camGx/_camGy 即時計算，確保 render() 尚未執行時也能回傳正確值
+  // rootX/Y 從視覺浮點座標計算，確保 lerp 期間 input.setGridConfig 也正確
   get rootX() {
     const s = this._tileSize;
-    return this._app.screen.width  / 2 - (this._camGx + 0.5) * s;
+    return this._app.screen.width  / 2 - (this._camVx + 0.5) * s;
   }
   get rootY() {
     const s     = this._tileSize;
     const gameH = Math.floor(this._app.screen.height * 0.66);
-    return gameH / 2 - (this._camGy + 0.5) * s;
+    return gameH / 2 - (this._camVy + 0.5) * s;
   }
   get mapWidth()      { return this._W; }
   get mapHeight()     { return this._H; }
@@ -1128,6 +1143,12 @@ export class MapManager {
 
     // ── 更新玩家位置（由外部注入） ──────────────────────────────────────────
     if (typeof onMidpoint === 'function') onMidpoint();
+
+    // ── 強制渲染一次：確保相機在淡入前已正確定位 ─────────────────────────────
+    // onMidpoint 呼叫 syncPlayer() → centerOn() 已標記 dirty，
+    // 但若 ticker 曾消費 _isDirty，這裡補刷保險，防止黑畫面殘留。
+    this._isDirty = true;
+    this.render();
 
     // ── Phase 3: CRT 電源開機閃爍 + 淡入 600ms ──────────────────────────────
     await this._fadeIn(600);

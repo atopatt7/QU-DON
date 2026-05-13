@@ -255,18 +255,19 @@ async function main() {
     playerSpr.y = (sheetTex ? px.y + s * 0.5 : px.y) - bob;
   }
 
-  // ── 鏡頭 + 輸入座標系（永遠跟隨整數格子，碰撞才正確）──────────────────────
+  // ── 輸入座標系更新（每次移動後同步 touch→grid 的座標基準）───────────────────
+  //    ※ 相機位置由 lerp 驅動，此函式不再呼叫 centerOn
   function updateCamera() {
-    mapManager.centerOn(player.gx, player.gy);
     input.setGridConfig(mapManager.tileSize, mapManager.rootX, mapManager.rootY);
   }
 
-  // ── syncPlayer：強制精靈 & 視窗立即對齊（用於初始 / resize / 傳送）──────────
+  // ── syncPlayer：強制精靈 & 鏡頭立即對齊（用於初始 / resize / 傳送）──────────
   const syncPlayer = () => {
     player.vx  = player.gx;
     player.vy  = player.gy;
     _isAnimating = false;
     _stepPhase   = 0;
+    mapManager.centerOn(player.gx, player.gy); // snap 視覺相機到邏輯座標
     updateSpritePos(player.vx, player.vy);
     updateCamera();
   };
@@ -340,14 +341,18 @@ async function main() {
         _isAnimating = true;
         _stepPhase   = 0;
 
-        // 鏡頭 & 霧立即對齊新邏輯格（碰撞 / 傳送偵測需要正確位置）
+        // 霧視野立即對齊新格（Pixi 自動渲染 alpha 變化）
+        mapManager.updateFog(player.gx, player.gy, mapManager.visionRadius);
+        // 輸入座標系更新（相機位置由 lerp section b 逐幀推進，不在此 snap）
         updateCamera();
-        requestUpdate();
 
         // ── 傳送門檢查 ─────────────────────────────────────────────────────
         const warp = mapManager.checkWarp(player.gx, player.gy);
         if (warp) {
           input.lock();
+          // 進入傳送前停止 lerp，避免 ticker section-b 在轉場期間干擾相機座標
+          _isAnimating = false;
+          _stepPhase   = 0;
           console.log(`[Warp] "${warp.label ?? warp.id}" → ${warp.targetMap}`);
           mapManager.transitionTo(warp.targetMap, () => {
             player.gx = warp.targetGx;
@@ -369,7 +374,7 @@ async function main() {
       }
     }
 
-    // ── b) Lerp 動畫推進 ────────────────────────────────────────────────────
+    // ── b) Lerp 動畫推進（精靈 + 相機同步）────────────────────────────────────
     if (_isAnimating) {
       const ex = player.gx - player.vx;
       const ey = player.gy - player.vy;
@@ -386,7 +391,10 @@ async function main() {
         _stepPhase  = Math.min(_stepPhase + 0.12, 1);
       }
 
+      // 精靈 & 相機同步到相同浮點視覺座標 → 地圖移動與角色完全一致，不暈
       updateSpritePos(player.vx, player.vy);
+      mapManager.setCameraVisual(player.vx, player.vy);
+      mapManager.render();
       return;
     }
 
