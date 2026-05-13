@@ -232,7 +232,7 @@ async function main() {
   await mapManager.loadMap('map_black_rock_street');
 
   const spawn  = mapManager.mapData.spawnPoints.find(s => s.id === 'player_start');
-  const player = { gx: spawn?.gx ?? 19, gy: spawn?.gy ?? 12 };
+  const player = { gx: spawn?.gx ?? 19, gy: spawn?.gy ?? 12, vx: 0, vy: 0 };
   let   facing = spawn?.facing ?? 'down';
 
   const sheetTex  = await loadPlayerSheet();
@@ -240,13 +240,35 @@ async function main() {
   playerSpr.setDir(facing);
   mapManager.entityLayer.addChild(playerSpr);
 
-  const syncPlayer = () => {
+  // ── Lerp 動畫常數 ────────────────────────────────────────────────────────────
+  const LERP_FACTOR = 0.30;   // 每幀收斂比例（30fps ≈ 150ms 抵達）
+  const LERP_SNAP   = 0.01;   // 誤差小於此值時強制對齊
+  let   _isAnimating = false;
+  let   _stepPhase   = 0;     // 0–1，用於步伐上下搖晃
+
+  // ── 精靈像素位置更新（接受浮點 grid 座標）──────────────────────────────────
+  function updateSpritePos(vgx, vgy) {
     const s  = mapManager.tileSize;
-    const px = mapManager.gridToPixel(player.gx, player.gy);
+    const px = mapManager.gridToPixel(vgx, vgy);
+    const bob = _isAnimating ? Math.sin(_stepPhase * Math.PI) * (s * 0.06) : 0;
     playerSpr.x = px.x;
-    playerSpr.y = sheetTex ? px.y + s * 0.5 : px.y;
+    playerSpr.y = (sheetTex ? px.y + s * 0.5 : px.y) - bob;
+  }
+
+  // ── 鏡頭 + 輸入座標系（永遠跟隨整數格子，碰撞才正確）──────────────────────
+  function updateCamera() {
     mapManager.centerOn(player.gx, player.gy);
-    input.setGridConfig(s, mapManager.rootX, mapManager.rootY);
+    input.setGridConfig(mapManager.tileSize, mapManager.rootX, mapManager.rootY);
+  }
+
+  // ── syncPlayer：強制精靈 & 視窗立即對齊（用於初始 / resize / 傳送）──────────
+  const syncPlayer = () => {
+    player.vx  = player.gx;
+    player.vy  = player.gy;
+    _isAnimating = false;
+    _stepPhase   = 0;
+    updateSpritePos(player.vx, player.vy);
+    updateCamera();
   };
 
   // ── 初始狀態：同步玩家位置 + 霧視野，並立即渲染鏡頭（不等 ticker）──────────
@@ -285,65 +307,90 @@ async function main() {
   // 移除淡出遮罩（讓遊戲顯現）
   overlay.destroy();
 
-  // ── requestUpdate：所有「狀態改變後的渲染更新」都集中在此 ──────────────────
-  //
-  //  ⚡ Stage 4 核心：render() 完全脫離 ticker，只由此函式主動觸發。
-  //     畫面靜止時 ticker 內不執行任何 Pixi 物件修改。
-  //
+  // ── requestUpdate：移動後立刻更新霧視野 + 鏡頭（精靈由 lerp 連續更新）──────
   function requestUpdate() {
-    syncPlayer();                                                    // 精靈位置 + centerOn（標記 dirty）
-    mapManager.updateFog(player.gx, player.gy, mapManager.visionRadius); // 霧視野（有守衛，座標不變則跳過）
-    mapManager.render();                                             // 鏡頭（有守衛，!dirty 則跳過）
+    mapManager.updateFog(player.gx, player.gy, mapManager.visionRadius);
+    mapManager.render();
   }
 
   // ── 3. 主遊戲迴圈 ────────────────────────────────────────────────────────
   //
-  //  ⚡ Stage 4：ticker 內部只做輸入採樣 + 移動判斷。
-  //     玩家靜止時，整個 ticker callback 不觸碰任何 Pixi 物件，CPU ≈ 0。
+  //  ⚡ Stage 4 + Lerp：
+  //     a) 有輸入 → 更新邏輯座標，啟動 lerp 動畫
+  //     b) 動畫進行中 → 每幀推進 vx/vy 直到收斂
+  //     c) 靜止且無動畫 → 直接返回，CPU ≈ 0
   //
   app.ticker.add(() => {
     const state = input.update();
 
-    // 玩家靜止時直接返回——不執行任何 Pixi 操作
-    if (!state.justMoved || !state.justDir) return;
+    // ── a) 有新輸入：嘗試移動 ──────────────────────────────────────────────
+    if (state.justMoved && state.justDir) {
+      facing = state.justDir;
+      playerSpr.setDir(facing);
 
-    facing = state.justDir;
-    playerSpr.setDir(facing);
+      const { dx, dy } = DIR_DELTA[state.justDir];
+      const nx = player.gx + dx;
+      const ny = player.gy + dy;
 
-    const { dx, dy } = DIR_DELTA[state.justDir];
-    const nx = player.gx + dx;
-    const ny = player.gy + dy;
+      if (mapManager.isWalkable(nx, ny)) {
+        player.gx = nx;
+        player.gy = ny;
 
-    if (!mapManager.isWalkable(nx, ny)) return; // 撞牆：不移動，不渲染
+        // 啟動（或重啟）lerp：視覺座標從當前位置平滑推進到新格子
+        _isAnimating = true;
+        _stepPhase   = 0;
 
-    player.gx = nx;
-    player.gy = ny;
-    flashPlayer(playerSpr);
+        // 鏡頭 & 霧立即對齊新邏輯格（碰撞 / 傳送偵測需要正確位置）
+        updateCamera();
+        requestUpdate();
 
-    // ── 移動後：一次性更新所有狀態（精靈 + 霧 + 鏡頭）──────────────────────
-    requestUpdate();
-
-    // ── 傳送門檢查 ───────────────────────────────────────────────────────────
-    const warp = mapManager.checkWarp(player.gx, player.gy);
-    if (!warp) return;
-
-    input.lock();
-    console.log(`[Warp] "${warp.label ?? warp.id}" → ${warp.targetMap}`);
-
-    mapManager.transitionTo(warp.targetMap, () => {
-      player.gx = warp.targetGx;
-      player.gy = warp.targetGy;
-      if (!mapManager.entityLayer.children.includes(playerSpr)) {
-        mapManager.entityLayer.addChild(playerSpr);
+        // ── 傳送門檢查 ─────────────────────────────────────────────────────
+        const warp = mapManager.checkWarp(player.gx, player.gy);
+        if (warp) {
+          input.lock();
+          console.log(`[Warp] "${warp.label ?? warp.id}" → ${warp.targetMap}`);
+          mapManager.transitionTo(warp.targetMap, () => {
+            player.gx = warp.targetGx;
+            player.gy = warp.targetGy;
+            if (!mapManager.entityLayer.children.includes(playerSpr)) {
+              mapManager.entityLayer.addChild(playerSpr);
+            }
+            clock.updateLocation(getMapLabel(mapManager.mapData));
+            syncPlayer(); // 傳送後強制對齊，不做 lerp
+            requestUpdate();
+          })
+            .then(() => input.unlock())
+            .catch(() => {
+              console.warn(`[Warp] 目標地圖 "${warp.targetMap}" 尚未建立，略過轉場`);
+              input.unlock();
+            });
+          return; // 傳送期間不繼續 lerp
+        }
       }
-      clock.updateLocation(getMapLabel(mapManager.mapData)); // [修改] 切換地圖時同步顯示名稱
-      requestUpdate(); // 黑畫面期間同步新地圖的鏡頭 + 霧視野
-    })
-      .then(() => input.unlock())
-      .catch(() => {
-        console.warn(`[Warp] 目標地圖 "${warp.targetMap}" 尚未建立，略過轉場`);
-        input.unlock();
-      });
+    }
+
+    // ── b) Lerp 動畫推進 ────────────────────────────────────────────────────
+    if (_isAnimating) {
+      const ex = player.gx - player.vx;
+      const ey = player.gy - player.vy;
+
+      if (Math.abs(ex) < LERP_SNAP && Math.abs(ey) < LERP_SNAP) {
+        // 誤差夠小 → 強制對齊，結束動畫
+        player.vx    = player.gx;
+        player.vy    = player.gy;
+        _isAnimating = false;
+        _stepPhase   = 0;
+      } else {
+        player.vx  += ex * LERP_FACTOR;
+        player.vy  += ey * LERP_FACTOR;
+        _stepPhase  = Math.min(_stepPhase + 0.12, 1);
+      }
+
+      updateSpritePos(player.vx, player.vy);
+      return;
+    }
+
+    // ── c) 靜止且無動畫：不觸碰任何 Pixi 物件，CPU ≈ 0 ─────────────────────
   });
 
   const renderer = app.renderer.type === 1 ? 'WebGL' : 'WebGPU';
