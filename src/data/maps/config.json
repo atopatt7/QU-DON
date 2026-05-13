@@ -144,13 +144,14 @@
       "desc":     "標準紅磚牆（建築外牆主體）"
     },
     "21": {
-      "name":     "wall_graffiti",
-      "group":    "wall",
+      "name":     "furniture_door_wood",
+      "group":    "indoor",
       "walkable": false,
       "collides": true,
-      "draw":     "graffiti",
-      "color":    "0x1e1830",
-      "desc":     "塗鴉牆（幫派領地標記 / 藝術）"
+      "draw":     "door_wood",
+      "color":    "0x3b2010",
+      "sfx":      "door_creak",
+      "desc":     "室內木門（斑駁、鉸鏈生鏽）"
     },
     "22": {
       "name":     "wall_metalgate",
@@ -262,13 +263,13 @@
       "desc":     "破舊的床（不可通行）"
     },
     "42": {
-      "name":     "indoor_table",
+      "name":     "mess_clutter",
       "group":    "indoor",
-      "walkable": false,
-      "collides": true,
+      "walkable": true,
+      "collides": false,
       "draw":     "indoor_table",
       "color":    "0x1c1208",
-      "desc":     "堆滿酒瓶的雜物桌（不可通行）"
+      "desc":     "散落地板的雜物 — 菸蒂、空罐、廢紙（僅視覺裝飾）"
     },
     "43": {
       "name":     "indoor_tv",
@@ -288,14 +289,25 @@
       "draw":     "indoor_sink",
       "color":    "0x181c1c",
       "desc":     "洗手台與發霉的牆角（不可通行）"
+    },
+
+    "45": {
+      "name":     "furniture_sofa",
+      "group":    "indoor",
+      "walkable": false,
+      "collides": true,
+      "draw":     "indoor_sofa",
+      "color":    "0x2e1a0e",
+      "desc":     "深棕色破舊沙發 — 彈簧外露、沾滿污漬（不可通行）"
     }
   },
 
   "_comment_groups": {
     "special":  "0",
-    "road":     "1–5",
+    "road":     "1–5, 9, 34–37",
     "sidewalk": "10–15",
-    "wall":     "20–25",
+    "wall":     "20, 22–25",
+    "indoor":   "21, 40–45  (21=door_wood, 40=floor, 41=bed, 42=clutter, 43=tv, 44=sink, 45=sofa)",
     "warp":     "30"
   }
 }

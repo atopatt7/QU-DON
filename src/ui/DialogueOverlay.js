@@ -309,48 +309,8 @@ export class DialogueOverlay extends PIXI.Container {
     this._app.stage.on('resize', this._rh);
   }
 
-  destroy(opts) {
-    if (this._typeTimer) { clearTimeout(this._typeTimer); this._typeTimer = null; }
-    if (this._ticker)    { this._ticker.destroy(); this._ticker = null; }
-    if (this._rh) this._app.stage.off('resize', this._rh);
-    super.destroy(opts);
-  }
-}
-lse;
-
-    const txt = new PIXI.Text({
-      text: (active ? '▶  ' : '　') + label,
-      style: new PIXI.TextStyle({
-        fontFamily: '"Noto Sans TC","Microsoft JhengHei",sans-serif',
-        fontSize: 12, fontWeight: active ? 'bold' : 'normal',
-        fill: active ? 0xE6B200 : 0x555555,
-      }),
-    });
-    txt.x = 12;
-    txt.y = Math.max(0, (H - txt.style.fontSize - 4) / 2);
-
-    c.addChild(bg, dn, txt);
-
-    c.on('pointerdown', (e) => {
-      e.stopPropagation();
-      bg.visible = false; dn.visible = true;
-    });
-    c.on('pointerup', () => {
-      bg.visible = true; dn.visible = false;
-      c.emit('_tap');
-    });
-    c.on('pointerupoutside', () => { bg.visible = true; dn.visible = false; });
-    c.on('pointercancel',    () => { bg.visible = true; dn.visible = false; });
-
-    return c;
-  }
-
-  // ─── Resize ───────────────────────────────────────────────────────────────
-
-  _bindResize() {
-    this._rh = () => this._build();
-    this._app.stage.on('resize', this._rh);
-  }
+  /** 鍵盤確認鍵觸發：打字中則跳到尾，否則推進到下一行。 */
+  advance() { this._skipOrNext(); }
 
   destroy(opts) {
     if (this._typeTimer) { clearTimeout(this._typeTimer); this._typeTimer = null; }

@@ -11,6 +11,8 @@ import { ControlPanel }          from './src/ui/ControlPanel.js';
 import { MapManager, DIR_DELTA } from './src/modules/MapManager.js';
 import { HomeScreen }            from './src/ui/HomeScreen.js';
 import { VFDClock }              from './src/ui/VFDClock.js';
+import { DialogueOverlay }       from './src/ui/DialogueOverlay.js';
+import { InteractionManager }    from './src/modules/InteractionManager.js';
 
 // ─── VT323 字型 ────────────────────────────────────────────────────────────
 const fontLink = document.createElement('link');
@@ -288,6 +290,13 @@ async function main() {
   const panel = await ControlPanel.create(app, input);
   app.stage.addChild(panel);
 
+  // ── 環境調查系統 ────────────────────────────────────────────────────────────
+  const dialogueOverlay = new DialogueOverlay(app, { text: '', speaker: '' });
+  dialogueOverlay.visible = false;
+  app.stage.addChild(dialogueOverlay);
+
+  const interaction = new InteractionManager(mapManager, dialogueOverlay);
+
   // ── VFD 時鐘（左下角，遊戲區底部）────────────────────────────────────────
   const clock = new VFDClock({ color: 'green', fontSize: 18, showSeconds: false });
   app.stage.addChild(clock);
@@ -323,6 +332,17 @@ async function main() {
   //
   app.ticker.add(() => {
     const state = input.update();
+
+    // ── 0) 環境調查：確認鍵邏輯 ────────────────────────────────────────────
+    if (interaction.isActive) {
+      // 對話框開啟中：確認鍵跳過打字機或關閉對話；其餘輸入全部丟棄
+      if (state.confirmJust) interaction.advance();
+      return;
+    }
+    if (state.confirmJust) {
+      // 嘗試調查正前方 Tile；若成功觸發則本幀跳過移動
+      if (interaction.tryInteract(player.gx, player.gy, facing)) return;
+    }
 
     // ── a) 有新輸入：嘗試移動 ──────────────────────────────────────────────
     if (state.justMoved && state.justDir) {
