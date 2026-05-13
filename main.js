@@ -278,8 +278,9 @@ async function main() {
   positionClock();
   app.stage.on('resize', positionClock);
 
-  // 初始地圖名稱
-  clock.updateLocation(mapManager.mapData?.name);
+  // 初始地圖名稱（優先讀 displayName，無則 fallback 到 name）
+  const getMapLabel = (data) => data?.displayName ?? data?.name ?? '---';
+  clock.updateLocation(getMapLabel(mapManager.mapData));
 
   // 移除淡出遮罩（讓遊戲顯現）
   overlay.destroy();
@@ -335,7 +336,7 @@ async function main() {
       if (!mapManager.entityLayer.children.includes(playerSpr)) {
         mapManager.entityLayer.addChild(playerSpr);
       }
-      clock.updateLocation(mapManager.mapData?.name); // [修改] 切換地圖時同步顯示名稱
+      clock.updateLocation(getMapLabel(mapManager.mapData)); // [修改] 切換地圖時同步顯示名稱
       requestUpdate(); // 黑畫面期間同步新地圖的鏡頭 + 霧視野
     })
       .then(() => input.unlock())
