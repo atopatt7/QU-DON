@@ -17,6 +17,10 @@ export class GameStateManager extends PIXI.EventEmitter {
     this._state    = GameState.HOME;
     this._previous = null;
     this._locked   = false;
+
+    // ── NPC 系統資料 ──────────────────────────────────────────────────────────
+    this.recruitedNpcs = [];   // 已招募 NPC 的 id 陣列
+    this.npcFlags      = {};   // 劇情旗標，例如 { "met_lena": true }
   }
 
   get state()    { return this._state; }
@@ -36,4 +40,24 @@ export class GameStateManager extends PIXI.EventEmitter {
   /** 暫時鎖定（轉場動畫期間） */
   lock()   { this._locked = true; }
   unlock() { this._locked = false; }
+
+  // ── NPC 招募方法 ────────────────────────────────────────────────────────────
+
+  recruitNpc(id) {
+    if (!this.recruitedNpcs.includes(id)) {
+      this.recruitedNpcs.push(id);
+    }
+  }
+
+  isRecruited(id) {
+    return this.recruitedNpcs.includes(id);
+  }
+
+  setNpcFlag(flagId, value = true) {
+    this.npcFlags[flagId] = value;
+  }
+
+  getNpcFlag(flagId) {
+    return this.npcFlags[flagId] ?? false;
+  }
 }

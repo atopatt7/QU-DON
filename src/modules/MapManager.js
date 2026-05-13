@@ -134,6 +134,9 @@ export class MapManager {
     this._lastFogGx = -1;
     this._lastFogGy = -1;
 
+    // NPC 系統（由 main.js 初始化後注入，預設 null）
+    this.entityManager = null;
+
     // ── 渲染凍結旗標 ──────────────────────────────────────────────────────────
     // 僅在鏡頭確實需要移動時才為 true，render() 若偵測到 false 直接返回
     this._isDirty = true;
@@ -145,6 +148,11 @@ export class MapManager {
 
   static async create(app, gameLayer) {
     return new MapManager(app, gameLayer);
+  }
+
+  /** 由 main.js 在初始化完成後注入 EntityManager 實例。 */
+  setEntityManager(entityManager) {
+    this.entityManager = entityManager;
   }
 
   // ─── 載入地圖 ──────────────────────────────────────────────────────────────
@@ -183,6 +191,11 @@ export class MapManager {
     this._renderLayer(this._groundLayer, data.layers.ground,  'ground');
     this._renderLayer(this._objectLayer, data.layers.objects, 'object');
     this._buildFogLayer();
+
+    // 地圖切換完成後，通知 EntityManager 重新載入 NPC
+    if (this.entityManager) {
+      await this.entityManager.init(mapId, this.entityLayer);
+    }
   }
 
   // ─── 自適應 Tile 大小 ──────────────────────────────────────────────────────

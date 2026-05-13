@@ -1,0 +1,44 @@
+[
+  {
+    "id": "npc_lena",
+    "name": "蕾娜",
+    "type": "recruitable",
+    "sprite": "assets/sprites/npcs/lena.png",
+    "position": { "x": 5, "y": 8 },
+    "mapId": "black_rock_street",
+    "dialogue": {
+      "default": ["...", "你來幹嘛？"],
+      "recruitable": ["聽說你在找人手？", "我可以考慮跟你走。"],
+      "recruited": ["交給我吧，瞿董。"]
+    },
+    "recruitCondition": {
+      "type": "flagSet",
+      "flagId": "met_lena"
+    },
+    "recruitable": true
+  },
+  {
+    "id": "npc_doctor_chen",
+    "name": "陳醫生",
+    "type": "static",
+    "sprite": "assets/sprites/npcs/doctor_chen.png",
+    "position": { "x": 12, "y": 4 },
+    "mapId": "black_rock_street",
+    "dialogue": {
+      "default": ["有傷嗎？我來看看。", "這條街不安全，小心點。"]
+    },
+    "recruitable": false
+  },
+  {
+    "id": "npc_merchant_wang",
+    "name": "老王",
+    "type": "static",
+    "sprite": "assets/sprites/npcs/merchant_wang.png",
+    "position": { "x": 18, "y": 10 },
+    "mapId": "black_rock_street",
+    "dialogue": {
+      "default": ["要買東西嗎？", "便宜賣你。"]
+    },
+    "recruitable": false
+  }
+]
