@@ -46,8 +46,9 @@ export class ControlPanel extends PIXI.Container {
 
   constructor(app, inputManager) {
     super();
-    this._app    = app;
-    this._input  = inputManager;
+    this._app       = app;
+    this._input     = inputManager;
+    this._coordText = null;   // 座標顯示文字，_build() 每次重建
 
     // AudioContext（需使用者互動後解鎖）
     this._audioCtx  = null;
@@ -113,6 +114,9 @@ export class ControlPanel extends PIXI.Container {
     const menuBtn = this._buildMenuBtn(panelH, W, actSize);
     if (menuBtn) this.addChild(menuBtn);
     this.addChild(this._buildScanlines(W, panelH));     // 最頂層（不攔截事件）
+
+    this._coordText = this._buildCoordDisplay(W, panelH);
+    this.addChild(this._coordText);
   }
 
   // ── 1. 背景 ─────────────────────────────────────────────────────────────
@@ -402,7 +406,28 @@ export class ControlPanel extends PIXI.Container {
     return c;
   }
 
-  // ── 6. CRT 掃描線疊加 ────────────────────────────────────────────────────
+  // ── 6. 座標顯示（中央，開發輔助）────────────────────────────────────────
+
+  _buildCoordDisplay(W, panelH) {
+    const fontSize = Math.max(10, Math.floor(panelH * 0.075));
+    const txt = new PIXI.Text({
+      text: '',
+      style: new PIXI.TextStyle({
+        fontFamily: '"Courier New", monospace',
+        fontSize,
+        fill:       0x00FF41,
+        fontWeight: 'bold',
+      }),
+    });
+    txt.anchor.set(0.5, 0.5);
+    txt.x = W / 2;
+    txt.y = Math.floor(panelH * 0.3);
+    txt.visible = false;
+    txt.eventMode = 'none';
+    return txt;
+  }
+
+  // ── 7. CRT 掃描線疊加 ────────────────────────────────────────────────────
 
   _buildScanlines(W, H) {
     const gfx = new PIXI.Graphics();
@@ -412,6 +437,18 @@ export class ControlPanel extends PIXI.Container {
     }
     gfx.eventMode = 'none'; // 穿透，不攔截下層點擊事件
     return gfx;
+  }
+
+  // ─── 公開 API ─────────────────────────────────────────────────────────────
+
+  updateCoordinates(gx, gy) {
+    if (!this._coordText) return;
+    if (window.SHOW_COORDS) {
+      this._coordText.text    = `[ ${Math.floor(gx)}, ${Math.floor(gy)} ]`;
+      this._coordText.visible = true;
+    } else {
+      this._coordText.visible = false;
+    }
   }
 
   // ─── 視窗縮放 ─────────────────────────────────────────────────────────────

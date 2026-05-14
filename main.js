@@ -207,6 +207,9 @@ function fadeOut(app, duration = 600) {
   });
 }
 
+// ─── 開發輔助旗標 ──────────────────────────────────────────────────────────
+window.SHOW_COORDS = false;
+
 // ═══════════════════════════════════════════════════════════════════════════
 //  主程式
 // ═══════════════════════════════════════════════════════════════════════════
@@ -374,7 +377,7 @@ async function main() {
   cigarMenu.on('inventory', ({ label })     => { console.log(`[Menu] ${label}`); });
   cigarMenu.on('crew',      ({ label })     => { console.log(`[Menu] ${label}`); });
   cigarMenu.on('journal',   ({ label })     => { console.log(`[Menu] ${label}`); });
-  cigarMenu.on('settings',  ({ label })     => { console.log(`[Menu] ${label}`); });
+  cigarMenu.on('settings',  ()              => { window.SHOW_COORDS = !window.SHOW_COORDS; _hideMenu(); });
   cigarMenu.on('save',      ({ label })     => { console.log(`[Menu] ${label}`); });
   cigarMenu.on('quit',      ()              => { console.log('[Menu] 放棄生存'); });
   // ────────────────────────────────────────────────────────────────────────
@@ -436,6 +439,9 @@ async function main() {
   //
   app.ticker.add(() => {
     const state = input.update();
+
+    // ── 座標顯示更新 ──────────────────────────────────────────────────────────
+    panel.updateCoordinates(player.gx, player.gy);
 
     // ── 0) 環境調查：確認鍵邏輯 ────────────────────────────────────────────
     if (interaction.isActive) {
