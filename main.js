@@ -319,6 +319,13 @@ async function main() {
     // TODO: 依 index 分流至狀態、物資、隊伍等功能畫面
   });
 
+  // 控制面板實體選單按鈕
+  panel.on('menu', () => {
+    if (!bulletMenu.visible && !interaction.isActive) {
+      bulletMenu.show();
+    }
+  });
+
   // Escape 開啟選單；選單自身的 Escape handler 負責關閉
   window.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && !bulletMenu.visible && !interaction.isActive) {
