@@ -35,6 +35,7 @@ const BULLET_INNER_X    = 0.08;  // 子彈插入彈匣的 X 比例
 const BULLET_GAP        = 6;     // 子彈間距（原生 px）
 const BULLET_TEXT_X     = 14;    // 文字距子彈左側 X（原生 px）
 const BULLET_FONT_SIZE  = 16;    // 鋼印文字固定大小（px）
+const MAX_BULLETS       = 12;    // 彈匣最大容量（含裝飾彈，微調此值填滿彈匣底部）
 
 export class BulletMenuOverlay extends PIXI.Container {
 
@@ -138,23 +139,33 @@ export class BulletMenuOverlay extends PIXI.Container {
     // Y：START_Y_OFFSET 為原生像素，乘 targetScale 轉成世界座標
     let originY = magY + (START_Y_OFFSET * targetScale);
 
-    MENU_LABELS.forEach((label, i) => {
-      // 中心點：用於 pivot 定位與 press 動畫基準
+    for (let i = 0; i < MAX_BULLETS; i++) {
       const centerX = originX + scaledBW / 2;
       const centerY = originY + scaledBH / 2;
 
-      const { container: c, sprite } = this._makeBulletItem(
-        label, i, bulletTex,
-        nativeBW, nativeBH, scaledBW, scaledBH,
-        targetScale, centerX, centerY,
-      );
+      if (i < MENU_LABELS.length) {
+        // 互動子彈：帶刻字、hover / press 動畫
+        const { container: c, sprite } = this._makeBulletItem(
+          MENU_LABELS[i], i, bulletTex,
+          nativeBW, nativeBH, scaledBW, scaledBH,
+          targetScale, centerX, centerY,
+        );
+        this._items.push({ container: c, sprite, baseX: centerX, baseY: centerY });
+        this.addChild(c);
+      } else if (bulletTex) {
+        // 裝飾子彈：純視覺填充，不可互動
+        const deco = new PIXI.Sprite(bulletTex);
+        deco.scale.set(targetScale);
+        deco.x         = originX;
+        deco.y         = originY;
+        deco.alpha     = 0.40;
+        deco.tint      = 0x777777;
+        deco.eventMode = 'none';
+        this.addChild(deco);
+      }
 
-      this._items.push({ container: c, sprite, baseX: centerX, baseY: centerY });
-      this.addChild(c);
-
-      // BULLET_GAP 同樣以原生像素定義，乘 targetScale
       originY += scaledBH + (BULLET_GAP * targetScale);
-    });
+    }
   }
 
   // ── 單顆子彈 Container ────────────────────────────────────────────────────
@@ -203,14 +214,14 @@ export class BulletMenuOverlay extends PIXI.Container {
         fontFamily:    '"Courier New", Courier, monospace',
         fontSize:      BULLET_FONT_SIZE,   // 固定，不受 targetScale 影響
         fontWeight:    'bold',
-        fill:          0x2C1808,           // 深棕 — 鋼印感
+        fill:          0x2e2013,           // 深棕 — 鋼印感
         letterSpacing: 1.5,
       }),
     });
-    // X：原生偏移量 × targetScale，對齊縮放後的彈殼位置
-    txt.x = BULLET_TEXT_X * targetScale;
-    // Y：縮放後子彈高度內垂直置中
-    txt.y = Math.floor((scaledH - BULLET_FONT_SIZE) / 2);
+    txt.anchor.set(0, 0.5);          // 水平靠左，垂直以中線為基準
+    txt.x = scaledW * 0.25;          // 跳過彈頭區（25% 處），對齊黃銅彈殼
+    txt.y = scaledH / 2;             // 對齊子彈縱向中線
+    txt.alpha = 0.85;
     c.addChild(txt);
 
     // 預設微暗
