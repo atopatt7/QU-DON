@@ -934,30 +934,56 @@ export class MapManager {
     const s = this._tileSize;
 
     for (const warp of this._mapData.warps) {
-      if (!warp.sprite) continue; // Case B：tile-30 已在 object layer 顯示，跳過
+      // 無 sprite 也無 label 則完全跳過（tile-30 已在 object layer 顯示）
+      if (!warp.sprite && !warp.label) continue;
 
-      // Case A：自訂圖片
-      // 直接從已完成的 _preloadWarpSprites() 快取中取貼圖
-      const url = 'assets/ui/' + warp.sprite;
-      const tex = PIXI.Assets.cache.get(url);
+      const cx = warp.gx * s + s / 2;
+      const cy = warp.gy * s + s / 2;
 
-      if (!tex) {
-        console.warn(`[MapManager] warp "${warp.id}" sprite 未找到，使用預設圖形`);
-        continue;
+      // ── 箭頭 Sprite（帶旋轉） ─────────────────────────────────────────────
+      if (warp.sprite) {
+        const url = 'assets/ui/' + warp.sprite;
+        const tex = PIXI.Assets.cache.get(url);
+
+        if (!tex) {
+          console.warn(`[MapManager] warp "${warp.id}" sprite 未找到，使用預設圖形`);
+          // sprite 缺失時不跳過，仍繼續渲染文字標籤
+        } else {
+          const spr    = new PIXI.Sprite(tex);
+          spr.anchor.set(0.5);
+          spr.x        = cx;
+          spr.y        = cy;
+          spr.width    = s;
+          spr.height   = s;
+          if (warp.rotation != null) {
+            spr.rotation = warp.rotation * (Math.PI / 180);
+          }
+          this._warpLayer.addChild(spr);
+        }
       }
 
-      const spr = new PIXI.Sprite(tex);
-      spr.anchor.set(0.5);
-      spr.x      = warp.gx * s + s / 2;
-      spr.y      = warp.gy * s + s / 2;
-      spr.width  = s;
-      spr.height = s;
-
-      if (warp.rotation != null) {
-        spr.rotation = warp.rotation * (Math.PI / 180);
+      // ── 文字標籤（永遠正向，rotation 強制 0） ─────────────────────────────
+      // 文字與 sprite 是同一 Container（_warpLayer）的兄弟節點，
+      // 因此 sprite 的旋轉完全不影響文字方向。
+      if (warp.label) {
+        const fontSize = Math.max(10, Math.floor(s * 0.30));
+        const txt = new PIXI.Text({
+          text: warp.label,
+          style: new PIXI.TextStyle({
+            fontFamily:  '"Noto Sans TC","Microsoft JhengHei",sans-serif',
+            fontSize,
+            fontWeight:  'bold',
+            fill:        0x00FF41,
+            dropShadow:  { color: 0x000000, blur: 3, distance: 1, alpha: 0.9 },
+          }),
+        });
+        // 水平置中、底部對齊格子底緣（文字壓在箭頭下方，不遮擋箭身）
+        txt.anchor.set(0.5, 1);
+        txt.x        = cx;
+        txt.y        = warp.gy * s + s - 2;
+        txt.rotation = 0;   // ← 關鍵：無論箭頭旋轉幾度，文字永遠水平可讀
+        this._warpLayer.addChild(txt);
       }
-
-      this._warpLayer.addChild(spr);
     }
   }
 
