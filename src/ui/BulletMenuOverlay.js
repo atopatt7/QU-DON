@@ -3,8 +3,8 @@
  * 暫停主選單 — 彈匣 + 子彈影像合成（RWD 動態縮放版）
  *
  * 素材（由 main.js 預載）：
- *   assets/ui/mag_base.png      彈匣外殼（含第一顆裝飾子彈）
- *   assets/ui/bullet_single.png 單顆子彈
+ *   assets/ui/mag_base.png      彈匣外殼（背景含 9 顆子彈刻槽，第 1 顆為裝飾）
+ *   assets/ui/bullet_single.png 單顆子彈（疊加在刻槽 2–9）
  *
  * 發出的具名事件：
  *   'resume'    繼續遊戲
@@ -35,24 +35,16 @@ const MENU_ITEMS = [
 // ║  調校常數區 — 只改這裡，不需動其他程式碼                                 ║
 // ║                                                                          ║
 // ║  MAG_HEIGHT_RATIO  彈匣高度佔螢幕高度的比例（0.85 = 85%）               ║
-// ║  MAX_BULLETS       彈匣總顯示子彈數（含裝飾彈，微調以填滿底部）          ║
-// ║  START_Y_OFFSET    第一顆互動子彈距彈匣頂端 Y（原生 px，未縮放）         ║
-// ║                    → 增大可讓起點更低，避開圖上自帶的第一顆子彈          ║
-// ║  BULLET_INNER_X    子彈 X 插入彈匣的深度（彈匣原生寬度的比例）           ║
-// ║  BULLET_GAP        子彈之間的垂直間距（原生 px，未縮放）                 ║
-// ║  BULLET_FONT_SIZE  鋼印文字大小（固定 px，不受 targetScale 縮放）        ║
-// ║  TEXT_X_RATIO      文字 X 起始位置（子彈縮放後寬度的比例）               ║
-// ║                    → 0.30 落在黃銅彈殼區，避開彈頭                       ║
-// ║  PRESS_OFFSET      按壓時的 XY 位移（原生 px，最終乘 targetScale 套用）  ║
+// ║  START_Y_OFFSET    第 1 顆互動子彈「中心點」距彈匣頂端的 Y（原生 px）    ║
+// ║                    → 向下加大以對齊背景圖第 2 顆刻槽中心                  ║
+// ║  BULLET_GAP_Y      相鄰子彈「中心點」之間的 Y 間距（原生 px）            ║
+// ║                    → 含子彈高度 + 縫隙，需與背景圖刻槽間距一致           ║
+// ║  BULLET_INNER_X    子彈 X 中心距彈匣左邊界的比例（彈匣原生寬度）         ║
 // ╚══════════════════════════════════════════════════════════════════════════╝
-const MAG_HEIGHT_RATIO = 0.85;
-const MAX_BULLETS      = 12;
-const START_Y_OFFSET   = 180;
-const BULLET_INNER_X   = 0.08;
-const BULLET_GAP       = 10;
-const BULLET_FONT_SIZE = 16;
-const TEXT_X_RATIO     = 0.30;
-const PRESS_OFFSET     = 2;
+const MAG_HEIGHT_RATIO = 0.85;  // 彈匣高度佔螢幕高度的比例
+const START_Y_OFFSET   = 180;   // 第 1 顆互動子彈中心距彈匣頂端 Y（原生 px）
+const BULLET_GAP_Y     = 65;    // 相鄰子彈中心點的 Y 間距（原生 px，含子彈高度）
+const BULLET_INNER_X   = 0.50;  // 子彈 X 中心位於彈匣寬度的比例（0.5 = 置中）
 
 export class BulletMenuOverlay extends PIXI.Container {
 
@@ -67,11 +59,10 @@ export class BulletMenuOverlay extends PIXI.Container {
   /** @param {PIXI.Application} app */
   constructor(app) {
     super();
-    this._app         = app;
-    this._items       = [];   // [{ container, sprite, baseX, baseY }]
-    this._cursor      = 0;
-    this._targetScale = 1;    // 最新 targetScale，供 _applyPress 使用
-    this._keyHandler  = null;
+    this._app        = app;
+    this._items      = [];   // [{ btn, sprite }]
+    this._cursor     = 0;
+    this._keyHandler = null;
 
     this._build();
     this._bindResize();
@@ -92,18 +83,18 @@ export class BulletMenuOverlay extends PIXI.Container {
     const nativeMagW = magTex ? magTex.width  : 90;
     const nativeMagH = magTex ? magTex.height : Math.floor(H / MAG_HEIGHT_RATIO);
 
-    const targetScale    = (H * MAG_HEIGHT_RATIO) / nativeMagH;
-    this._targetScale    = targetScale;  // 存入實例，_applyPress 直接取用
+    // targetScale：統一縮放倍率，讓整組 UI 在任何解析度下等比縮放
+    const targetScale = (H * MAG_HEIGHT_RATIO) / nativeMagH;
 
     const scaledMagW = nativeMagW * targetScale;
     const scaledMagH = nativeMagH * targetScale;
 
-    // 彈匣水平置中、垂直置中
+    // 彈匣水平 & 垂直置中
     const magX = Math.floor((W - scaledMagW) / 2);
     const magY = Math.floor((H - scaledMagH) / 2);
 
     this._buildMag(magTex, magX, magY, targetScale, scaledMagW, scaledMagH);
-    this._buildBullets(magX, magY, targetScale, nativeMagW);
+    this._buildBullets(magTex, magX, magY, targetScale, nativeMagW);
 
     this._applyCursor(0);
   }
@@ -138,162 +129,148 @@ export class BulletMenuOverlay extends PIXI.Container {
     return magSprite;
   }
 
-  // ── 子彈列（互動 + 裝飾填充）─────────────────────────────────────────────
+  // ── 8 顆互動子彈（疊加於背景刻槽 2–9）───────────────────────────────────
 
   /**
+   * 座標系說明：
+   *   btn.x / btn.y = 子彈「中心點」在世界座標的位置
+   *   bulletSprite.anchor.set(0.5) → 圖片中心對齊 btn(0,0)
+   *   text.anchor.set(0, 0.5)      → 文字垂直中線對齊 btn(0,0)
+   *   text.x = 負值               → 往左偏移，對齊黃銅彈殼區
+   *
+   * @param {PIXI.Texture|null} magTex
    * @param {number} magX        彈匣縮放後 X 起點（世界座標）
    * @param {number} magY        彈匣縮放後 Y 起點（世界座標）
    * @param {number} targetScale 全域縮放倍率
    * @param {number} nativeMagW  彈匣原生寬度（px）
    */
-  _buildBullets(magX, magY, targetScale, nativeMagW) {
+  _buildBullets(magTex, magX, magY, targetScale, nativeMagW) {
     const bulletTex = PIXI.Assets.get('assets/ui/bullet_single.png') ?? null;
-    const nativeBW  = bulletTex ? bulletTex.width  : 130;
-    const nativeBH  = bulletTex ? bulletTex.height : 24;
 
-    // 縮放後的子彈尺寸
-    const scaledBW = nativeBW * targetScale;
-    const scaledBH = nativeBH * targetScale;
+    MENU_ITEMS.forEach((item, index) => {
+      // ── 計算子彈中心點（世界座標）──────────────────────────────────────
+      // X：彈匣左邊界 + 彈匣寬度 × BULLET_INNER_X（比例）× targetScale
+      const btnX = magX + (nativeMagW * BULLET_INNER_X * targetScale);
 
-    // X：彈匣原生寬度的 BULLET_INNER_X 比例，乘 targetScale → 世界座標
-    const originX = magX + (nativeMagW * BULLET_INNER_X * targetScale);
+      // Y：彈匣頂端 + START_Y_OFFSET（原生 px）× targetScale
+      //    + index × BULLET_GAP_Y（原生 px）× targetScale
+      const btnY = magY
+        + (START_Y_OFFSET * targetScale)
+        + (index * BULLET_GAP_Y * targetScale);
 
-    // Y：START_Y_OFFSET 原生 px × targetScale
-    let originY = magY + (START_Y_OFFSET * targetScale);
+      const { btn, sprite } = this._makeBulletItem(
+        item, index, bulletTex, targetScale, btnX, btnY,
+      );
 
-    for (let i = 0; i < MAX_BULLETS; i++) {
-      // 中心點：pivot 定位與 press 動畫的基準
-      const centerX = originX + scaledBW / 2;
-      const centerY = originY + scaledBH / 2;
-
-      if (i < MENU_ITEMS.length) {
-        // ── 互動子彈：帶彈體刻字、hover / press 動畫 ──────────────────
-        const { container: c, sprite } = this._makeBulletItem(
-          MENU_ITEMS[i], i,
-          bulletTex, nativeBW, nativeBH, scaledBW, scaledBH,
-          targetScale, centerX, centerY,
-        );
-        this._items.push({ container: c, sprite, baseX: centerX, baseY: centerY });
-        this.addChild(c);
-      } else if (bulletTex) {
-        // ── 裝飾子彈：純視覺填充彈匣空間，不可互動 ────────────────────
-        const deco     = new PIXI.Sprite(bulletTex);
-        deco.scale.set(targetScale);
-        deco.x         = originX;
-        deco.y         = originY;
-        deco.alpha     = 0.38;
-        deco.tint      = 0x777777;
-        deco.eventMode = 'none';
-        this.addChild(deco);
-      }
-
-      originY += scaledBH + (BULLET_GAP * targetScale);
-    }
+      this._items.push({ btn, sprite });
+      this.addChild(btn);
+    });
   }
 
   // ── 單顆互動子彈 Container ────────────────────────────────────────────────
 
   /**
-   * Container 結構：
-   *   c（pivot 設縮放後中心 → press 以中心為軸，不產生位置跳動）
-   *   ├── bulletSprite（scale.set(targetScale)，只縮圖片，保護文字解析度）
-   *   └── txt（固定 BULLET_FONT_SIZE px，不受 targetScale 縮放）
+   * Container 結構（原點 = 子彈中心）：
+   *   btn
+   *   ├── bulletSprite  anchor(0.5)     → 圖片以中心點對齊原點，scale 縮放不偏移
+   *   └── txt           anchor(0, 0.5)  → 文字垂直置中，水平從 text.x 起算
+   *
+   * Press 動畫：btn.scale.set(0.95) 以原點（子彈中心）為基準收縮
+   *             → 不需要 pivot、不需要手動校正座標
    */
-  _makeBulletItem(
-    item, index,
-    bulletTex, nativeW, nativeH, scaledW, scaledH,
-    targetScale, centerX, centerY,
-  ) {
-    const c = new PIXI.Container();
+  _makeBulletItem(item, index, bulletTex, targetScale, btnX, btnY) {
+    const btn = new PIXI.Container();
 
-    // pivot 設縮放後中心：scale(0.96) 時以中心點收縮，不偏移
-    c.pivot.set(scaledW / 2, scaledH / 2);
-    c.x = centerX;
-    c.y = centerY;
+    // btn 的絕對位置 = 子彈中心點（世界座標）
+    btn.x = btnX;
+    btn.y = btnY;
 
-    c.eventMode = 'static';
-    c.cursor    = 'pointer';
+    btn.eventMode = 'static';
+    btn.cursor    = 'pointer';
 
-    // ── 子彈圖片（個別縮放，保護 txt 尺寸）────────────────────────────
-    let bulletSprite = null;
+    // ── 子彈圖片（anchor 0.5 → 中心對齊 btn 原點）────────────────────
+    let sprite = null;
     if (bulletTex) {
-      bulletSprite = new PIXI.Sprite(bulletTex);
-      bulletSprite.scale.set(targetScale);
-      c.addChild(bulletSprite);
+      sprite = new PIXI.Sprite(bulletTex);
+      sprite.anchor.set(0.5);         // 圖片中心 = btn(0,0)
+      sprite.scale.set(targetScale);  // RWD 縮放
+      btn.addChild(sprite);
     } else {
-      // 素材缺失佔位
+      // 素材缺失佔位（維持相同中心對齊）
+      const nativeW = 130;
+      const nativeH = 24;
       const ph = new PIXI.Graphics();
-      ph.roundRect(0, 0, scaledW, scaledH, 4)
-        .fill({ color: 0x7A6040 })
-        .stroke({ color: 0xC4A55A, width: 1 });
-      c.addChild(ph);
+      ph.roundRect(
+        -(nativeW * targetScale) / 2,
+        -(nativeH * targetScale) / 2,
+        nativeW * targetScale,
+        nativeH * targetScale,
+        4,
+      ).fill({ color: 0x7A6040 }).stroke({ color: 0xC4A55A, width: 1 });
+      btn.addChild(ph);
     }
 
     // ── 彈體刻字（鋼印效果）────────────────────────────────────────────
+    // 因為 bulletSprite 中心在 (0,0)，左邊界在 -(nativeW/2 * targetScale)。
+    // text.x = -(bulletTex.width / 2) * targetScale * 0.4
+    //        = 左邊界往右移 60%（40% 留給彈頭，60% 開始是黃銅彈殼）
+    const nativeW   = bulletTex ? bulletTex.width : 130;
+    const fontSize  = Math.max(14, Math.round(20 * targetScale));  // RWD 字體
+
     const txt = new PIXI.Text({
       text: item.label,
       style: new PIXI.TextStyle({
         fontFamily:    '"Courier New", Courier, monospace',
-        fontSize:      BULLET_FONT_SIZE,   // 固定 px，不受 targetScale 影響
+        fontSize,                  // 隨 targetScale 縮放，確保任何解析度可讀
         fontWeight:    'bold',
-        fill:          0x2e2013,           // 深棕 — 金屬鋼印色
-        letterSpacing: 1.5,
+        fill:          0x2e2013,   // 深棕 — 金屬鋼印色
+        letterSpacing: 1,
       }),
     });
-    txt.anchor.set(0, 0.5);             // 水平靠左，垂直以中線為基準
-    txt.x = scaledW * TEXT_X_RATIO;     // 黃銅彈殼區（30%），避開彈頭
-    txt.y = scaledH / 2;                // 對齊子彈縱向中線
+    txt.anchor.set(0, 0.5);                                  // 垂直置中，水平靠左
+    txt.x = -((nativeW / 2) * targetScale) * 0.4;           // 對齊黃銅彈殼區
+    txt.y = 0;                                               // 與子彈縱向中線齊平
     txt.alpha = 0.85;
-    c.addChild(txt);
+    btn.addChild(txt);
 
     // 預設微暗（非選中狀態）
-    c.alpha = 0.75;
-    if (bulletSprite) bulletSprite.tint = 0xAAAAAA;
+    btn.alpha = 0.75;
+    if (sprite) sprite.tint = 0xAAAAAA;
 
     // ── 互動事件 ──────────────────────────────────────────────────────
-    c.on('pointerover',      () => this._applyHover(index, true));
-    c.on('pointerout',       () => { if (this._cursor !== index) this._applyHover(index, false); });
-    c.on('pointerdown',      (e) => { e.stopPropagation(); this._applyPress(index, true); });
-    c.on('pointerup',        () => { this._applyPress(index, false); this._select(index); });
-    c.on('pointerupoutside', () => this._applyPress(index, false));
-    c.on('pointercancel',    () => this._applyPress(index, false));
+    btn.on('pointerover',      () => this._applyHover(index, true));
+    btn.on('pointerout',       () => { if (this._cursor !== index) this._applyHover(index, false); });
+    btn.on('pointerdown',      (e) => { e.stopPropagation(); this._applyPress(index, true); });
+    btn.on('pointerup',        () => { this._applyPress(index, false); this._select(index); });
+    btn.on('pointerupoutside', () => this._applyPress(index, false));
+    btn.on('pointercancel',    () => this._applyPress(index, false));
 
-    return { container: c, sprite: bulletSprite };
+    return { btn, sprite };
   }
 
   // ─── 特效 ─────────────────────────────────────────────────────────────────
 
   /**
-   * 懸停增亮：alpha 0.75 → 1.0 ＋ Sprite tint 0xAAAAAA → 0xFFFFFF
-   * 雙管齊下，無需 ColorMatrixFilter，不增加 GPU pass
+   * 懸停增亮：
+   *   btn.alpha 0.75 → 1.0（整體透明度）
+   *   sprite.tint 0xAAAAAA → 0xFFFFFF（子彈圖片亮度，無額外 GPU pass）
    */
   _applyHover(index, on) {
     const entry = this._items[index];
     if (!entry) return;
-    const { container: c, sprite } = entry;
-    c.alpha = on ? 1.0 : 0.75;
-    if (sprite) sprite.tint = on ? 0xFFFFFF : 0xAAAAAA;
+    entry.btn.alpha = on ? 1.0 : 0.75;
+    if (entry.sprite) entry.sprite.tint = on ? 0xFFFFFF : 0xAAAAAA;
   }
 
   /**
    * Z 軸按壓感：
-   *   scale(0.96)：pivot 在中心，縮放不產生位置偏移
-   *   x / y += PRESS_OFFSET * targetScale：右下位移模擬實體鍵陷入感
+   *   btn.scale.set(0.95) — 以 btn 原點（子彈中心）為基準均勻收縮
+   *   不需要手動校正 x / y，因為所有子物件皆以中心對齊原點
    */
   _applyPress(index, down) {
     const entry = this._items[index];
     if (!entry) return;
-    const { container: c, baseX, baseY } = entry;
-    const offset = PRESS_OFFSET * this._targetScale;
-    if (down) {
-      c.scale.set(0.96);
-      c.x = baseX + offset;
-      c.y = baseY + offset;
-    } else {
-      c.scale.set(1.0);
-      c.x = baseX;
-      c.y = baseY;
-    }
+    entry.btn.scale.set(down ? 0.95 : 1.0);
   }
 
   // ─── 游標管理 ─────────────────────────────────────────────────────────────
@@ -305,8 +282,8 @@ export class BulletMenuOverlay extends PIXI.Container {
   }
 
   /**
-   * 發出具名事件（如 'resume'）以及通用 'select' 事件。
-   * main.js 可同時監聽具名事件與 'select'。
+   * 發出具名事件（如 'resume'）+ 通用 'select' 事件。
+   * main.js 可分別監聽各功能，也可統一用 'select' 處理。
    */
   _select(index) {
     const item = MENU_ITEMS[index];
