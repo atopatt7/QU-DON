@@ -16,6 +16,7 @@ import { InteractionManager }    from './src/modules/InteractionManager.js';
 import { CigarMenuOverlay }      from './src/ui/CigarMenuOverlay.js';
 import { BattleUI }              from './src/ui/BattleUI.js';
 import { StatusScreen }          from './src/ui/StatusScreen.js';
+import { WorldMapScreen }        from './src/ui/WorldMapScreen.js';
 
 // ─── VT323 字型 ────────────────────────────────────────────────────────────
 const fontLink = document.createElement('link');
@@ -345,6 +346,11 @@ async function main() {
   statusScreen.zIndex = 1100;
   app.stage.addChild(statusScreen);
 
+  // ── 城市地圖介面 ──────────────────────────────────────────────────────────
+  const worldMap = new WorldMapScreen(app);
+  worldMap.zIndex = 1100;
+  app.stage.addChild(worldMap);
+
   // 從 actors.json 取得初始玩家數值（若已載入）
   const _actorsJson = await fetch('./src/data/actors.json').then(r => r.json()).catch(() => null);
   const _quDonData  = _actorsJson?.actors?.find(a => a.id === 'qu_don');
@@ -377,9 +383,12 @@ async function main() {
   cigarMenu.on('inventory', ({ label })     => { console.log(`[Menu] ${label}`); });
   cigarMenu.on('crew',      ({ label })     => { console.log(`[Menu] ${label}`); });
   cigarMenu.on('journal',   ({ label })     => { console.log(`[Menu] ${label}`); });
+  cigarMenu.on('map',       ()              => { cigarMenu.hide(); worldMap.show(); });
   cigarMenu.on('settings',  ()              => { window.SHOW_COORDS = !window.SHOW_COORDS; _hideMenu(); });
   cigarMenu.on('save',      ({ label })     => { console.log(`[Menu] ${label}`); });
   cigarMenu.on('quit',      ()              => { console.log('[Menu] 放棄生存'); });
+
+  worldMap.on('close', () => { _showMenu(); });
   // ────────────────────────────────────────────────────────────────────────
 
   // 控制面板實體選單按鈕

@@ -20,6 +20,7 @@ const MENU_ITEMS = [
   { label: '隨身物資', event: 'inventory' },
   { label: '隊伍人脈', event: 'crew'      },
   { label: '備忘錄',   event: 'journal'   },
+  { label: '城市地圖', event: 'map'       },
   { label: '系統設定', event: 'settings'  },
   { label: '儲存進度', event: 'save'      },
   { label: '放棄生存', event: 'quit'      },
