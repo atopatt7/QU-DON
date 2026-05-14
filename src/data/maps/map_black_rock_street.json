@@ -4885,12 +4885,12 @@
     },
     {
       "id": "warp_to_qu_don_room",
-      "gx": 5,
-      "gy": 5,
+      "gx": 16,
+      "gy": 3,
       "targetMap": "map_qu_don_room",
       "targetGx": 4,
       "targetGy": 5,
-      "direction": "right",
+      "direction": "left",
       "label": "瞿董的房間",
       "active": true
     },

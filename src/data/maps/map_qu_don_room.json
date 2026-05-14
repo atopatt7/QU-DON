@@ -74,8 +74,8 @@
       "gx": 5,
       "gy": 0,
       "targetMap": "map_black_rock_street",
-      "targetGx": 6,
-      "targetGy": 5,
+      "targetGx": 16,
+      "targetGy": 4,
       "direction": "up",
       "label": "出口 — Black Rock Street",
       "active": true
