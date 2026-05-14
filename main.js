@@ -311,25 +311,17 @@ async function main() {
     updateCamera();
   };
 
-  // ── 初始狀態：同步玩家位置 + 霧視野，並立即渲染鏡頭（不等 ticker）──────────
+  // ── 初始狀態：同步玩家位置 + 霧視野（鏡頭定位延遲到 ticker 第一幀揭幕時執行）
   syncPlayer();
   mapManager.updateFog(player.gx, player.gy, mapManager.visionRadius);
-  mapManager.render(); // ← 初始 render：確保鏡頭在第一幀就正確
-
-  // ── iOS Safari 安全機制：canvas layout 在首幀後才穩定，補一次 RAF 定位 ──────
-  // 若初始 render 時 _root.x/y 因 layout 尚未完成而為 NaN/0，
-  // 下一幀強制重新對齊，確保手機不會卡在地圖左上角
-  requestAnimationFrame(() => {
-    syncPlayer();
-    mapManager.render();
-  });
 
   // ── resize 處理：重建貼圖 + 重新置中，立即渲染（不依賴 ticker）──────────────
   app.stage.on('resize', () => {
     mapManager.onResize(player.gx, player.gy);
     playerSpr.resizeTo?.(mapManager.tileSize);
-    syncPlayer();
-    mapManager.render(); // ← resize 後立即刷新鏡頭
+    // setCameraVisual 沒有 centerOn 的 early-return guard，確保 tileSize 改變後鏡頭重算
+    mapManager.setCameraVisual(player.vx, player.vy);
+    mapManager.render();
   });
 
   const panel = await ControlPanel.create(app, input);
@@ -438,8 +430,7 @@ async function main() {
   const getMapLabel = (data) => data?.displayName ?? data?.name ?? '---';
   clock.updateLocation(getMapLabel(mapManager.mapData));
 
-  // 移除淡出遮罩（讓遊戲顯現）
-  overlay.destroy();
+  // ⚠️ overlay 不在此處 destroy，由 ticker 第一幀在鏡頭定位後才揭幕（見下方）
 
   // ── requestUpdate：移動後立刻更新霧視野 + 鏡頭（精靈由 lerp 連續更新）──────
   function requestUpdate() {
@@ -454,7 +445,22 @@ async function main() {
   //     b) 動畫進行中 → 每幀推進 vx/vy 直到收斂
   //     c) 靜止且無動畫 → 直接返回，CPU ≈ 0
   //
+  // 揭幕用：ticker 第一幀在 iOS layout 穩定後才移除 overlay，確保鏡頭正確
+  // setCameraVisual 沒有 centerOn 的 early-return guard，保證 _isDirty=true
+  let _revealOverlay = overlay;
+
   app.ticker.add(() => {
+    // ── 第一幀揭幕：所有 await 已完成，iOS layout 已穩定 ──────────────────────
+    if (_revealOverlay) {
+      mapManager.setCameraVisual(player.vx, player.vy);
+      mapManager.render();
+      updateSpritePos(player.vx, player.vy);
+      updateCamera();
+      _revealOverlay.destroy();
+      _revealOverlay = null;
+      return; // 揭幕幀不處理輸入，避免「按新遊戲」的 pointerup 殘留觸發移動
+    }
+
     const state = input.update();
 
     // ── 座標顯示更新 ──────────────────────────────────────────────────────────
