@@ -15,6 +15,7 @@ import { DialogueOverlay }       from './src/ui/DialogueOverlay.js';
 import { InteractionManager }    from './src/modules/InteractionManager.js';
 import { CigarMenuOverlay }      from './src/ui/CigarMenuOverlay.js';
 import { BattleUI }              from './src/ui/BattleUI.js';
+import { StatusScreen }          from './src/ui/StatusScreen.js';
 
 // ─── VT323 字型 ────────────────────────────────────────────────────────────
 const fontLink = document.createElement('link');
@@ -336,9 +337,40 @@ async function main() {
 
   cigarMenu.on('close', _hideMenu);
 
+  // ── 狀態與專長介面 ────────────────────────────────────────────────────────
+  const statusScreen = new StatusScreen(app);
+  statusScreen.zIndex = 1100;
+  app.stage.addChild(statusScreen);
+
+  // 從 actors.json 取得初始玩家數值（若已載入）
+  const _actorsJson = await fetch('./src/data/actors.json').then(r => r.json()).catch(() => null);
+  const _quDonData  = _actorsJson?.actors?.find(a => a.id === 'qu_don');
+  if (_quDonData) {
+    statusScreen.updateData({
+      name:         _quDonData.name,
+      level:        1,
+      exp:          0,
+      nextLevelExp: _quDonData.levelProgression?.xpPerLevel ?? 100,
+      hp:           _quDonData.stats.hp,
+      maxHp:        _quDonData.stats.maxHp,
+      atk:          _quDonData.stats.attack,
+      def:          _quDonData.stats.defense,
+      stamina:      _quDonData.stats.hp,
+      maxStamina:   _quDonData.stats.maxHp,
+      skillPoints:  3,
+      perks:        (_quDonData.passives ?? []).map(p => ({
+        label: p.label, rank: 1, desc: p.effect,
+      })),
+    });
+  }
+
+  statusScreen.on('close', () => {
+    _showMenu(); // 關閉狀態介面後回到雪茄選單
+  });
+
   // ── 具名事件 Stubs（功能待實作）──────────────────────────────────────────
   cigarMenu.on('resume',    ()              => _hideMenu());
-  cigarMenu.on('status',    ({ label })     => { console.log(`[Menu] ${label}`); });
+  cigarMenu.on('status',    ()              => { cigarMenu.hide(); statusScreen.show(); });
   cigarMenu.on('inventory', ({ label })     => { console.log(`[Menu] ${label}`); });
   cigarMenu.on('crew',      ({ label })     => { console.log(`[Menu] ${label}`); });
   cigarMenu.on('journal',   ({ label })     => { console.log(`[Menu] ${label}`); });
