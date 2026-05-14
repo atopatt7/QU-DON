@@ -3011,7 +3011,7 @@
       0,
       0,
       20,
-      20,
+      30,
       0,
       0,
       0,
@@ -4614,7 +4614,7 @@
     1,
     1,
     1,
-    1,
+    0,
     1,
     1,
     1,
@@ -4873,6 +4873,19 @@
       "targetGy": 2,
       "direction": "down",
       "label": "後巷入口",
+      "active": true
+    },
+    {
+      "id": "exit_to_hakka",
+      "gx": 0,
+      "gy": 35,
+      "targetMap": "map_hakka_street",
+      "targetGx": 38,
+      "targetGy": 35,
+      "direction": "left",
+      "label": "往哈卡街",
+      "sprite": "warp_door.png",
+      "rotation": -90,
       "active": true
     }
   ],
