@@ -38,9 +38,9 @@ const MENU_ITEMS = [
 // ║    0    → 緊貼彈匣頂端                                                   ║
 // ║    正值 → 會跑到彈匣上方（錯誤方向）                                     ║
 // ║                                                                          ║
-// ║  BULLET_GAP_EXTRA  子彈之間的額外間距（縮放後 px，不含子彈本身高度）     ║
-// ║                    → 間距 = 子彈實際高度 + BULLET_GAP_EXTRA              ║
-// ║                    → 設為 0 時緊密排列（無縫隙）                          ║
+// ║  BULLET_STEP_Y     相鄰子彈「中心點」的固定 Y 間距（原生 px）              ║
+// ║                    與圖片尺寸無關，直接對應彈匣背景圖的刻槽節奏            ║
+// ║                    → 加大 = 子彈間距拉開；縮小 = 子彈靠近                 ║
 // ║                                                                          ║
 // ║  BULLET_INNER_X    子彈 X 中心位於彈匣寬度的比例（0.5 = 水平置中）       ║
 // ║                                                                          ║
@@ -51,7 +51,7 @@ const MENU_ITEMS = [
 // ╚══════════════════════════════════════════════════════════════════════════╝
 const MAG_HEIGHT_RATIO  = 0.85;
 const START_Y_OFFSET    = -200;   // 負值 = 從彈匣頂端往下（加大絕對值往下移）
-const BULLET_GAP_EXTRA  = 8;      // 子彈之間的額外間距（縮放後 px）
+const BULLET_STEP_Y     = 60;     // 相鄰子彈中心點的固定 Y 間距（原生 px，與圖片尺寸無關）
 const BULLET_INNER_X    = 0.50;   // 子彈 X 中心（彈匣寬度比例）
 const BULLET_SCALE      = 0.8;    // 子彈縮放倍率（相對於 targetScale）
 const TEXT_START_RATIO  = 0.28;   // 文字 X 起始（子彈左邊界算起的比例）
@@ -137,13 +137,13 @@ export class BulletMenuOverlay extends PIXI.Container {
 
   /**
    * ★ Y 軸方向規則（與 START_Y_OFFSET 一致）：
-   *   btnY = magY − (START_Y_OFFSET × targetScale)
+   *   btnYBase = magY − (START_Y_OFFSET × targetScale) + stepY
    *
    *   START_Y_OFFSET 為負值時：
    *     − (負數) = + 正數 → magY 往「下」位移 → 進入彈匣內部 ✓
+   *   額外 + stepY：讓第一顆子彈再往下移一顆子彈的距離
    *
-   * ★ stepY 由子彈實際縮放高度動態計算，確保不重疊：
-   *   stepY = 子彈縮放後高度 + BULLET_GAP_EXTRA
+   * ★ stepY = BULLET_STEP_Y × targetScale（固定值，與圖片尺寸無關）
    */
   _buildBullets(magTex, magX, magY, targetScale, nativeMagW) {
     const bulletTex   = PIXI.Assets.get('assets/ui/bullet_single.png') ?? null;
@@ -155,17 +155,15 @@ export class BulletMenuOverlay extends PIXI.Container {
     const scaledBW    = nativeBW * bulletScale;
     const scaledBH    = nativeBH * bulletScale;
 
-    // 間距 = 子彈實際高度 + 額外縫隙（確保不重疊）
-    const stepY = scaledBH + BULLET_GAP_EXTRA;
+    // 固定間距：與圖片尺寸無關，直接乘 targetScale 換算世界座標
+    const stepY = BULLET_STEP_Y * targetScale;
 
     // X：彈匣左邊界 + 彈匣寬度 × BULLET_INNER_X × targetScale
     const btnX = magX + (nativeMagW * BULLET_INNER_X * targetScale);
 
     // Y 起點：負號讓 START_Y_OFFSET 負值 = 往彈匣內部向下
-    //   magY − (START_Y_OFFSET × targetScale)
-    //   = magY − (負數 × ts)
-    //   = magY + 正數 → 往下進入彈匣 ✓
-    const btnYBase = magY - (START_Y_OFFSET * targetScale);
+    // 再加一個 stepY，讓第一顆子彈往下移一顆子彈的距離
+    const btnYBase = magY - (START_Y_OFFSET * targetScale) + stepY;
 
     MENU_ITEMS.forEach((item, index) => {
       const btnY = btnYBase + (index * stepY);
