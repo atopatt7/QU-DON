@@ -310,12 +310,18 @@ async function main() {
   // 素材已由前述 PIXI.Assets.load() 預載，此處同步取回並建立選單
   const cigarMenu = CigarMenuOverlay.create(app);
   cigarMenu.visible = false;
+  app.stage.sortableChildren = true;
+  cigarMenu.zIndex = 1000;
   app.stage.addChild(cigarMenu);
 
-  cigarMenu.on('close', () => cigarMenu.hide());
+  // 關閉選單時恢復控制面板
+  const _hideMenu = () => { cigarMenu.hide(); panel.visible = true; };
+  const _showMenu = () => { cigarMenu.show(); panel.visible = false; };
+
+  cigarMenu.on('close', _hideMenu);
 
   // ── 具名事件 Stubs（功能待實作）──────────────────────────────────────────
-  cigarMenu.on('resume',    ()              => { cigarMenu.hide(); });
+  cigarMenu.on('resume',    ()              => _hideMenu());
   cigarMenu.on('status',    ({ label })     => { console.log(`[Menu] ${label}`); });
   cigarMenu.on('inventory', ({ label })     => { console.log(`[Menu] ${label}`); });
   cigarMenu.on('crew',      ({ label })     => { console.log(`[Menu] ${label}`); });
@@ -328,7 +334,7 @@ async function main() {
   // 控制面板實體選單按鈕
   panel.on('menu', () => {
     if (!cigarMenu.visible && !interaction.isActive) {
-      cigarMenu.show();
+      _showMenu();
     }
   });
 
@@ -336,7 +342,7 @@ async function main() {
   window.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && !cigarMenu.visible && !interaction.isActive) {
       e.preventDefault();
-      cigarMenu.show();
+      _showMenu();
     }
   });
 
