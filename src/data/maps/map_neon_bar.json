@@ -317,9 +317,9 @@
       "gx": 5,
       "gy": 7,
       "targetMap": "map_black_rock_street",
-      "targetGx": 38,
-      "targetGy": 19,
-      "direction": "down",
+      "targetGx": 12,
+      "targetGy": 16,
+      "direction": "up",
       "label": "回到 Black Rock Street",
       "active": true
     }
