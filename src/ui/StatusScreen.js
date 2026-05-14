@@ -167,12 +167,35 @@ export class StatusScreen extends PIXI.Container {
     title.y = py + th / 2;
     this.addChild(title);
 
-    // 關閉提示（右上角）
-    const hint = this._text('[ESC] 關閉', Math.max(9, fs * 0.65), C.dim);
-    hint.anchor.set(1, 0.5);
-    hint.x = px + pw - 10;
-    hint.y = py + th / 2;
-    this.addChild(hint);
+    // 關閉按鈕（右上角，鍵盤 ESC ＆ 手機觸控皆可用）
+    const btnW = Math.max(64, Math.floor(pw * 0.14));
+    const btnH = Math.floor(th * 0.72);
+    const btnX = px + pw - btnW - 8;
+    const btnY = py + Math.floor((th - btnH) / 2);
+
+    const btnBg = new PIXI.Graphics();
+    btnBg.roundRect(btnX, btnY, btnW, btnH, 3)
+         .fill({ color: 0x2a1a00 })
+         .stroke({ color: C.dim, width: 1 });
+    this.addChild(btnBg);
+
+    const btnTxt = this._text('✕  關閉', Math.max(9, Math.floor(btnH * 0.52)), C.dim);
+    btnTxt.anchor.set(0.5, 0.5);
+    btnTxt.x = btnX + btnW / 2;
+    btnTxt.y = btnY + btnH / 2;
+    this.addChild(btnTxt);
+
+    // 互動區（比文字大，方便手指點擊）
+    const hitArea = new PIXI.Container();
+    hitArea.eventMode = 'static';
+    hitArea.cursor    = 'pointer';
+    hitArea.hitArea   = new PIXI.Rectangle(btnX - 4, btnY - 4, btnW + 8, btnH + 8);
+    hitArea.on('pointerover',  () => { btnBg.tint = 0xddaa44; btnTxt.tint = 0xddaa44; });
+    hitArea.on('pointerout',   () => { btnBg.tint = 0xffffff; btnTxt.tint = 0xffffff; });
+    hitArea.on('pointerdown',  (e) => e.stopPropagation());
+    hitArea.on('pointerup',    () => this.hide());
+    hitArea.on('pointertap',   () => this.hide());
+    this.addChild(hitArea);
   }
 
   // ── 左欄：身體數值 ───────────────────────────────────────────────────────
