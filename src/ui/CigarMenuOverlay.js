@@ -48,6 +48,9 @@ const BOX_HEIGHT_RATIO    = 0.85;
 const TOTAL_CIGARS  = 10;
 const ACTIVE_CIGARS = MENU_ITEMS.length; // 8
 
+// 雪茄高度壓縮比（寬度不變，高度乘以此值讓 10 支剛好塞進盒內）
+const CIGAR_HEIGHT_SQUEEZE = 0.9;
+
 const PRESS_SCALE     = 0.96;       // Z 軸下沉按壓深度
 const HOVER_TINT      = 0xffe8b0;   // 暖金高光
 const DEFAULT_TINT    = 0xffffff;
@@ -158,11 +161,12 @@ export class CigarMenuOverlay extends PIXI.Container {
                  + (BOX_INNER_OFFSET_X  * boxScale)
                  + (CIGAR_NATIVE_WIDTH  * finalCigarScale) / 2;
 
+    // 高度乘上壓縮比，startY 的半高與 stepY 同步縮小
     const startY = boxY
                  + (BOX_INNER_OFFSET_Y  * boxScale)
-                 + (CIGAR_NATIVE_HEIGHT * finalCigarScale) / 2;
+                 + (CIGAR_NATIVE_HEIGHT * finalCigarScale * CIGAR_HEIGHT_SQUEEZE) / 2;
 
-    const stepY = CIGAR_NATIVE_HEIGHT * finalCigarScale;
+    const stepY = CIGAR_NATIVE_HEIGHT * finalCigarScale * CIGAR_HEIGHT_SQUEEZE;
 
     for (let i = 0; i < TOTAL_CIGARS; i++) {
       const isActive = i < ACTIVE_CIGARS;
@@ -201,12 +205,12 @@ export class CigarMenuOverlay extends PIXI.Container {
     if (cigarTex) {
       cigar = new PIXI.Sprite(cigarTex);
       cigar.anchor.set(0.5);
-      cigar.scale.set(finalCigarScale);
+      cigar.scale.set(finalCigarScale, finalCigarScale * CIGAR_HEIGHT_SQUEEZE);
       btn.addChild(cigar);
     } else {
       // 素材缺失佔位（中心對齊）
       const scaledW = CIGAR_NATIVE_WIDTH  * finalCigarScale;
-      const scaledH = CIGAR_NATIVE_HEIGHT * finalCigarScale;
+      const scaledH = CIGAR_NATIVE_HEIGHT * finalCigarScale * CIGAR_HEIGHT_SQUEEZE;
       const ph = new PIXI.Graphics();
       ph.roundRect(-scaledW / 2, -scaledH / 2, scaledW, scaledH, scaledH * 0.45)
         .fill({ color: 0x7a5c2e })
@@ -223,9 +227,11 @@ export class CigarMenuOverlay extends PIXI.Container {
     }
 
     // ── 茄標刻字 ──────────────────────────────────────────────────────────
-    const scaledCigarH = CIGAR_NATIVE_HEIGHT * finalCigarScale;
+    const scaledCigarH = CIGAR_NATIVE_HEIGHT * finalCigarScale * CIGAR_HEIGHT_SQUEEZE;
     const scaledCigarW = CIGAR_NATIVE_WIDTH  * finalCigarScale;
     const fontSize = Math.max(11, Math.round(scaledCigarH * 0.46));
+    // Courier New 等寬字元寬 ≈ fontSize × 0.6，整體右移 4 個字元寬避開茄標圖案
+    const charWidth = fontSize * 0.6;
 
     const txt = new PIXI.Text({
       text: item.label,
@@ -243,9 +249,9 @@ export class CigarMenuOverlay extends PIXI.Container {
       }),
     });
 
-    // 文字中心對準雪茄中心，再向左偏 TEXT_X_RATIO（對準茄標印刷區）
+    // 文字中心對準雪茄中心，再向左偏 TEXT_X_RATIO（對準茄標印刷區），並右移 4 字寬避開標籤
     txt.anchor.set(0.5, 0.5);
-    txt.x = scaledCigarW * TEXT_X_RATIO;
+    txt.x = scaledCigarW * TEXT_X_RATIO + charWidth * 4;
     txt.y = 0;
     txt.alpha = 0.92;
     btn.addChild(txt);
