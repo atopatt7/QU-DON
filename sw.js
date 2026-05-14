@@ -6,10 +6,10 @@
  *    才能讓舊快取失效、手機端取得最新版本。
  */
 
-const CACHE_NAME = 'qudon-v14';
+const CACHE_NAME = 'qudon-v15';
 
 // ── 本機檔案：安裝時全數預快取 ────────────────────────────────────────────────
-// 包含所有 JS 模組與資料檔，確保離線 / 弱網路環境也能正常啟動
+// 包含所有 JS 模組、資料檔與圖片資源，確保離線 / 弱網路環境也能正常啟動
 const LOCAL_FILES = [
   './',
   './index.html',
@@ -40,6 +40,17 @@ const LOCAL_FILES = [
   './src/data/maps/map_back_alley.json',
   './src/data/maps/map_underground_parking.json',
   './src/data/npcs/npcs_black_rock_street.json',
+  // ── 圖片資源（預快取後載入速度大幅提升）────────────────────────────────────
+  './assets/images/home_bg.jpg',
+  './assets/sprites/player_sheet.png',
+  './assets/ui/cigar_box.png',
+  './assets/ui/cigar_single.png',
+  './assets/ui/warp_arrow_base.png',
+  './assets/ui/warp_door.png',
+  './assets/ui/warp_shutter.png',
+  './assets/ui/mag_base.png',
+  './assets/ui/Wood067_1K-PNG_Color.png',
+  './assets/ui/bullet_single.png',
 ];
 
 // ── CDN 資源：嘗試快取，失敗不阻塞安裝（網路可用時仍可從 CDN 抓取）────────────
