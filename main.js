@@ -312,12 +312,18 @@ async function main() {
   bulletMenu.visible = false;
   app.stage.addChild(bulletMenu);
 
-  bulletMenu.on('close',  () => bulletMenu.hide());
-  bulletMenu.on('select', ({ index, label }) => {
-    console.log(`[BulletMenu] 選擇：${label} (${index})`);
-    if (index === 0) bulletMenu.hide(); // 繼續生存 → 關閉選單
-    // TODO: 依 index 分流至狀態、物資、隊伍等功能畫面
-  });
+  bulletMenu.on('close', () => bulletMenu.hide());
+
+  // ── 具名事件 Stubs（功能待實作）──────────────────────────────────────────
+  bulletMenu.on('resume',    ()              => { bulletMenu.hide(); });
+  bulletMenu.on('status',    ({ label })     => { console.log(`[Menu] ${label}`); });
+  bulletMenu.on('inventory', ({ label })     => { console.log(`[Menu] ${label}`); });
+  bulletMenu.on('crew',      ({ label })     => { console.log(`[Menu] ${label}`); });
+  bulletMenu.on('journal',   ({ label })     => { console.log(`[Menu] ${label}`); });
+  bulletMenu.on('settings',  ({ label })     => { console.log(`[Menu] ${label}`); });
+  bulletMenu.on('save',      ({ label })     => { console.log(`[Menu] ${label}`); });
+  bulletMenu.on('quit',      ()              => { console.log('[Menu] 放棄生存'); });
+  // ────────────────────────────────────────────────────────────────────────
 
   // 控制面板實體選單按鈕
   panel.on('menu', () => {
