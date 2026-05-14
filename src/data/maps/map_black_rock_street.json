@@ -4870,6 +4870,8 @@
       "targetGy": 5,
       "direction": "left",
       "label": "瞿董的房間",
+      "sprite": "warp_door.png",
+      "rotation": -90,
       "active": true
     },
     {
@@ -4892,6 +4894,7 @@
       "targetGy": 1,
       "direction": "down",
       "label": "地下停車場入口",
+      "sprite": "warp_shutter.png",
       "active": true
     },
     {

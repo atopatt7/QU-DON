@@ -101,12 +101,14 @@ export class MapManager {
     this._root        = new PIXI.Container();
     this._groundLayer = new PIXI.Container();
     this._objectLayer = new PIXI.Container();
+    this._warpLayer   = new PIXI.Container(); // 自訂 warp 圖片疊加層
     this.entityLayer  = new PIXI.Container(); // public，供 EntityManager
     this._fogLayer    = new PIXI.Container();
 
     this._root.addChild(
       this._groundLayer,
       this._objectLayer,
+      this._warpLayer,
       this.entityLayer,
       this._fogLayer,
     );
@@ -192,6 +194,8 @@ export class MapManager {
     this._buildTexCache();
     this._renderLayer(this._groundLayer, data.layers.ground,  'ground');
     this._renderLayer(this._objectLayer, data.layers.objects, 'object');
+    await this._preloadWarpSprites(data.warps);
+    this._buildWarpOverlays();
     this._buildFogLayer();
 
     // 地圖切換完成後，通知 EntityManager 重新載入 NPC
@@ -216,6 +220,7 @@ export class MapManager {
   _clearMap(preserveEntities = false) {
     this._groundLayer.removeChildren();
     this._objectLayer.removeChildren();
+    this._warpLayer.removeChildren();
     if (!preserveEntities) this.entityLayer.removeChildren();
     this._fogLayer.removeChildren();
 
@@ -895,6 +900,69 @@ export class MapManager {
     gfx.rect(ix + iw / 2 - 1, iy + 2, 2, ih - 4).fill({ color: 0x1c1614, alpha: 0.4 });
   }
 
+  // ─── 自訂 Warp 圖片疊加 ───────────────────────────────────────────────────
+
+  /**
+   * 預載所有帶有 `sprite` 屬性的 warp 圖片，確保 _buildWarpOverlays 能同步取得貼圖尺寸。
+   * 載入失敗的項目會靜默降級（_buildWarpOverlays 會用 tile-30 取代）。
+   */
+  async _preloadWarpSprites(warps) {
+    if (!warps?.length) return;
+    const urls = warps
+      .filter(w => w.sprite)
+      .map(w => 'assets/ui/' + w.sprite);
+    if (urls.length === 0) return;
+    try {
+      await PIXI.Assets.load(urls);
+    } catch (e) {
+      console.warn('[MapManager] 部分 warp sprite 載入失敗，降級為預設圖形', e);
+    }
+  }
+
+  /**
+   * 為帶有 `sprite` 屬性的 warp 建立自訂圖片疊加（覆蓋 tile-30 預設圖形）。
+   * 沒有 `sprite` 的 warp 由 objects layer 的 tile-30 顯示（_drawWarpDoor）。
+   *
+   * warp JSON 欄位：
+   *   sprite   {string}  圖片檔名，從 assets/ui/ 讀取（例如 "warp_parking_ramp.png"）
+   *   rotation {number}  旋轉角度（度數，選填，例如 90 / -90 / 180）
+   */
+  _buildWarpOverlays() {
+    this._warpLayer.removeChildren();
+    if (!this._mapData?.warps) return;
+
+    const s = this._tileSize;
+
+    for (const warp of this._mapData.warps) {
+      if (!warp.sprite) continue; // Case B：tile-30 已在 object layer 顯示，跳過
+
+      // Case A：自訂圖片
+      let tex;
+      try {
+        tex = PIXI.Assets.get('assets/ui/' + warp.sprite);
+      } catch (_) { tex = null; }
+
+      if (!tex || !tex.valid) {
+        // 預載失敗 → 降級：tile-30 仍然顯示在 object layer 下方，不再額外疊加
+        console.warn(`[MapManager] warp "${warp.id}" sprite 未找到，使用預設圖形`);
+        continue;
+      }
+
+      const spr = new PIXI.Sprite(tex);
+      spr.anchor.set(0.5);
+      spr.x      = warp.gx * s + s / 2;
+      spr.y      = warp.gy * s + s / 2;
+      spr.width  = s;
+      spr.height = s;
+
+      if (warp.rotation != null) {
+        spr.rotation = warp.rotation * (Math.PI / 180);
+      }
+
+      this._warpLayer.addChild(spr);
+    }
+  }
+
   // ─── 渲染層 ────────────────────────────────────────────────────────────────
 
   // ⚠️  此方法只在 loadMap / onResize 期間呼叫，絕對不在每幀執行。
@@ -1268,6 +1336,7 @@ export class MapManager {
     this._buildTexCache();
     this._renderLayer(this._groundLayer, this._mapData.layers.ground,  'ground');
     this._renderLayer(this._objectLayer, this._mapData.layers.objects, 'object');
+    this._buildWarpOverlays(); // 貼圖已快取，同步呼叫即可
 
     // 重建霧精靈（保留已探索狀態）
     this._rebuildFogSprites();
