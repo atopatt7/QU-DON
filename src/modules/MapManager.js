@@ -937,13 +937,11 @@ export class MapManager {
       if (!warp.sprite) continue; // Case B：tile-30 已在 object layer 顯示，跳過
 
       // Case A：自訂圖片
-      let tex;
-      try {
-        tex = PIXI.Assets.get('assets/ui/' + warp.sprite);
-      } catch (_) { tex = null; }
+      // 直接從已完成的 _preloadWarpSprites() 快取中取貼圖
+      const url = 'assets/ui/' + warp.sprite;
+      const tex = PIXI.Assets.cache.get(url);
 
-      if (!tex || !tex.valid) {
-        // 預載失敗 → 降級：tile-30 仍然顯示在 object layer 下方，不再額外疊加
+      if (!tex) {
         console.warn(`[MapManager] warp "${warp.id}" sprite 未找到，使用預設圖形`);
         continue;
       }

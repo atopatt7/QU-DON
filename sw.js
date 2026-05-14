@@ -3,7 +3,7 @@
  * 快取策略：Cache First（靜態資源），Network First（動態資料）
  */
 
-const CACHE_NAME = 'qudon-v3';
+const CACHE_NAME = 'qudon-v4';
 const STATIC_FILES = [
   './',
   './index.html',
