@@ -224,18 +224,35 @@ export class HomeScreen extends PIXI.Container {
       this.addChild(btn);
       startY += btnH + gap;
     });
+
+    // ── 開發者專區 ─────────────────────────────────────────────────────────
+    // 額外間距，與一般選單形成視覺分隔
+    startY += Math.max(6, Math.floor(H * 0.014));
+    const devBtn = this._makeBtn('[ DEV ZONE ]', btnW, btnH, false, 'dev');
+    devBtn.x = (W - btnW) / 2;
+    devBtn.y = startY;
+    devBtn.on('_tap', () => this.emit('startDevMode'));
+    this.addChild(devBtn);
   }
 
-  _makeBtn(label, W, H, accent) {
+  /**
+   * @param {string}  label
+   * @param {number}  W
+   * @param {number}  H
+   * @param {boolean} accent   - 紅色強調（新遊戲）
+   * @param {string}  variant  - 'dev' → 開發者綠色配色
+   */
+  _makeBtn(label, W, H, accent, variant = '') {
     const c = new PIXI.Container();
     c.eventMode = 'static';
     c.cursor    = 'pointer';
     c.hitArea   = new PIXI.Rectangle(0, 0, W, H);
 
-    const r = 3;
-    const borderColor = accent ? 0xFF0040 : 0x363636;
-    const fillColor   = accent ? 0x2A1616 : 0x1C1C1C;
-    const textColor   = accent ? 0xFF5555 : 0x888888;
+    const r   = 3;
+    const dev = variant === 'dev';
+    const borderColor = dev ? 0x00FF41 : (accent ? 0xFF0040 : 0x363636);
+    const fillColor   = dev ? 0x081208 : (accent ? 0x2A1616 : 0x1C1C1C);
+    const textColor   = dev ? 0x00CC33 : (accent ? 0xFF5555 : 0x888888);
     const fontSize    = Math.floor(H * 0.31);
 
     const up = new PIXI.Graphics();

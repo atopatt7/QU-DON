@@ -215,15 +215,25 @@ async function main() {
   const homeScreen = await HomeScreen.create(app);
   app.stage.addChild(homeScreen);
 
-  // 等待玩家點「新遊戲」
+  // 等待玩家點「新遊戲」或「DEV ZONE」
+  let _devMode = false;
   await new Promise(resolve => {
     homeScreen.on('action', (id) => {
       if (id === 'new_game') resolve();
     });
+    homeScreen.on('startDevMode', () => {
+      _devMode = true;
+      resolve();
+    });
   });
 
+  if (_devMode) {
+    window.DEV_MODE = true;
+    console.log('[DEV MODE] 啟動開發者測試環境 → map_qu_don_room');
+  }
+
   // 淡出首頁
-  const overlay = await fadeOut(app, 500);
+  const overlay = await fadeOut(app, _devMode ? 250 : 500);
   homeScreen.destroy({ children: true });
 
   // ── 2. 建立遊戲世界 ────────────────────────────────────────────────────
@@ -231,9 +241,10 @@ async function main() {
   const gameLayer = buildGameLayer(app);
 
   const mapManager = await MapManager.create(app, gameLayer);
-  await mapManager.loadMap('map_black_rock_street');
+  await mapManager.loadMap(_devMode ? 'map_qu_don_room' : 'map_black_rock_street');
 
-  const spawn  = mapManager.mapData.spawnPoints.find(s => s.id === 'player_start');
+  const spawn  = mapManager.mapData.spawnPoints?.find(s => s.id === 'player_start')
+              ?? mapManager.mapData.spawnPoints?.[0];
   const player = { gx: spawn?.gx ?? 19, gy: spawn?.gy ?? 12, vx: 0, vy: 0 };
   let   facing = spawn?.facing ?? 'down';
 
