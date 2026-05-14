@@ -13,6 +13,7 @@ import { HomeScreen }            from './src/ui/HomeScreen.js';
 import { VFDClock }              from './src/ui/VFDClock.js';
 import { DialogueOverlay }       from './src/ui/DialogueOverlay.js';
 import { InteractionManager }    from './src/modules/InteractionManager.js';
+import { BulletMenuOverlay }     from './src/ui/BulletMenuOverlay.js';
 
 // ─── VT323 字型 ────────────────────────────────────────────────────────────
 const fontLink = document.createElement('link');
@@ -211,6 +212,10 @@ async function main() {
   const app = await initPixi();
   bindResize(app);
 
+  // 彈匣選單素材預載：與首頁顯示並行，不阻塞畫面
+  PIXI.Assets.load(['assets/ui/mag_base.png', 'assets/ui/bullet_single.png'])
+    .catch(() => console.warn('[QU-DON] BulletMenu 素材預載失敗，選單將使用佔位圖形'));
+
   // ── 1. 顯示首頁 ──────────────────────────────────────────────────────────
   const homeScreen = await HomeScreen.create(app);
   app.stage.addChild(homeScreen);
@@ -300,6 +305,27 @@ async function main() {
 
   const panel = await ControlPanel.create(app, input);
   app.stage.addChild(panel);
+
+  // ── 彈匣主選單（暫停選單）──────────────────────────────────────────────────
+  // 素材已由前述 PIXI.Assets.load() 預載，此處同步取回並建立選單
+  const bulletMenu = BulletMenuOverlay.create(app);
+  bulletMenu.visible = false;
+  app.stage.addChild(bulletMenu);
+
+  bulletMenu.on('close',  () => bulletMenu.hide());
+  bulletMenu.on('select', ({ index, label }) => {
+    console.log(`[BulletMenu] 選擇：${label} (${index})`);
+    if (index === 0) bulletMenu.hide(); // 繼續生存 → 關閉選單
+    // TODO: 依 index 分流至狀態、物資、隊伍等功能畫面
+  });
+
+  // Escape 開啟選單；選單自身的 Escape handler 負責關閉
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !bulletMenu.visible && !interaction.isActive) {
+      e.preventDefault();
+      bulletMenu.show();
+    }
+  });
 
   // ── 環境調查系統 ────────────────────────────────────────────────────────────
   const dialogueOverlay = new DialogueOverlay(app, { text: '', speaker: '' });

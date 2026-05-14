@@ -1,6 +1,27 @@
 {
   "_comment": "QU-DON | actors.json — All stats are data-driven. Edit here, not in code.",
 
+  "npc_blueprints": {
+    "system": {
+      "_TEMPLATE": {
+        "id": "template_sys", "name": "System NPC", "sprite": "sys_sheet.png",
+        "category": "system", "serviceType": "shop", "dialogueId": "sys_01"
+      }
+    },
+    "recruitable": {
+      "_TEMPLATE": {
+        "id": "template_rec", "name": "Recruit NPC", "sprite": "rec_sheet.png",
+        "category": "recruitable", "faction": "neutral", "stats": {"hp": 100, "atk": 10}, "recruitCondition": "none"
+      }
+    },
+    "hostile": {
+      "_TEMPLATE": {
+        "id": "template_hos", "name": "Hostile NPC", "sprite": "hos_sheet.png",
+        "category": "hostile", "aggroRange": 3, "stats": {"hp": 50, "atk": 5}, "lootTable": "basic_thug"
+      }
+    }
+  },
+
   "actors": [
     {
       "id": "qu_don",
