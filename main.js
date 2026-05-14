@@ -432,6 +432,20 @@ async function main() {
 
   // ⚠️ overlay 不在此處 destroy，由 ticker 第一幀在鏡頭定位後才揭幕（見下方）
 
+  // ── DEBUG 顯示（臨時診斷 iOS 相機問題，確認修復後移除）─────────────────────
+  const _dbg = new PIXI.Text({
+    text: '...',
+    style: new PIXI.TextStyle({
+      fontFamily: 'monospace', fontSize: 12,
+      fill: 0xffff00,
+      stroke: { color: 0x000000, width: 3 },
+    }),
+  });
+  _dbg.x = 8;
+  _dbg.y = Math.floor(app.screen.height * 0.66) + 4;
+  _dbg.zIndex = 9999;
+  app.stage.addChild(_dbg);
+
   // ── requestUpdate：移動後立刻更新霧視野 + 鏡頭（精靈由 lerp 連續更新）──────
   function requestUpdate() {
     mapManager.updateFog(player.gx, player.gy, mapManager.visionRadius);
@@ -465,6 +479,11 @@ async function main() {
 
     // ── 座標顯示更新 ──────────────────────────────────────────────────────────
     panel.updateCoordinates(player.gx, player.gy);
+
+    // ── DEBUG 更新 ────────────────────────────────────────────────────────────
+    _dbg.text =
+      `W:${app.screen.width} H:${app.screen.height} s:${mapManager.tileSize}` +
+      `\nrX:${mapManager.rootX.toFixed(0)} vx:${player.vx} vy:${player.vy}`;
 
     // ── 0) 環境調查：確認鍵邏輯 ────────────────────────────────────────────
     if (interaction.isActive) {
