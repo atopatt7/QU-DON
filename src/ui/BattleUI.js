@@ -288,6 +288,35 @@ export class BattleUI extends PIXI.Container {
 
   // ─── 公開 API ──────────────────────────────────────────────────────────────
 
+  /**
+   * 以外部傳入的角色資料初始化戰鬥畫面。
+   * 接受兩種格式：
+   *   扁平式  { name, hp, maxHp, sp, maxSp, level }
+   *   巢狀式  { name, stats: { hp, maxHp, atk, def } }  ← actors.json 格式
+   */
+  startBattle(playerData, enemyData) {
+    const pStats = playerData.stats ?? playerData;
+    const eStats = enemyData.stats  ?? enemyData;
+    this._data = {
+      player: {
+        name:  playerData.name,
+        level: playerData.level ?? 1,
+        hp:    pStats.hp    ?? 100,
+        maxHp: pStats.maxHp ?? 100,
+        sp:    pStats.sp    ?? 80,
+        maxSp: pStats.maxSp ?? 80,
+      },
+      enemy: {
+        name:  enemyData.name,
+        level: enemyData.level ?? 1,
+        hp:    eStats.hp    ?? 50,
+        maxHp: eStats.maxHp ?? 50,
+      },
+    };
+    this._log = [`${enemyData.name} 擋住了去路！`];
+    this._build();
+  }
+
   /** 推入 Log 並刷新 */
   pushLog(msg) {
     this._log.push(msg);

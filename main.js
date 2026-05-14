@@ -14,6 +14,7 @@ import { VFDClock }              from './src/ui/VFDClock.js';
 import { DialogueOverlay }       from './src/ui/DialogueOverlay.js';
 import { InteractionManager }    from './src/modules/InteractionManager.js';
 import { CigarMenuOverlay }      from './src/ui/CigarMenuOverlay.js';
+import { BattleUI }              from './src/ui/BattleUI.js';
 
 // ─── VT323 字型 ────────────────────────────────────────────────────────────
 const fontLink = document.createElement('link');
@@ -232,14 +233,29 @@ async function main() {
     });
   });
 
-  if (_devMode) {
-    window.DEV_MODE = true;
-    console.log('[DEV MODE] 啟動開發者測試環境 → map_qu_don_room');
-  }
-
   // 淡出首頁
   const overlay = await fadeOut(app, _devMode ? 250 : 500);
   homeScreen.destroy({ children: true });
+
+  // ── DEV MODE：直接啟動戰鬥測試，跳過地圖世界建置 ─────────────────────────
+  if (_devMode) {
+    window.DEV_MODE = true;
+    console.log('[DEV MODE] 啟動戰鬥測試介面');
+    overlay.destroy();
+
+    const actorsJson = await fetch('./src/data/actors.json').then(r => r.json()).catch(() => null);
+    const enemyData  = actorsJson?.actors?.find(a => a.id === 'enemy_red_dog_thug_01')
+                    ?? { name: '紅犬幫混混', stats: { hp: 50, maxHp: 50, atk: 8, def: 2 } };
+    const playerData = actorsJson?.actors?.find(a => a.id === 'qu_don')
+                    ?? { name: '瞿董', stats: { hp: 85, maxHp: 85 } };
+
+    const battleUI = new BattleUI(app);
+    app.stage.addChild(battleUI);
+    battleUI.startBattle(playerData, enemyData);
+
+    battleUI.on('action', (id) => console.log(`[DEV BATTLE] action → ${id}`));
+    return;
+  }
 
   // ── 2. 建立遊戲世界 ────────────────────────────────────────────────────
   const input     = new InputManager(app.canvas);

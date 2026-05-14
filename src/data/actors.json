@@ -288,6 +288,15 @@
           "evasion":      1
         }
       }
+    },
+
+    {
+      "id": "enemy_red_dog_thug_01",
+      "name": "紅犬幫混混",
+      "category": "hostile",
+      "sprite": "thug_sheet.png",
+      "stats": { "hp": 50, "maxHp": 50, "atk": 8, "def": 2 },
+      "lootTable": "basic_thug"
     }
   ]
 }
