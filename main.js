@@ -266,21 +266,31 @@ async function main() {
   const input     = new InputManager(app.canvas);
   const gameLayer = buildGameLayer(app);
 
+  // ⚡ overlay 設為最頂層（zIndex 最大），確保遮住地圖初始化期間的所有畫面
+  // gameLayer 加到 stage 的順序比 overlay 晚，自然在 overlay 上方渲染，
+  // 必須用 sortableChildren + zIndex 才能讓 overlay 蓋住 gameLayer。
+  app.stage.sortableChildren = true;
+  overlay.zIndex = 99999;
+
   const mapManager = await MapManager.create(app, gameLayer);
-  await mapManager.loadMap(_devMode ? 'map_qu_don_room' : 'map_black_rock_street');
 
-  const spawn  = mapManager.mapData.spawnPoints?.find(s => s.id === 'player_start')
-              ?? mapManager.mapData.spawnPoints?.[0];
-  const player = { gx: spawn?.gx ?? 19, gy: spawn?.gy ?? 12, vx: 0, vy: 0 };
-  let   facing = spawn?.facing ?? 'down';
+  // ⚡ 平行載入：地圖 JSON、玩家貼圖、控制面板、角色資料 同時進行，
+  //    大幅縮短黑屏等待時間（原本依序 await，現在同步發出所有請求）
+  const [, sheetTex, panel, _actorsJson] = await Promise.all([
+    mapManager.loadMap(_devMode ? 'map_qu_don_room' : 'map_black_rock_street'),
+    loadPlayerSheet(),
+    ControlPanel.create(app, input),
+    fetch('./src/data/actors.json').then(r => r.json()).catch(() => null),
+  ]);
 
-  // ── 立即設定鏡頭（在任何 await 前同步執行，防止地圖以錯誤位置渲染）──────────
-  // loadMap 後地圖 tile 已加入 gameLayer；gameLayer 在 overlay 上方，
-  // 用戶可直接看到地圖。必須在 await loadPlayerSheet 之前先定位鏡頭。
-  mapManager.setCameraVisual(player.gx, player.gy);
-  mapManager.render();
+  const spawn   = mapManager.mapData.spawnPoints?.find(s => s.id === 'player_start')
+               ?? mapManager.mapData.spawnPoints?.[0];
+  const spawnGx = spawn?.gx ?? 19;
+  const spawnGy = spawn?.gy ?? 12;
+  // ⚡ vx/vy 直接設為出生座標，防止 ticker 第一幀用初始值 0 重設鏡頭
+  const player  = { gx: spawnGx, gy: spawnGy, vx: spawnGx, vy: spawnGy };
+  let   facing  = spawn?.facing ?? 'down';
 
-  const sheetTex  = await loadPlayerSheet();
   const playerSpr = buildPlayerSprite(mapManager.tileSize, sheetTex);
   playerSpr.setDir(facing);
   mapManager.entityLayer.addChild(playerSpr);
@@ -317,10 +327,9 @@ async function main() {
     updateCamera();
   };
 
-  // ── 初始狀態：同步玩家位置 + 霧視野 + 再次確認鏡頭（sprite 加入後補一次）──────
+  // ── 初始狀態：同步玩家位置 + 霧視野（鏡頭由 ticker 第一幀揭幕前確認）──────────
   syncPlayer();
   mapManager.updateFog(player.gx, player.gy, mapManager.visionRadius);
-  mapManager.render(); // centerOn 可能 early-return，但 setCameraVisual 已設 dirty
 
   // ── resize 處理：重建貼圖 + 重新置中，立即渲染（不依賴 ticker）──────────────
   app.stage.on('resize', () => {
@@ -331,7 +340,6 @@ async function main() {
     mapManager.render();
   });
 
-  const panel = await ControlPanel.create(app, input);
   app.stage.addChild(panel);
 
   // ── 雪茄盒主選單（暫停選單）────────────────────────────────────────────────
@@ -358,8 +366,7 @@ async function main() {
   worldMap.zIndex = 1100;
   app.stage.addChild(worldMap);
 
-  // 從 actors.json 取得初始玩家數值（若已載入）
-  const _actorsJson = await fetch('./src/data/actors.json').then(r => r.json()).catch(() => null);
+  // 從 actors.json 取得初始玩家數值（已在 Promise.all 平行載入）
   const _quDonData  = _actorsJson?.actors?.find(a => a.id === 'qu_don');
   if (_quDonData) {
     statusScreen.updateData({
@@ -452,17 +459,14 @@ async function main() {
   //     b) 動畫進行中 → 每幀推進 vx/vy 直到收斂
   //     c) 靜止且無動畫 → 直接返回，CPU ≈ 0
   //
-  // 揭幕用：ticker 第一幀在 iOS layout 穩定後才移除 overlay，確保鏡頭正確
-  // setCameraVisual 沒有 centerOn 的 early-return guard，保證 _isDirty=true
+  // ── overlay（zIndex=99999）蓋住初始化畫面，ticker 第一幀定位後才揭幕 ──────────
   let _revealOverlay = overlay;
 
   app.ticker.add(() => {
-    // ── 第一幀揭幕：所有 await 已完成，iOS layout 已穩定 ──────────────────────
+    // ── 第一幀揭幕：overlay 確實擋住畫面，在此確認鏡頭正確後銷毀 ──────────────
     if (_revealOverlay) {
-      mapManager.setCameraVisual(player.vx, player.vy);
-      mapManager.render();
-      updateSpritePos(player.vx, player.vy);
-      updateCamera();
+      syncPlayer();        // 確保精靈 & 鏡頭對齊（vx/vy 已設為出生座標，不會拉回 0）
+      mapManager.render(); // 若 _isDirty（resize 等觸發），重算 _root.x/y
       _revealOverlay.destroy();
       _revealOverlay = null;
       return; // 揭幕幀不處理輸入，避免「按新遊戲」的 pointerup 殘留觸發移動
