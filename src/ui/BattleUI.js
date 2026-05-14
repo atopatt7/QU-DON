@@ -83,7 +83,7 @@ export class BattleUI extends PIXI.Container {
     this.addChild(nameTxt);
 
     const barY = y + nameTxt.height + 18;
-    this._buildBar(16, barY, W - 110, 14,
+    this._buildBar(16, barY, W - 32, 22,
       enemy.hp, enemy.maxHp, 0xFF0040, '生命值');
 
     // 敵方精靈框
@@ -125,8 +125,8 @@ export class BattleUI extends PIXI.Container {
     this.addChild(nameTxt);
 
     const barY = y + nameTxt.height + 18;
-    this._buildBar(16, barY,      W - 110, 13, p.hp, p.maxHp, 0x00FF41, '生命值');
-    this._buildBar(16, barY + 20, W - 110, 10, p.sp ?? 144, p.maxSp ?? 240, 0x3366FF, 'SP');
+    this._buildBar(16, barY,      W - 32, 22, p.hp, p.maxHp, 0x00FF41, '生命值');
+    this._buildBar(16, barY + 30, W - 32, 16, p.sp ?? 144, p.maxSp ?? 240, 0x3366FF, 'SP');
 
     // 玩家精靈框
     const sw = Math.floor(W * 0.31), sh = Math.floor(h * 0.52);
@@ -139,35 +139,43 @@ export class BattleUI extends PIXI.Container {
   // ── 通用血條（帶輝光） ────────────────────────────────────────────────────
 
   _buildBar(x, y, barW, barH, cur, max, color, label) {
-    const pct = Math.max(0, Math.min(1, cur / max));
+    const pct     = Math.max(0, Math.min(1, cur / max));
+    const bgColor = color === 0xFF0040 ? 0x1A0505
+                  : color === 0x3366FF ? 0x050514
+                  : 0x050A05;
 
+    // 底板
     const bg = new PIXI.Graphics();
-    bg.roundRect(x, y, barW, barH, 2)
-      .fill({ color: color === 0xFF0040 ? 0x1A0505 : color === 0x3366FF ? 0x050514 : 0x050A05 });
-    bg.roundRect(x, y, barW, barH, 2).stroke({ color: 0x222222, width: 1 });
+    bg.roundRect(x, y, barW, barH, 3).fill({ color: bgColor });
+    bg.roundRect(x, y, barW, barH, 3).stroke({ color: 0x333333, width: 1 });
     this.addChild(bg);
 
+    // 輝光層
     if (pct > 0) {
       const fillGlow = new PIXI.Graphics();
-      fillGlow.roundRect(x, y, Math.floor(barW * pct), barH, 2).fill({ color });
-      fillGlow.filters = [new PIXI.BlurFilter({ strength: barH * 0.5, quality: 1 })];
-      fillGlow.alpha   = 0.5;
+      fillGlow.roundRect(x, y, Math.floor(barW * pct), barH, 3).fill({ color });
+      fillGlow.filters = [new PIXI.BlurFilter({ strength: barH * 0.4, quality: 1 })];
+      fillGlow.alpha   = 0.45;
       this.addChild(fillGlow);
 
       const fill = new PIXI.Graphics();
-      fill.roundRect(x, y, Math.floor(barW * pct), barH, 2).fill({ color });
+      fill.roundRect(x, y, Math.floor(barW * pct), barH, 3).fill({ color });
       this.addChild(fill);
     }
 
+    // ── 文字疊在血條內部（左側 padding 8px，垂直置中）────────────────────
+    const fontSize = Math.max(10, Math.floor(barH * 0.68));
     const txt = new PIXI.Text({
       text: `${label}  ${cur} / ${max}`,
       style: new PIXI.TextStyle({
         fontFamily: '"VT323","Courier New",monospace',
-        fontSize: Math.max(10, barH + 1), fill: color,
+        fontSize,
+        fill: 0xFFFFFF,
+        dropShadow: { color: 0x000000, blur: 3, distance: 1, alpha: 0.9 },
       }),
     });
-    txt.x = x + barW + 6;
-    txt.y = y - 1;
+    txt.x = x + 8;
+    txt.y = y + Math.floor((barH - fontSize) / 2);
     this.addChild(txt);
   }
 
