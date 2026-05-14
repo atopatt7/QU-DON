@@ -200,7 +200,7 @@ export class StatusScreen extends PIXI.Container {
 
     // LV & EXP
     const lvLine = this._text(
-      `LV.${String(d.level).padStart(2,'0')}`, fsLg, C.accent, 'bold'
+      `等級 ${String(d.level).padStart(2,'0')}`, fsLg, C.accent, 'bold'
     );
     lvLine.x = cx + pad; lvLine.y = curY;
     this.addChild(lvLine);
@@ -218,10 +218,10 @@ export class StatusScreen extends PIXI.Container {
 
     // 數值列表
     const stats = [
-      { label: 'MAX HP',       value: `${d.hp} / ${d.maxHp}`,     color: C.accent },
-      { label: 'ATK',          value: String(d.atk),               color: C.value  },
-      { label: 'DEF',          value: String(d.def),               color: C.value  },
-      { label: 'MAX STAMINA',  value: `${d.stamina} / ${d.maxStamina}`, color: 0x3399ff },
+      { label: '生命上限',  value: `${d.hp} / ${d.maxHp}`,          color: C.accent },
+      { label: '攻擊力',    value: String(d.atk),                    color: C.value  },
+      { label: '防禦力',    value: String(d.def),                    color: C.value  },
+      { label: '耐力上限',  value: `${d.stamina} / ${d.maxStamina}`, color: 0x3399ff },
     ];
 
     stats.forEach(({ label, value, color }) => {
@@ -248,7 +248,7 @@ export class StatusScreen extends PIXI.Container {
          .stroke({ color: C.sp, width: 1.5 });
     this.addChild(spBox);
 
-    const spLabel = this._text('SKILL POINTS', fsSm, C.dim);
+    const spLabel = this._text('剩餘技能點', fsSm, C.dim);
     spLabel.x = cx + pad + 8; spLabel.y = curY + 5;
     this.addChild(spLabel);
 
@@ -262,7 +262,7 @@ export class StatusScreen extends PIXI.Container {
     this._hLine(cx + pad, curY, cw - pad * 2);
     curY += 8;
 
-    const perkTitle = this._text('◆ PERKS', fs, C.borderHi, 'bold');
+    const perkTitle = this._text('【 街頭專長 】', fs, C.borderHi, 'bold');
     perkTitle.x = cx + pad; perkTitle.y = curY;
     this.addChild(perkTitle);
     curY += perkTitle.height + 6;
@@ -290,7 +290,7 @@ export class StatusScreen extends PIXI.Container {
     }
 
     const expTxt = this._text(
-      `EXP  ${exp} / ${next}`,
+      `經驗值  ${exp} / ${next}`,
       Math.max(9, barH - 1), C.value
     );
     expTxt.x = x; expTxt.y = y + barH + 3;

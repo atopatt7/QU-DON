@@ -22,7 +22,7 @@ export class BattleUI extends PIXI.Container {
     super();
     this._app  = app;
     this._data = data;
-    this._log  = ['準備戰鬥……'];
+    this._log  = ['戰鬥即將開始...'];
     this._build();
     this._bindResize();
   }
@@ -82,7 +82,7 @@ export class BattleUI extends PIXI.Container {
 
     const barY = y + nameTxt.height + 18;
     this._buildBar(16, barY, W - 110, 14,
-      enemy.hp, enemy.maxHp, 0xFF0040, 'HP');
+      enemy.hp, enemy.maxHp, 0xFF0040, '生命值');
 
     // 敵方精靈框
     const sw = Math.floor(W * 0.38), sh = Math.floor(h * 0.55);
@@ -123,7 +123,7 @@ export class BattleUI extends PIXI.Container {
     this.addChild(nameTxt);
 
     const barY = y + nameTxt.height + 18;
-    this._buildBar(16, barY,      W - 110, 13, p.hp, p.maxHp, 0x00FF41, 'HP');
+    this._buildBar(16, barY,      W - 110, 13, p.hp, p.maxHp, 0x00FF41, '生命值');
     this._buildBar(16, barY + 20, W - 110, 10, p.sp ?? 144, p.maxSp ?? 240, 0x3366FF, 'SP');
 
     // 玩家精靈框
@@ -203,10 +203,10 @@ export class BattleUI extends PIXI.Container {
     this.addChild(bg);
 
     const DEFS = [
-      { label:'攻擊', sub:'ATTACK',  action:'attack',  fill:0x4D0D0D, border:0xFF0040, text:0xFF5555 },
-      { label:'技能', sub:'SKILL',   action:'skill',   fill:0x071A0D, border:0x00FF41, text:0x00FF41 },
-      { label:'道具', sub:'ITEM',    action:'item',    fill:0x1A1405, border:0xE6B200, text:0xE6B200 },
-      { label:'逃跑', sub:'RUN',     action:'escape',  fill:0x1A1A1A, border:0x555555, text:0x888888 },
+      { label:'[ 攻 擊 ]', sub:'ATTACK',  action:'attack',  fill:0x4D0D0D, border:0xFF0040, text:0xFF5555 },
+      { label:'技能',      sub:'SKILL',   action:'skill',   fill:0x071A0D, border:0x00FF41, text:0x00FF41 },
+      { label:'[ 物 品 ]', sub:'ITEM',    action:'item',    fill:0x1A1405, border:0xE6B200, text:0xE6B200 },
+      { label:'[ 逃 跑 ]', sub:'RUN',     action:'escape',  fill:0x1A1A1A, border:0x555555, text:0x888888 },
     ];
 
     const pad  = 8;
