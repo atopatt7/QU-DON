@@ -274,6 +274,12 @@ async function main() {
   const player = { gx: spawn?.gx ?? 19, gy: spawn?.gy ?? 12, vx: 0, vy: 0 };
   let   facing = spawn?.facing ?? 'down';
 
+  // ── 立即設定鏡頭（在任何 await 前同步執行，防止地圖以錯誤位置渲染）──────────
+  // loadMap 後地圖 tile 已加入 gameLayer；gameLayer 在 overlay 上方，
+  // 用戶可直接看到地圖。必須在 await loadPlayerSheet 之前先定位鏡頭。
+  mapManager.setCameraVisual(player.gx, player.gy);
+  mapManager.render();
+
   const sheetTex  = await loadPlayerSheet();
   const playerSpr = buildPlayerSprite(mapManager.tileSize, sheetTex);
   playerSpr.setDir(facing);
@@ -311,9 +317,10 @@ async function main() {
     updateCamera();
   };
 
-  // ── 初始狀態：同步玩家位置 + 霧視野（鏡頭定位延遲到 ticker 第一幀揭幕時執行）
+  // ── 初始狀態：同步玩家位置 + 霧視野 + 再次確認鏡頭（sprite 加入後補一次）──────
   syncPlayer();
   mapManager.updateFog(player.gx, player.gy, mapManager.visionRadius);
+  mapManager.render(); // centerOn 可能 early-return，但 setCameraVisual 已設 dirty
 
   // ── resize 處理：重建貼圖 + 重新置中，立即渲染（不依賴 ticker）──────────────
   app.stage.on('resize', () => {
