@@ -20,9 +20,11 @@ export class BattleUI extends PIXI.Container {
    */
   constructor(app, data = {}) {
     super();
-    this._app  = app;
-    this._data = data;
-    this._log  = ['戰鬥即將開始...'];
+    this._app        = app;
+    this._data       = data;
+    this._log        = ['戰鬥即將開始...'];
+    this._isLocked   = false;
+    this._actHandler = null;   // 內部 action 監聽器（startBattle 時綁定）
     this._build();
     this._bindResize();
   }
@@ -305,19 +307,95 @@ export class BattleUI extends PIXI.Container {
         maxHp: pStats.maxHp ?? 100,
         sp:    pStats.sp    ?? 80,
         maxSp: pStats.maxSp ?? 80,
+        atk:   pStats.atk   ?? 10,
+        def:   pStats.def   ?? 5,
       },
       enemy: {
         name:  enemyData.name,
         level: enemyData.level ?? 1,
         hp:    eStats.hp    ?? 50,
         maxHp: eStats.maxHp ?? 50,
+        atk:   eStats.atk   ?? 6,
+        def:   eStats.def   ?? 2,
       },
     };
-    this._log = [`${enemyData.name} 擋住了去路！`];
+    this._log      = [`${enemyData.name} 擋住了去路！`];
+    this._isLocked = false;
+
+    // 重新綁定內部戰鬥邏輯（移除舊監聽器後再掛）
+    if (this._actHandler) this.off('action', this._actHandler);
+    this._actHandler = (a) => this._onAction(a);
+    this.on('action', this._actHandler);
+
     this._build();
   }
 
-  /** 推入 Log 並刷新 */
+  // ─── 戰鬥輔助 ────────────────────────────────────────────────────────────────
+
+  /** 推入訊息（最多保留 4 筆）並重繪介面。 */
+  _pushLog(msg) {
+    this._log.push(msg);
+    if (this._log.length > 4) this._log.shift();
+    this._build();
+  }
+
+  /** 以 _data 最新 hp 重繪介面（血條 + 數值）。 */
+  _updateHealthUI() {
+    this._build();
+  }
+
+  /**
+   * 內部回合制邏輯入口，由 startBattle 綁定至 'action' 事件。
+   * 僅處理 'attack'；其餘行動預留給未來擴充。
+   */
+  _onAction(action) {
+    if (action !== 'attack') return;
+    if (this._isLocked) return;
+    this._isLocked = true;
+
+    const p = this._data.player;
+    const e = this._data.enemy;
+
+    // ── 玩家攻擊 ────────────────────────────────────────────────────────────
+    let dmg = Math.max(1, p.atk - e.def);
+    dmg = Math.floor(dmg * (0.9 + Math.random() * 0.2));
+    e.hp = Math.max(0, e.hp - dmg);
+    this._pushLog(`瞿董 攻擊了 ${e.name}，造成 ${dmg} 點傷害！`);
+
+    // ── 勝利判定 ────────────────────────────────────────────────────────────
+    if (e.hp === 0) {
+      this._pushLog('🏆 戰鬥勝利！');
+      setTimeout(() => {
+        this._isLocked = false;
+        this.visible = false;
+        this.emit('close');
+      }, 1500);
+      return;
+    }
+
+    // ── 敵人反擊（延遲 1 秒） ─────────────────────────────────────────────
+    setTimeout(() => {
+      let eDmg = Math.floor(Math.max(1, e.atk - p.def) * (0.9 + Math.random() * 0.2));
+      p.hp = Math.max(0, p.hp - eDmg);
+      this._pushLog(`${e.name} 反擊，造成 ${eDmg} 點傷害！`);
+      this._updateHealthUI();
+
+      // ── 敗北判定 ──────────────────────────────────────────────────────────
+      if (p.hp === 0) {
+        this._pushLog('💀 戰鬥失敗...');
+        setTimeout(() => {
+          this._isLocked = false;
+          this.visible = false;
+          this.emit('close');
+        }, 1500);
+        return;
+      }
+
+      this._isLocked = false; // 解鎖，等待玩家下一回合
+    }, 1000);
+  }
+
+  /** 推入 Log 並刷新（公開版，供外部呼叫） */
   pushLog(msg) {
     this._log.push(msg);
     if (this._log.length > 6) this._log.shift();
