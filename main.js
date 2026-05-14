@@ -316,6 +316,14 @@ async function main() {
   mapManager.updateFog(player.gx, player.gy, mapManager.visionRadius);
   mapManager.render(); // ← 初始 render：確保鏡頭在第一幀就正確
 
+  // ── iOS Safari 安全機制：canvas layout 在首幀後才穩定，補一次 RAF 定位 ──────
+  // 若初始 render 時 _root.x/y 因 layout 尚未完成而為 NaN/0，
+  // 下一幀強制重新對齊，確保手機不會卡在地圖左上角
+  requestAnimationFrame(() => {
+    syncPlayer();
+    mapManager.render();
+  });
+
   // ── resize 處理：重建貼圖 + 重新置中，立即渲染（不依賴 ticker）──────────────
   app.stage.on('resize', () => {
     mapManager.onResize(player.gx, player.gy);
