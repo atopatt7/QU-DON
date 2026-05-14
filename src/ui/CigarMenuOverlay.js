@@ -219,10 +219,9 @@ export class CigarMenuOverlay extends PIXI.Container {
       btn.addChild(ph);
     }
 
-    // 裝飾雪茄：暗棕調、半透明，無文字
+    // 裝飾雪茄：淺色調，不透明，無文字
     if (!isActive) {
       if (cigar.tint !== undefined) cigar.tint = DECO_TINT;
-      cigar.alpha = 0.55;
       return { btn, cigar };
     }
 
@@ -251,13 +250,12 @@ export class CigarMenuOverlay extends PIXI.Container {
 
     // 文字中心對準雪茄中心，再向左偏 TEXT_X_RATIO（對準茄標印刷區），並右移 4 字寬避開標籤
     txt.anchor.set(0.5, 0.5);
-    txt.x = scaledCigarW * TEXT_X_RATIO + charWidth * 4;
+    txt.x = scaledCigarW * TEXT_X_RATIO + charWidth * 8;
     txt.y = 0;
     txt.alpha = 0.92;
     btn.addChild(txt);
 
-    // 預設微暗（非游標狀態）
-    btn.alpha = 0.72;
+    // 預設較淺色調（非游標狀態），不透明
     if (cigar.tint !== undefined) cigar.tint = 0xbbbbbb;
 
     // ── 互動事件 ──────────────────────────────────────────────────────────
@@ -276,7 +274,7 @@ export class CigarMenuOverlay extends PIXI.Container {
   _applyHover(index, on) {
     const entry = this._items[index];
     if (!entry) return;
-    entry.btn.alpha = on ? 1.0 : 0.72;
+    // 選中：亮金色；未選中：淺灰色；兩者皆不透明
     if (entry.cigar?.tint !== undefined) {
       entry.cigar.tint = on ? HOVER_TINT : 0xbbbbbb;
     }
