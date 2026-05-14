@@ -13,7 +13,7 @@ import { HomeScreen }            from './src/ui/HomeScreen.js';
 import { VFDClock }              from './src/ui/VFDClock.js';
 import { DialogueOverlay }       from './src/ui/DialogueOverlay.js';
 import { InteractionManager }    from './src/modules/InteractionManager.js';
-import { BulletMenuOverlay }     from './src/ui/BulletMenuOverlay.js';
+import { CigarMenuOverlay }      from './src/ui/CigarMenuOverlay.js';
 
 // ─── VT323 字型 ────────────────────────────────────────────────────────────
 const fontLink = document.createElement('link');
@@ -212,9 +212,9 @@ async function main() {
   const app = await initPixi();
   bindResize(app);
 
-  // 彈匣選單素材預載：與首頁顯示並行，不阻塞畫面
-  PIXI.Assets.load(['assets/ui/mag_base.png', 'assets/ui/bullet_single.png'])
-    .catch(() => console.warn('[QU-DON] BulletMenu 素材預載失敗，選單將使用佔位圖形'));
+  // 雪茄盒選單素材預載：與首頁顯示並行，不阻塞畫面
+  PIXI.Assets.load(['assets/ui/cigar_box.png', 'assets/ui/cigar_single.png'])
+    .catch(() => console.warn('[QU-DON] CigarMenu 素材預載失敗，選單將使用佔位圖形'));
 
   // ── 1. 顯示首頁 ──────────────────────────────────────────────────────────
   const homeScreen = await HomeScreen.create(app);
@@ -306,37 +306,37 @@ async function main() {
   const panel = await ControlPanel.create(app, input);
   app.stage.addChild(panel);
 
-  // ── 彈匣主選單（暫停選單）──────────────────────────────────────────────────
+  // ── 雪茄盒主選單（暫停選單）────────────────────────────────────────────────
   // 素材已由前述 PIXI.Assets.load() 預載，此處同步取回並建立選單
-  const bulletMenu = BulletMenuOverlay.create(app);
-  bulletMenu.visible = false;
-  app.stage.addChild(bulletMenu);
+  const cigarMenu = CigarMenuOverlay.create(app);
+  cigarMenu.visible = false;
+  app.stage.addChild(cigarMenu);
 
-  bulletMenu.on('close', () => bulletMenu.hide());
+  cigarMenu.on('close', () => cigarMenu.hide());
 
   // ── 具名事件 Stubs（功能待實作）──────────────────────────────────────────
-  bulletMenu.on('resume',    ()              => { bulletMenu.hide(); });
-  bulletMenu.on('status',    ({ label })     => { console.log(`[Menu] ${label}`); });
-  bulletMenu.on('inventory', ({ label })     => { console.log(`[Menu] ${label}`); });
-  bulletMenu.on('crew',      ({ label })     => { console.log(`[Menu] ${label}`); });
-  bulletMenu.on('journal',   ({ label })     => { console.log(`[Menu] ${label}`); });
-  bulletMenu.on('settings',  ({ label })     => { console.log(`[Menu] ${label}`); });
-  bulletMenu.on('save',      ({ label })     => { console.log(`[Menu] ${label}`); });
-  bulletMenu.on('quit',      ()              => { console.log('[Menu] 放棄生存'); });
+  cigarMenu.on('resume',    ()              => { cigarMenu.hide(); });
+  cigarMenu.on('status',    ({ label })     => { console.log(`[Menu] ${label}`); });
+  cigarMenu.on('inventory', ({ label })     => { console.log(`[Menu] ${label}`); });
+  cigarMenu.on('crew',      ({ label })     => { console.log(`[Menu] ${label}`); });
+  cigarMenu.on('journal',   ({ label })     => { console.log(`[Menu] ${label}`); });
+  cigarMenu.on('settings',  ({ label })     => { console.log(`[Menu] ${label}`); });
+  cigarMenu.on('save',      ({ label })     => { console.log(`[Menu] ${label}`); });
+  cigarMenu.on('quit',      ()              => { console.log('[Menu] 放棄生存'); });
   // ────────────────────────────────────────────────────────────────────────
 
   // 控制面板實體選單按鈕
   panel.on('menu', () => {
-    if (!bulletMenu.visible && !interaction.isActive) {
-      bulletMenu.show();
+    if (!cigarMenu.visible && !interaction.isActive) {
+      cigarMenu.show();
     }
   });
 
   // Escape 開啟選單；選單自身的 Escape handler 負責關閉
   window.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && !bulletMenu.visible && !interaction.isActive) {
+    if (e.key === 'Escape' && !cigarMenu.visible && !interaction.isActive) {
       e.preventDefault();
-      bulletMenu.show();
+      cigarMenu.show();
     }
   });
 
