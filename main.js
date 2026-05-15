@@ -16,6 +16,7 @@ import { DialogueOverlay }       from './src/ui/DialogueOverlay.js';
 import { InteractionManager }    from './src/modules/InteractionManager.js';
 import { CigarMenuOverlay }      from './src/ui/CigarMenuOverlay.js';
 import { BattleUI }              from './src/ui/BattleUI.js';
+import { AudioManager }          from './src/core/AudioManager.js';
 import { StatusScreen }          from './src/ui/StatusScreen.js';
 import { WorldMapScreen }        from './src/ui/WorldMapScreen.js';
 
@@ -443,6 +444,7 @@ async function main() {
   // ── 觸發戰鬥：鎖定輸入、顯示 BattleUI、戰後處理 NPC ─────────────────────
   function _startBattle(npc) {
     if (!npc.entityData) return;
+    AudioManager.stopBGM();
     input.lock();
     panel.visible = false;
     MapManager.onActorMoveEnd(playerSpr);

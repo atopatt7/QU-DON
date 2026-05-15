@@ -23,6 +23,13 @@
  *   mm.centerOn(3, 2);    // 初始鏡頭
  */
 
+import { AudioManager } from '../core/AudioManager.js';
+
+// ─── BGM 設定：各地圖 ID → 音訊路徑（無設定 = 靜音）──────────────────────────
+const MAP_BGM = {
+  map_neon_bar: 'assets/sounds/bgm/neon_bar_theme.webm',
+};
+
 // ─── 鄰近方向向量（供外部參考） ────────────────────────────────────────────────
 export const DIR_DELTA = {
   up:    { dx:  0, dy: -1 },
@@ -202,6 +209,11 @@ export class MapManager {
     data.collision = col; // isWalkable 讀取此欄位
 
     console.log(`[MapManager] 載入 "${data.name}"  ${this._W}×${this._H}  tile=${this._tileSize}px  visionR=${this.visionRadius}`);
+
+    // BGM：有對應音訊則播放，否則停止（確保離開有BGM地圖後靜音）
+    const bgmUrl = MAP_BGM[mapId];
+    if (bgmUrl) AudioManager.playBGM(bgmUrl);
+    else AudioManager.stopBGM();
 
     this._buildTexCache();
     this._renderLayer(this._groundLayer, data.layers.ground,  'ground');
@@ -1362,6 +1374,9 @@ export class MapManager {
    * @param {Function} onMidpoint   黑畫面期間更新玩家位置的 callback
    */
   async transitionTo(targetMapId, onMidpoint) {
+    // 地圖切換前先停 BGM（新地圖的 BGM 由 loadMap 決定）
+    AudioManager.stopBGM();
+
     // ── Phase 1: 淡出 400ms ─────────────────────────────────────────────────
     await this._fadeOut(400);
 
