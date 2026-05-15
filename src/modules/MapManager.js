@@ -42,7 +42,7 @@ const FOG_ALPHA = {
 };
 
 // ─── 位置變體快取：這些 tile 每格使用不同亂數種子，視覺多樣 ───────────────────────
-const VARIANT_IDS   = new Set([1, 2, 4, 5, 10, 11, 40]);
+const VARIANT_IDS   = new Set([1, 2, 4, 5, 10, 11, 40, 200, 201, 202]);
 const VARIANT_COUNT = 4;
 
 // ─── 程式繪製 Tile 調色盤（Noir 低飽和深色系）────────────────────────────────────
@@ -82,6 +82,15 @@ const TILE_PALETTE = {
   42: { base: 0x1c1208, hi: 0x241a0c, lo: 0x100c04 }, // junk table with bottles
   43: { base: 0x0c0e14, hi: 0x14161e, lo: 0x06080e }, // old TV (faint blue)
   44: { base: 0x181c1c, hi: 0x202828, lo: 0x0e1414 }, // sink & mold
+  // ── Chinatown / Hakka Street (IDs 200-207) ────────────────────────────
+  200: { base: 0x0c1018, hi: 0x18202c, lo: 0x060810 }, // 潮濕柏油路（霓虹倒影）
+  201: { base: 0x2e2418, hi: 0x3a2e20, lo: 0x201810 }, // 唐人街青石磚人行道
+  202: { base: 0x0e0e0c, hi: 0x161612, lo: 0x060604 }, // 髒污暗巷地磚
+  203: { base: 0x3a1510, hi: 0x4a1c14, lo: 0x240e08 }, // 唐人街紅磚牆
+  204: { base: 0x3a1c08, hi: 0x4a2a0c, lo: 0x281404 }, // 烤鴨店（暖黃燈光）
+  205: { base: 0x1a2010, hi: 0x222a16, lo: 0x10160a }, // 中藥行/當鋪（墨綠）
+  206: { base: 0x2a2010, hi: 0x36281a, lo: 0x1a140a }, // 牌坊石柱（刻龍紋）
+  207: { base: 0x141410, hi: 0x1c1c18, lo: 0x0a0a08 }, // 垃圾堆/疊箱（暗巷）
 };
 
 // ─── 確定性偽隨機（LCG，以 tile 位置為種子，保證重複渲染一致）─────────────────────
@@ -298,9 +307,13 @@ export class MapManager {
       case 2:  this._drawCracked(gfx, s, pal, rng);       break;
       case 4:  this._drawPuddle(gfx, s, pal, rng);        break;
       case 5:  this._drawDebris(gfx, s, pal, rng);        break;
-      case 10: this._drawSidewalk(gfx, s, pal, rng);      break;
-      case 11: this._drawSidewalkTrash(gfx, s, pal, rng); break;
-      case 40: this._drawIndoorFloor(gfx, s, pal, rng);   break;
+      case 10:  this._drawSidewalk(gfx, s, pal, rng);      break;
+      case 11:  this._drawSidewalkTrash(gfx, s, pal, rng); break;
+      case 40:  this._drawIndoorFloor(gfx, s, pal, rng);   break;
+      // ── Chinatown variants ──────────────────────────────────────────────
+      case 200: this._drawPuddle(gfx, s, pal, rng);        break;
+      case 201: this._drawSidewalk(gfx, s, pal, rng);      break;
+      case 202: this._drawAsphalt(gfx, s, pal, rng);       break;
       default: gfx.rect(0, 0, s, s).fill({ color: pal.base });
     }
     return gfx;
@@ -349,6 +362,15 @@ export class MapManager {
       case 42: this._drawIndoorTable(gfx, s, pal, rng);  break;
       case 43: this._drawIndoorTV(gfx, s, pal);           break;
       case 44: this._drawIndoorSink(gfx, s, pal);         break;
+      // ── Chinatown / Hakka Street (IDs 200-207) ──────────────────────────
+      case 200: this._drawPuddle(gfx, s, pal, rng);       break; // 潮濕柏油路
+      case 201: this._drawSidewalk(gfx, s, pal, rng);     break; // 青石磚人行道
+      case 202: this._drawAsphalt(gfx, s, pal, rng);      break; // 暗巷地磚
+      case 203: this._drawBrickWall(gfx, s, pal, rng);    break; // 紅磚牆
+      case 204: this._drawDuckShop(gfx, s, pal, rng);     break; // 烤鴨店
+      case 205: this._drawHerbShop(gfx, s, pal, rng);     break; // 中藥行/當鋪
+      case 206: this._drawPaifang(gfx, s, pal, rng);      break; // 牌坊石柱
+      case 207: this._drawTrashPile(gfx, s, pal, rng);    break; // 垃圾堆
       default:
         gfx.rect(0, 0, s, s).fill({ color: pal.base });
     }
@@ -934,6 +956,85 @@ export class MapManager {
     gfx.rect(fx - 7, by - 9, 14, 3).fill({ color: 0x242220 });
     // 水垢痕跡
     gfx.rect(ix + iw / 2 - 1, iy + 2, 2, ih - 4).fill({ color: 0x1c1614, alpha: 0.4 });
+  }
+
+  // ─── 唐人街 / 哈卡街 專用 tile 繪製函式 ──────────────────────────────────────
+
+  // 204 烤鴨店：紅磚牆底 + 暖黃燈光窗
+  _drawDuckShop(gfx, s, pal, rng) {
+    this._drawBrickWall(gfx, s, pal, rng);
+    // 暖黃店面燈光（半透明疊層）
+    const wx = Math.floor(s * 0.12), ww = Math.floor(s * 0.76);
+    const wy = Math.floor(s * 0.30), wh = Math.floor(s * 0.45);
+    gfx.rect(wx, wy, ww, wh).fill({ color: 0xffaa22, alpha: 0.18 });
+    gfx.rect(wx, wy, ww, wh).stroke({ color: 0xcc8800, width: 1, alpha: 0.6 });
+    // 掛鴨剪影（兩個深色橢圓）
+    gfx.ellipse(s * 0.30, s * 0.52, s * 0.07, s * 0.12).fill({ color: 0x2a1408, alpha: 0.75 });
+    gfx.ellipse(s * 0.56, s * 0.50, s * 0.07, s * 0.12).fill({ color: 0x2a1408, alpha: 0.70 });
+    // 底部燈帶
+    gfx.rect(wx, wy + wh - 3, ww, 3).fill({ color: 0xffcc44, alpha: 0.45 });
+  }
+
+  // 205 中藥行/當鋪：紅磚牆底 + 暗綠鐵花窗
+  _drawHerbShop(gfx, s, pal, rng) {
+    this._drawBrickWall(gfx, s, pal, rng);
+    const wx = Math.floor(s * 0.10), ww = Math.floor(s * 0.80);
+    const wy = Math.floor(s * 0.28), wh = Math.floor(s * 0.48);
+    // 門框底
+    gfx.rect(wx, wy, ww, wh).fill({ color: 0x0e1610, alpha: 0.70 });
+    gfx.rect(wx, wy, ww, wh).stroke({ color: 0x1a2814, width: 1.5, alpha: 0.85 });
+    // 鐵花格（橫竪各三條）
+    for (let i = 1; i <= 2; i++) {
+      gfx.rect(wx, wy + Math.floor(wh * i / 3), ww, 1)
+        .fill({ color: 0x2a3820, alpha: 0.70 });
+      gfx.rect(wx + Math.floor(ww * i / 3), wy, 1, wh)
+        .fill({ color: 0x2a3820, alpha: 0.70 });
+    }
+    // 微弱招牌紅（頂部條帶）
+    gfx.rect(wx, wy - 5, ww, 5).fill({ color: 0x8c1010, alpha: 0.55 });
+  }
+
+  // 206 牌坊石柱：石灰色厚實方柱 + 龍紋刻線
+  _drawPaifang(gfx, s, pal, rng) {
+    // 石柱基底
+    gfx.rect(0, 0, s, s).fill({ color: pal.base });
+    const cx = s / 2;
+    const pw = Math.floor(s * 0.52), px = Math.floor((s - pw) / 2);
+    // 柱身
+    gfx.rect(px, 0, pw, s).fill({ color: pal.hi });
+    gfx.rect(px, 0, pw, s).stroke({ color: pal.lo, width: 1, alpha: 0.6 });
+    // 左右光影
+    gfx.rect(px,           0, 3, s).fill({ color: 0xffffff, alpha: 0.06 });
+    gfx.rect(px + pw - 3,  0, 3, s).fill({ color: 0x000000, alpha: 0.25 });
+    // 橫向刻紋（龍紋裝飾）
+    for (let i = 1; i <= 3; i++) {
+      const ly = Math.floor(s * i / 4);
+      gfx.rect(px + 3, ly, pw - 6, 1).fill({ color: pal.lo, alpha: 0.55 });
+    }
+    // 柱頂橫樑
+    gfx.rect(0, 0, s, Math.floor(s * 0.12)).fill({ color: pal.lo });
+    gfx.rect(0, 0, s, 2).fill({ color: 0xcc8800, alpha: 0.40 });
+  }
+
+  // 207 垃圾堆/疊箱：深暗隨機堆疊
+  _drawTrashPile(gfx, s, pal, rng) {
+    gfx.rect(0, 0, s, s).fill({ color: pal.base });
+    // 底部積液水漬
+    gfx.ellipse(s * 0.50, s * 0.82, s * 0.38, s * 0.10)
+      .fill({ color: 0x050504, alpha: 0.65 });
+    // 隨機垃圾袋 / 紙箱（3-4 個）
+    const items = 3 + Math.floor(rng.next() * 2);
+    for (let i = 0; i < items; i++) {
+      const bx = Math.floor(rng.next() * s * 0.55 + s * 0.06);
+      const by = Math.floor(rng.next() * s * 0.30 + s * 0.38);
+      const bw = Math.floor(rng.next() * s * 0.24 + s * 0.18);
+      const bh = Math.floor(rng.next() * s * 0.18 + s * 0.14);
+      const bc = rng.next() > 0.5 ? pal.hi : 0x1e1a0e;
+      gfx.rect(bx, by, bw, bh).fill({ color: bc, alpha: 0.80 });
+      gfx.rect(bx, by, bw, bh).stroke({ color: pal.lo, width: 0.8, alpha: 0.5 });
+    }
+    // 頂部壓暗
+    gfx.rect(0, 0, s, 3).fill({ color: 0x000000, alpha: 0.40 });
   }
 
   // ─── 自訂 Warp 圖片疊加 ───────────────────────────────────────────────────
