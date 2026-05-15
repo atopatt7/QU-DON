@@ -119,11 +119,12 @@ function buildGameLayer(app) {
 
 // ─── 載入玩家四向獨立貼圖（從 player.json mapSprites 讀取路徑）──────────────
 // src 可為字串（單幀）或字串陣列（多幀動畫），分別回傳 Texture 或 Texture[]
+// 同時回傳 playerJson（供戰鬥頭像使用）
 async function loadPlayerSprites() {
   try {
     const resp       = await fetch('./src/data/entities/actors/player.json');
-    const playerData = await resp.json();
-    const mapSprites = playerData?.visuals?.mapSprites ?? {};
+    const playerJson = await resp.json();
+    const mapSprites = playerJson?.visuals?.mapSprites ?? {};
 
     const texMap = {};
     await Promise.allSettled(
@@ -141,10 +142,10 @@ async function loadPlayerSprites() {
     );
     const loaded = Object.keys(texMap).length;
     console.log(`[QU-DON] 玩家四向貼圖 ${loaded}/4 組載入成功`);
-    return texMap;
+    return { texMap, playerJson };
   } catch {
     console.warn('[QU-DON] 無法載入玩家實體資料，使用圓形佔位精靈');
-    return {};
+    return { texMap: {}, playerJson: null };
   }
 }
 
@@ -315,7 +316,7 @@ async function main() {
 
   // ⚡ 平行載入：地圖 JSON、玩家貼圖、控制面板、角色資料 同時進行，
   //    大幅縮短黑屏等待時間（原本依序 await，現在同步發出所有請求）
-  const [, playerTexMap, panel, _actorsJson] = await Promise.all([
+  const [, { texMap: playerTexMap, playerJson: _playerJson }, panel, _actorsJson] = await Promise.all([
     mapManager.loadMap(_devMode ? 'map_qu_don_room' : 'map_black_rock_street'),
     loadPlayerSprites(),
     ControlPanel.create(app, input),
@@ -446,7 +447,8 @@ async function main() {
     panel.visible = false;
     MapManager.onActorMoveEnd(playerSpr);
 
-    const playerData = _quDonData ?? { name: '瞿董', stats: { hp: 85, maxHp: 85, atk: 10, def: 5 } };
+    const playerBase = _quDonData ?? { name: '瞿董', stats: { hp: 85, maxHp: 85, atk: 10, def: 5 } };
+    const playerData = { ...playerBase, visuals: _playerJson?.visuals ?? null };
     battleUI.visible = true;
     battleUI.startBattle(playerData, npc.entityData);
 

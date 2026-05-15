@@ -140,9 +140,9 @@ export class BattleUI extends PIXI.Container {
     this._buildBar(16, barY,      W - 32, 22, p.hp, p.maxHp, 0x00FF41, '生命值');
     this._buildBar(16, barY + 30, W - 32, 16, p.sp ?? 144, p.maxSp ?? 240, 0x3366FF, 'SP');
 
-    // 玩家精靈框（左側）
-    const sw = Math.floor(W * 0.31), sh = Math.floor(h * 0.52);
-    const frameX = 16, frameY = y + h - sh - 2;
+    // 玩家精靈框（左側）— 縮小以免與血條重疊
+    const sw = Math.floor(W * 0.26), sh = Math.floor(h * 0.40);
+    const frameX = 16, frameY = y + h - sh - 4;
     const sf = new PIXI.Graphics();
     sf.rect(frameX, frameY, sw, sh).fill({ color: 0x050910 });
     sf.rect(frameX, frameY, sw, sh).stroke({ color: 0x00FF41, width: 1 });
@@ -376,9 +376,14 @@ export class BattleUI extends PIXI.Container {
    * player 有 fallback 路徑（即使 visuals 未傳入也能顯示正面圖）。
    */
   async _loadPortraits() {
-    const playerPath = this._data.player?.visuals?.mapSprites?.down
-                     ?? 'assets/sprites/entities/player_down.png';
-    const enemyPath  = this._data.enemy?.visuals?.mapSprites?.down ?? null;
+    // mapSprites.down 可為字串或字串陣列（動畫幀），陣列時取 index[1]（站立姿）
+    const pDown = this._data.player?.visuals?.mapSprites?.down;
+    const playerPath = Array.isArray(pDown)
+      ? pDown[1]
+      : (pDown ?? 'assets/sprites/entities/player_down_1.png');
+
+    const eDown = this._data.enemy?.visuals?.mapSprites?.down;
+    const enemyPath = Array.isArray(eDown) ? eDown[1] : (eDown ?? null);
 
     await Promise.allSettled([
       this._loadOnePortrait('player', playerPath),
