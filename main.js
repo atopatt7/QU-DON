@@ -332,8 +332,11 @@ async function main() {
   mapManager.entityLayer.addChild(playerSpr);
 
   // ── Lerp 動畫常數 ────────────────────────────────────────────────────────────
-  const LERP_FACTOR = 0.30;   // 每幀收斂比例（30fps ≈ 150ms 抵達）
+  const LERP_FACTOR = 0.30;   // 放開按鍵後的收斂比例（自然減速停步）
   const LERP_SNAP   = 0.01;   // 誤差小於此值時強制對齊
+  // 按住方向鍵時的定速移動量（tiles/frame @ 30fps）
+  // 0.15 → 每格約 7 幀 ≈ 233ms；調高加速，調低放慢
+  const MOVE_SPEED  = 0.15;
   let   _isAnimating = false;
   let   _stepPhase   = 0;     // 0–1，用於步伐上下搖晃
 
@@ -574,29 +577,41 @@ async function main() {
       if (tryMovePlayer(state.justDir) === 'warping') return;
     }
 
-    // ── b) Lerp 動畫推進（精靈 + 相機同步）────────────────────────────────────
+    // ── b) 移動推進（精靈 + 相機同步）──────────────────────────────────────────
+    //   按住方向鍵：定速線性移動（無加減速，消除格間頓挫感）
+    //   放開按鍵後：lerp 自然減速至對齊格子中心
     if (_isAnimating) {
-      const ex = player.gx - player.vx;
-      const ey = player.gy - player.vy;
+      const ex   = player.gx - player.vx;
+      const ey   = player.gy - player.vy;
+      const dist = Math.abs(ex) + Math.abs(ey); // 軸對齊移動，兩分量僅一為非 0
+      const held = state.direction;
 
-      if (Math.abs(ex) < LERP_SNAP && Math.abs(ey) < LERP_SNAP) {
-        // 誤差夠小 → 強制對齊格子
-        player.vx = player.gx;
-        player.vy = player.gy;
+      // 按住：snap 門檻擴大至一步之內，到位後立刻銜接下一格
+      // 放開：只在誤差極小時才 snap，讓 lerp 把最後幾幀自然收完
+      const snapAt = held ? MOVE_SPEED + LERP_SNAP : LERP_SNAP;
+
+      if (dist < snapAt) {
+        player.vx    = player.gx;
+        player.vy    = player.gy;
         _isAnimating = false;
         _stepPhase   = 0;
 
-        // 連續移動：有方向鍵按住且無對話 → 立刻嘗試下一格（動畫不中斷）
-        const held = state.direction;
         if (held && !interaction.isActive) {
           const result = tryMovePlayer(held);
           if (result === 'warping') return;
           if (result === 'blocked') MapManager.onActorMoveEnd(playerSpr);
-          // 'moved'：_isAnimating 已重置為 true，AnimatedSprite 持續播放
+          // 'moved'：_isAnimating 已重置為 true，AnimatedSprite 持續播放不重啟
         } else {
           MapManager.onActorMoveEnd(playerSpr);
         }
+      } else if (held) {
+        // 定速線性：每幀推進固定 MOVE_SPEED（tiles），不會在格尾減速
+        const step  = Math.min(MOVE_SPEED, dist);
+        player.vx  += (ex / dist) * step;
+        player.vy  += (ey / dist) * step;
+        _stepPhase  = Math.min(_stepPhase + 0.14, 1);
       } else {
+        // 放開後：lerp 自然減速，最後幾幀會慢下來再 snap
         player.vx  += ex * LERP_FACTOR;
         player.vy  += ey * LERP_FACTOR;
         _stepPhase  = Math.min(_stepPhase + 0.12, 1);
