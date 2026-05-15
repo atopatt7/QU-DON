@@ -299,12 +299,33 @@
       "draw":     "indoor_sofa",
       "color":    "0x2e1a0e",
       "desc":     "深棕色破舊沙發 — 彈簧外露、沾滿污漬（不可通行）"
+    },
+
+    "46": {
+      "name":     "asphalt_crosswalk_h",
+      "group":    "road",
+      "walkable": true,
+      "collides": false,
+      "draw":     "crosswalk_h",
+      "color":    "0x1c1c1c",
+      "sfx":      "footstep_asphalt",
+      "desc":     "斑馬線 — 橫向白條（供左右向行人穿越，垂直於 Y 軸擺放）"
+    },
+    "47": {
+      "name":     "asphalt_crosswalk_v",
+      "group":    "road",
+      "walkable": true,
+      "collides": false,
+      "draw":     "crosswalk_v",
+      "color":    "0x1c1c1c",
+      "sfx":      "footstep_asphalt",
+      "desc":     "斑馬線 — 縱向白條（供上下向行人穿越，垂直於 X 軸擺放）"
     }
   },
 
   "_comment_groups": {
     "special":  "0",
-    "road":     "1–5, 9, 34–37",
+    "road":     "1–5, 9, 34–37, 46–47",
     "sidewalk": "10–15",
     "wall":     "20, 22–25",
     "indoor":   "21, 40–45  (21=door_wood, 40=floor, 41=bed, 42=clutter, 43=tv, 44=sink, 45=sofa)",

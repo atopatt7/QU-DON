@@ -73,6 +73,9 @@ const TILE_PALETTE = {
   6:  { base: 0x0e1a10, hi: 0x142018, lo: 0x080e0a }, // metal dumpster / bar counter
   7:  { base: 0x1c1408, hi: 0x241a0c, lo: 0x100e06 }, // interior door
   8:  { base: 0x0c0c0c, hi: 0x141414, lo: 0x040404 }, // storm gutter
+  // ── Crosswalk (IDs 46-47) ─────────────────────────────────────────────────
+  46: { base: 0x1c1c1c, hi: 0x242424, lo: 0x101010 }, // crosswalk: horizontal stripes
+  47: { base: 0x1c1c1c, hi: 0x242424, lo: 0x101010 }, // crosswalk: vertical stripes
   // ── Indoor (IDs 40-44) — 瞿董的房間 ────────────────────────────────────────
   40: { base: 0x1a1610, hi: 0x221e16, lo: 0x100e08 }, // dirty carpet floor
   41: { base: 0x1a1820, hi: 0x24222c, lo: 0x100e14 }, // old bed
@@ -333,6 +336,9 @@ export class MapManager {
       case 22: this._drawMetalGate(gfx, s, pal);          break;
       // ── Warp ──────────────────────────────────────────────────────────────
       case 30: this._drawWarpDoor(gfx, s, pal);           break;
+      // ── Crosswalk (IDs 46-47) ─────────────────────────────────────────────
+      case 46: this._drawCrosswalkH(gfx, s, pal, rng);   break;
+      case 47: this._drawCrosswalkV(gfx, s, pal, rng);   break;
       // ── Legacy interior (map_01 / map_neon_bar) ───────────────────────────
       case 6:  this._drawDumpster(gfx, s, pal);           break;
       case 7:  this._drawDoor(gfx, s, pal);               break;
@@ -514,6 +520,36 @@ export class MapManager {
     const skipX = Math.floor(rng.next() * s * 0.5);
     gfx.rect(skipX, cy - gap - lw, Math.floor(s * 0.12), lw)
        .fill({ color: pal.base, alpha: 0.55 });
+  }
+
+  // ── 斑馬線：橫向白條（ID 46，供左右向行人穿越）────────────────────────────
+  // 白條垂直於移動方向，tile 水平擺開形成一整條通道
+  _drawCrosswalkH(gfx, s, pal, rng) {
+    this._drawAsphalt(gfx, s, pal, rng);
+    const stripeW = Math.max(2, Math.floor(s * 0.14));
+    const stripeH = Math.max(1, Math.floor(s * 0.10));
+    const count   = 4;
+    const gap     = Math.floor((s - count * stripeH) / (count + 1));
+    for (let i = 0; i < count; i++) {
+      const y = gap + i * (stripeH + gap);
+      gfx.rect(Math.floor(s * 0.08), y, s - Math.floor(s * 0.16), stripeH)
+         .fill({ color: 0xd0d0c8, alpha: 0.82 });
+    }
+  }
+
+  // ── 斑馬線：縱向白條（ID 47，供上下向行人穿越）────────────────────────────
+  // 白條垂直於移動方向，tile 縱向擺開形成一整條通道
+  _drawCrosswalkV(gfx, s, pal, rng) {
+    this._drawAsphalt(gfx, s, pal, rng);
+    const stripeH = Math.max(2, Math.floor(s * 0.14));
+    const stripeW = Math.max(1, Math.floor(s * 0.10));
+    const count   = 4;
+    const gap     = Math.floor((s - count * stripeW) / (count + 1));
+    for (let i = 0; i < count; i++) {
+      const x = gap + i * (stripeW + gap);
+      gfx.rect(x, Math.floor(s * 0.08), stripeW, s - Math.floor(s * 0.16))
+         .fill({ color: 0xd0d0c8, alpha: 0.82 });
+    }
   }
 
   // ── 路口轉角雙黃線 ────────────────────────────────────────────────────────
