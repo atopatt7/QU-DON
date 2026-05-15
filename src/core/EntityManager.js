@@ -15,8 +15,6 @@
  * ]
  */
 
-import { MapManager } from '../modules/MapManager.js';
-
 export class EntityManager {
   constructor(app) {
     this.app      = app;
@@ -103,32 +101,50 @@ export class EntityManager {
   }
 
   // ─── 從 registry → entity JSON → 載入貼圖 → 建立精靈 ─────────────────────
+  // 直接持有 Texture 物件，繞過 PIXI.Assets.cache.get(path) 的 key 對齊問題
   async _buildEntitySprite(entityRef, direction, tileSize) {
     try {
-      const regRes  = await fetch('./src/data/entities/registry.json');
+      const regRes   = await fetch('./src/data/entities/registry.json');
       const registry = await regRes.json();
       const entityPath = registry[entityRef];
       if (!entityPath) return null;
 
-      const entRes   = await fetch(`./src/data/entities/${entityPath}`);
-      const entData  = await entRes.json();
+      const entRes  = await fetch(`./src/data/entities/${entityPath}`);
+      const entData = await entRes.json();
       const mapSprites = entData?.visuals?.mapSprites;
       if (!mapSprites) return null;
 
-      // 預載入所有方向貼圖（放入 PIXI.Assets 快取，createActorSprite 會從快取取用）
+      // 載入所有方向貼圖，直接收集 Texture / Texture[] 物件
+      const texMap = {};
       await Promise.allSettled(
-        Object.entries(mapSprites).map(async ([, src]) => {
+        Object.entries(mapSprites).map(async ([dir, src]) => {
           try {
-            if (Array.isArray(src)) {
-              await Promise.all(src.map(p => PIXI.Assets.load(`./${p}`)));
-            } else {
-              await PIXI.Assets.load(`./${src}`);
-            }
+            texMap[dir] = Array.isArray(src)
+              ? await Promise.all(src.map(p => PIXI.Assets.load(p)))
+              : await PIXI.Assets.load(src);
           } catch {}
         })
       );
 
-      return MapManager.createActorSprite(mapSprites, direction, tileSize);
+      const baseSrc    = texMap[direction] ?? texMap.down ?? Object.values(texMap)[0] ?? null;
+      if (!baseSrc) return null;
+      const isAnimated = Array.isArray(baseSrc) && baseSrc.length >= 3;
+
+      const refTex = isAnimated ? baseSrc[1] : baseSrc;
+      let spr;
+      if (isAnimated) {
+        spr = new PIXI.AnimatedSprite([baseSrc[0], baseSrc[1], baseSrc[2], baseSrc[1]]);
+        spr.animationSpeed = 0.12;
+        spr.loop           = true;
+        spr.gotoAndStop(1);
+      } else {
+        spr = new PIXI.Sprite(baseSrc);
+      }
+
+      const scl = refTex?.height ? (tileSize * 1.7) / refTex.height : 1;
+      spr.scale.set(scl);
+      spr.anchor.set(0.5, 1.0);
+      return spr;
     } catch {
       return null;
     }
