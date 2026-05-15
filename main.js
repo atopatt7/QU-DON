@@ -488,6 +488,51 @@ async function main() {
     mapManager.render();
   }
 
+  // ── tryMovePlayer：嘗試向 dir 方向移動一格 ────────────────────────────────
+  // 回傳 'moved' | 'blocked' | 'warping'
+  // 連鎖移動（連續按住）與初次移動共用同一段邏輯，避免重複。
+  function tryMovePlayer(dir) {
+    facing = dir;
+    playerSpr.setDir(facing);
+    const { dx, dy } = DIR_DELTA[dir];
+    const nx = player.gx + dx;
+    const ny = player.gy + dy;
+    if (!mapManager.isWalkable(nx, ny)) return 'blocked';
+
+    player.gx = nx;
+    player.gy = ny;
+    _isAnimating = true;
+    _stepPhase   = 0;
+    MapManager.onActorMoveStart(playerSpr);
+    mapManager.updateFog(player.gx, player.gy, mapManager.visionRadius);
+    updateCamera();
+
+    const warp = mapManager.checkWarp(player.gx, player.gy);
+    if (warp) {
+      input.lock();
+      _isAnimating = false;
+      _stepPhase   = 0;
+      console.log(`[Warp] "${warp.label ?? warp.id}" → ${warp.targetMap}`);
+      mapManager.transitionTo(warp.targetMap, () => {
+        player.gx = warp.targetGx;
+        player.gy = warp.targetGy;
+        if (!mapManager.entityLayer.children.includes(playerSpr)) {
+          mapManager.entityLayer.addChild(playerSpr);
+        }
+        clock.updateLocation(getMapLabel(mapManager.mapData));
+        syncPlayer();
+        requestUpdate();
+      })
+        .then(() => input.unlock())
+        .catch(() => {
+          console.warn(`[Warp] 目標地圖 "${warp.targetMap}" 尚未建立，略過轉場`);
+          input.unlock();
+        });
+      return 'warping';
+    }
+    return 'moved';
+  }
+
   // ── 3. 主遊戲迴圈 ────────────────────────────────────────────────────────
   //
   //  ⚡ Stage 4 + Lerp：
@@ -525,54 +570,8 @@ async function main() {
     }
 
     // ── a) 有新輸入：嘗試移動 ──────────────────────────────────────────────
-    if (state.justMoved && state.justDir) {
-      facing = state.justDir;
-      playerSpr.setDir(facing);
-
-      const { dx, dy } = DIR_DELTA[state.justDir];
-      const nx = player.gx + dx;
-      const ny = player.gy + dy;
-
-      if (mapManager.isWalkable(nx, ny)) {
-        player.gx = nx;
-        player.gy = ny;
-
-        // 啟動（或重啟）lerp：視覺座標從當前位置平滑推進到新格子
-        _isAnimating = true;
-        _stepPhase   = 0;
-        MapManager.onActorMoveStart(playerSpr);
-
-        // 霧視野立即對齊新格（Pixi 自動渲染 alpha 變化）
-        mapManager.updateFog(player.gx, player.gy, mapManager.visionRadius);
-        // 輸入座標系更新（相機位置由 lerp section b 逐幀推進，不在此 snap）
-        updateCamera();
-
-        // ── 傳送門檢查 ─────────────────────────────────────────────────────
-        const warp = mapManager.checkWarp(player.gx, player.gy);
-        if (warp) {
-          input.lock();
-          // 進入傳送前停止 lerp，避免 ticker section-b 在轉場期間干擾相機座標
-          _isAnimating = false;
-          _stepPhase   = 0;
-          console.log(`[Warp] "${warp.label ?? warp.id}" → ${warp.targetMap}`);
-          mapManager.transitionTo(warp.targetMap, () => {
-            player.gx = warp.targetGx;
-            player.gy = warp.targetGy;
-            if (!mapManager.entityLayer.children.includes(playerSpr)) {
-              mapManager.entityLayer.addChild(playerSpr);
-            }
-            clock.updateLocation(getMapLabel(mapManager.mapData));
-            syncPlayer(); // 傳送後強制對齊，不做 lerp
-            requestUpdate();
-          })
-            .then(() => input.unlock())
-            .catch(() => {
-              console.warn(`[Warp] 目標地圖 "${warp.targetMap}" 尚未建立，略過轉場`);
-              input.unlock();
-            });
-          return; // 傳送期間不繼續 lerp
-        }
-      }
+    if (state.justMoved && state.justDir && !_isAnimating) {
+      if (tryMovePlayer(state.justDir) === 'warping') return;
     }
 
     // ── b) Lerp 動畫推進（精靈 + 相機同步）────────────────────────────────────
@@ -581,12 +580,22 @@ async function main() {
       const ey = player.gy - player.vy;
 
       if (Math.abs(ex) < LERP_SNAP && Math.abs(ey) < LERP_SNAP) {
-        // 誤差夠小 → 強制對齊，結束動畫
-        player.vx    = player.gx;
-        player.vy    = player.gy;
+        // 誤差夠小 → 強制對齊格子
+        player.vx = player.gx;
+        player.vy = player.gy;
         _isAnimating = false;
         _stepPhase   = 0;
-        MapManager.onActorMoveEnd(playerSpr);
+
+        // 連續移動：有方向鍵按住且無對話 → 立刻嘗試下一格（動畫不中斷）
+        const held = state.direction;
+        if (held && !interaction.isActive) {
+          const result = tryMovePlayer(held);
+          if (result === 'warping') return;
+          if (result === 'blocked') MapManager.onActorMoveEnd(playerSpr);
+          // 'moved'：_isAnimating 已重置為 true，AnimatedSprite 持續播放
+        } else {
+          MapManager.onActorMoveEnd(playerSpr);
+        }
       } else {
         player.vx  += ex * LERP_FACTOR;
         player.vy  += ey * LERP_FACTOR;

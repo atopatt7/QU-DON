@@ -280,6 +280,25 @@ export class InputManager {
     }
   }
 
+  // ─── 按鍵狀態查詢 API ─────────────────────────────────────────────────────
+
+  /**
+   * 查詢某按鍵目前是否正被按住（KeyboardEvent.code）。
+   * 可傳入邏輯名稱 'up'|'down'|'left'|'right' 由內部對應方向鍵 + WASD。
+   * @param {string} code  KeyboardEvent.code 或方向邏輯名稱
+   * @returns {boolean}
+   */
+  isKeyDown(code) {
+    const aliases = {
+      up:    ['ArrowUp',    'KeyW'],
+      down:  ['ArrowDown',  'KeyS'],
+      left:  ['ArrowLeft',  'KeyA'],
+      right: ['ArrowRight', 'KeyD'],
+    };
+    if (aliases[code]) return aliases[code].some(k => !!this._keys[k]);
+    return !!this._keys[code];
+  }
+
   // ─── 轉場鎖定 API ────────────────────────────────────────────────────────
 
   /** 鎖定輸入（地圖轉場期間呼叫），防止幽靈移動。 */
