@@ -6,7 +6,7 @@
  *    才能讓舊快取失效、手機端取得最新版本。
  */
 
-const CACHE_NAME = 'qudon-v17';
+const CACHE_NAME = 'qudon-v18';
 
 // ── 本機檔案：安裝時全數預快取 ────────────────────────────────────────────────
 // 包含所有 JS 模組、資料檔與圖片資源，確保離線 / 弱網路環境也能正常啟動
@@ -30,8 +30,14 @@ const LOCAL_FILES = [
   // ── 遊戲模組 ───────────────────────────────────────────────────────────────
   './src/modules/MapManager.js',
   './src/modules/InteractionManager.js',
+  './src/modules/DataManager.js',
   // ── 資料 JSON ──────────────────────────────────────────────────────────────
   './src/data/actors.json',
+  // ── 實體系統（registry + 獨立角色檔）──────────────────────────────────────
+  './src/data/entities/registry.json',
+  './src/data/entities/actors/player.json',
+  './src/data/entities/actors/enemy_thug.json',
+  './src/data/entities/actors/enemy_pickpocket.json',
   './src/data/maps/config.json',
   './src/data/maps/map_black_rock_street.json',
   './src/data/maps/map_neon_bar.json',

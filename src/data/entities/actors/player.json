@@ -1,0 +1,16 @@
+{
+  "id": "player",
+  "name": "瞿董",
+  "level": 1,
+  "stats": {
+    "hp": 85, "maxHp": 85, "atk": 12, "def": 8, "eva": 0.15
+  },
+  "visuals": {
+    "mapSprite":      "assets/sprites/player_sheet.png",
+    "battleMugshot":  "assets/ui/monochrome_qu_don_vfd.png"
+  },
+  "behavior": {
+    "skills": ["street_network"]
+  },
+  "description": "前黑道協調人，以資訊和談判見長。"
+}

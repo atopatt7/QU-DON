@@ -1,0 +1,16 @@
+{
+  "id": "enemy_pickpocket",
+  "name": "扒手",
+  "level": 2,
+  "stats": {
+    "hp": 35, "maxHp": 35, "atk": 6, "def": 2, "eva": 0.25
+  },
+  "visuals": {
+    "mapSprite":      "assets/sprites/enemy_pickpocket_move.json",
+    "battleMugshot":  "assets/ui/monochrome_pickpocket_vfd.png"
+  },
+  "behavior": {
+    "skills": ["steal_money", "quick_flee"]
+  },
+  "description": "哈卡街的街頭鼠輩，擅長在推擠中摸走財物。"
+}

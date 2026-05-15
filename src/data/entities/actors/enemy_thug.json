@@ -1,0 +1,16 @@
+{
+  "id": "enemy_thug",
+  "name": "紅犬幫混混",
+  "level": 1,
+  "stats": {
+    "hp": 50, "maxHp": 50, "atk": 8, "def": 2, "eva": 0.0
+  },
+  "visuals": {
+    "mapSprite":      "assets/sprites/enemy_thug_move.json",
+    "battleMugshot":  "assets/ui/monochrome_thug_vfd.png"
+  },
+  "behavior": {
+    "skills": []
+  },
+  "description": "紅犬幫的底層打手，靠蠻力行事。"
+}
