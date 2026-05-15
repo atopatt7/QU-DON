@@ -6,8 +6,13 @@
     "hp": 85, "maxHp": 85, "atk": 12, "def": 8, "eva": 0.15
   },
   "visuals": {
-    "mapSprite":      "assets/sprites/entities/player_sheet.png",
-    "battleMugshot":  "assets/ui/portraits/monochrome_qu_don_vfd.png"
+    "mapSprites": {
+      "down":  "assets/sprites/entities/player_down.png",
+      "up":    "assets/sprites/entities/player_up.png",
+      "left":  "assets/sprites/entities/player_left.png",
+      "right": "assets/sprites/entities/player_right.png"
+    },
+    "battleMugshot": "assets/ui/portraits/monochrome_qu_don_vfd.png"
   },
   "behavior": {
     "skills": ["street_network"]

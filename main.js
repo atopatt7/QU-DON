@@ -116,41 +116,51 @@ function buildGameLayer(app) {
   return layer;
 }
 
-// ─── 載入玩家精靈圖（失敗時回傳 null）─────────────────────────────────────
-async function loadPlayerSheet() {
+// ─── 載入玩家四向獨立貼圖（從 player.json mapSprites 讀取路徑）──────────────
+async function loadPlayerSprites() {
   try {
-    const tex = await PIXI.Assets.load('./assets/sprites/entities/player_sheet.png');
-    console.log(`[QU-DON] 玩家精靈圖 ${tex.width}×${tex.height} 載入成功`);
-    return tex;
+    const resp       = await fetch('./src/data/entities/actors/player.json');
+    const playerData = await resp.json();
+    const mapSprites = playerData?.visuals?.mapSprites ?? {};
+
+    const texMap = {};
+    await Promise.allSettled(
+      Object.entries(mapSprites).map(async ([dir, path]) => {
+        try {
+          texMap[dir] = await PIXI.Assets.load(`./${path}`);
+        } catch {
+          console.warn(`[QU-DON] 玩家貼圖載入失敗 (${dir}): ${path}`);
+        }
+      })
+    );
+    const loaded = Object.keys(texMap).length;
+    console.log(`[QU-DON] 玩家四向貼圖 ${loaded}/4 張載入成功`);
+    return texMap;
   } catch {
-    console.warn('[QU-DON] player_sheet.png 不存在，使用圓形佔位精靈');
-    return null;
+    console.warn('[QU-DON] 無法載入玩家實體資料，使用圓形佔位精靈');
+    return {};
   }
 }
 
-// ─── 建立玩家精靈 ──────────────────────────────────────────────────────────
-function buildPlayerSprite(tileSize, sheetTex = null) {
-  if (sheetTex) {
-    const fw  = Math.floor(sheetTex.width / 4);
-    const fw3 = sheetTex.width - fw * 3;
-    const fh  = sheetTex.height;
+// ─── 建立玩家精靈（四向獨立貼圖版）───────────────────────────────────────────
+// texMap: { down?: Texture, up?: Texture, left?: Texture, right?: Texture }
+function buildPlayerSprite(tileSize, texMap = {}) {
+  const baseTex = texMap.down ?? Object.values(texMap)[0] ?? null;
 
-    const DIR_FRAMES = {
-      down:  new PIXI.Texture({ source: sheetTex.source, frame: new PIXI.Rectangle(0,      0, fw,  fh) }),
-      up:    new PIXI.Texture({ source: sheetTex.source, frame: new PIXI.Rectangle(fw,     0, fw,  fh) }),
-      right: new PIXI.Texture({ source: sheetTex.source, frame: new PIXI.Rectangle(fw * 2, 0, fw,  fh) }),
-      left:  new PIXI.Texture({ source: sheetTex.source, frame: new PIXI.Rectangle(fw * 3, 0, fw3, fh) }),
-    };
+  if (baseTex) {
+    const fw = baseTex.width;
+    const fh = baseTex.height;
 
-    const spr = new PIXI.Sprite(DIR_FRAMES.down);
+    const spr   = new PIXI.Sprite(baseTex);
     const dispH = Math.floor(tileSize * 2.0);
     const dispW = Math.floor(dispH * (fw / fh));
     spr.width  = dispW;
     spr.height = dispH;
     spr.anchor.set(0.5, 1.0);
 
-    spr.setDir   = (dir) => {
-      const t = DIR_FRAMES[dir] ?? DIR_FRAMES.down;
+    // 方向切換：直接替換整張獨立貼圖
+    spr.setDir = (dir) => {
+      const t = texMap[dir] ?? texMap.down ?? baseTex;
       if (spr.texture !== t) spr.texture = t;
     };
     spr.resizeTo = (s) => {
@@ -276,9 +286,9 @@ async function main() {
 
   // ⚡ 平行載入：地圖 JSON、玩家貼圖、控制面板、角色資料 同時進行，
   //    大幅縮短黑屏等待時間（原本依序 await，現在同步發出所有請求）
-  const [, sheetTex, panel, _actorsJson] = await Promise.all([
+  const [, playerTexMap, panel, _actorsJson] = await Promise.all([
     mapManager.loadMap(_devMode ? 'map_qu_don_room' : 'map_black_rock_street'),
-    loadPlayerSheet(),
+    loadPlayerSprites(),
     ControlPanel.create(app, input),
     fetch('./src/data/actors.json').then(r => r.json()).catch(() => null),
   ]);
@@ -291,7 +301,7 @@ async function main() {
   const player  = { gx: spawnGx, gy: spawnGy, vx: spawnGx, vy: spawnGy };
   let   facing  = spawn?.facing ?? 'down';
 
-  const playerSpr = buildPlayerSprite(mapManager.tileSize, sheetTex);
+  const playerSpr = buildPlayerSprite(mapManager.tileSize, playerTexMap);
   playerSpr.setDir(facing);
   mapManager.entityLayer.addChild(playerSpr);
 
@@ -307,7 +317,7 @@ async function main() {
     const px = mapManager.gridToPixel(vgx, vgy);
     const bob = _isAnimating ? Math.sin(_stepPhase * Math.PI) * (s * 0.06) : 0;
     playerSpr.x = px.x;
-    playerSpr.y = (sheetTex ? px.y + s * 0.5 : px.y) - bob;
+    playerSpr.y = (Object.keys(playerTexMap).length > 0 ? px.y + s * 0.5 : px.y) - bob;
   }
 
   // ── 輸入座標系更新（每次移動後同步 touch→grid 的座標基準）───────────────────
