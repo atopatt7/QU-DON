@@ -154,12 +154,9 @@ function buildPlayerSprite(tileSize, texMap = {}) {
   const isAnimated = Array.isArray(baseSrc) && baseSrc.length >= 3;
 
   if (baseSrc) {
-    // 以站立幀（index 1）或單幀作為尺寸參考
+    // 以站立幀（index 1）或單幀作為縮放基準
     const refTex = isAnimated ? baseSrc[1] : baseSrc;
-    const fw     = refTex.width;
     const fh     = refTex.height;
-    const dispH  = Math.floor(tileSize * 1.7);
-    const dispW  = Math.floor(dispH * (fw / fh));
 
     let spr;
     if (isAnimated) {
@@ -172,8 +169,8 @@ function buildPlayerSprite(tileSize, texMap = {}) {
       spr = new PIXI.Sprite(baseSrc);
     }
 
-    spr.width  = dispW;
-    spr.height = dispH;
+    // 均等縮放：鎖高度，寬度隨各幀原始比例自然延伸，不壓縮
+    spr.scale.set((tileSize * 1.7) / fh);
     spr.anchor.set(0.5, 1.0);
 
     let _dir = 'down';
@@ -195,9 +192,7 @@ function buildPlayerSprite(tileSize, texMap = {}) {
     };
 
     spr.resizeTo = (s) => {
-      const h = Math.floor(s * 1.7);
-      spr.height = h;
-      spr.width  = Math.floor(h * (fw / fh));
+      spr.scale.set((s * 1.7) / fh);
     };
     return spr;
   }

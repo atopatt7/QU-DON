@@ -1442,12 +1442,10 @@ export class MapManager {
       spr = new PIXI.Sprite(PIXI.Assets.cache.get(path) ?? PIXI.Texture.WHITE);
     }
 
-    const baseTex = spr.textures ? spr.textures[0] : spr.texture;
-    const dispW   = baseTex?.width
-                  ? Math.floor(dispH * (baseTex.width / baseTex.height))
-                  : dispH;
-    spr.width  = dispW;
-    spr.height = dispH;
+    // 以站立幀（index 1）高度為基準，用均等縮放保留各幀原始寬度
+    const refTex = spr.textures ? spr.textures[1] : spr.texture;
+    const scl    = refTex?.height ? (tileSize * 1.7) / refTex.height : 1;
+    spr.scale.set(scl);
     spr.anchor.set(0.5, 1.0);
     return spr;
   }
