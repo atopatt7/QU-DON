@@ -20,11 +20,12 @@ export class BattleUI extends PIXI.Container {
    */
   constructor(app, data = {}) {
     super();
-    this._app        = app;
-    this._data       = data;
-    this._log        = ['戰鬥即將開始...'];
-    this._isLocked   = false;
-    this._actHandler = null;   // 內部 action 監聽器（startBattle 時綁定）
+    this._app           = app;
+    this._data          = data;
+    this._log           = ['戰鬥即將開始...'];
+    this._isLocked      = false;
+    this._actHandler    = null;
+    this._portraitCache = { player: null, enemy: null }; // null=未載入, false=失敗, Sprite=就緒
     this._build();
     this._bindResize();
   }
@@ -86,22 +87,32 @@ export class BattleUI extends PIXI.Container {
     this._buildBar(16, barY, W - 32, 22,
       enemy.hp, enemy.maxHp, 0xFF0040, '生命值');
 
-    // 敵方精靈框
+    // 敵方精靈框（右對齊）
     const sw = Math.floor(W * 0.38), sh = Math.floor(h * 0.55);
+    const frameX = W - sw - 16, frameY = y + h - sh - 2;
     const sf = new PIXI.Graphics();
-    sf.rect((W - sw) / 2, y + h - sh - 2, sw, sh).fill({ color: 0x0D0606 });
-    sf.rect((W - sw) / 2, y + h - sh - 2, sw, sh).stroke({ color: 0xFF0040, width: 1 });
+    sf.rect(frameX, frameY, sw, sh).fill({ color: 0x0D0606 });
+    sf.rect(frameX, frameY, sw, sh).stroke({ color: 0xFF0040, width: 1 });
     this.addChild(sf);
 
-    const sl = new PIXI.Text({
-      text: 'ENEMY SPRITE',
-      style: new PIXI.TextStyle({ fontFamily: '"VT323",monospace', fontSize: 9, fill: 0xFF0040 }),
-    });
-    sl.anchor.set(0.5);
-    sl.x = W / 2;
-    sl.y = y + h - sh / 2 - 2;
-    sl.alpha = 0.3;
-    this.addChild(sl);
+    if (this._portraitCache.enemy) {
+      const p  = this._portraitCache.enemy;
+      p.x      = frameX + 1;
+      p.y      = frameY + 1;
+      p.width  = sw - 2;
+      p.height = sh - 2;
+      this.addChild(p);
+    } else {
+      const sl = new PIXI.Text({
+        text: 'ENEMY SPRITE',
+        style: new PIXI.TextStyle({ fontFamily: '"VT323",monospace', fontSize: 9, fill: 0xFF0040 }),
+      });
+      sl.anchor.set(0.5);
+      sl.x = frameX + sw / 2;
+      sl.y = frameY + sh / 2;
+      sl.alpha = 0.3;
+      this.addChild(sl);
+    }
   }
 
   // ── 我方區塊 ────────────────────────────────────────────────────────────
@@ -128,12 +139,22 @@ export class BattleUI extends PIXI.Container {
     this._buildBar(16, barY,      W - 32, 22, p.hp, p.maxHp, 0x00FF41, '生命值');
     this._buildBar(16, barY + 30, W - 32, 16, p.sp ?? 144, p.maxSp ?? 240, 0x3366FF, 'SP');
 
-    // 玩家精靈框
+    // 玩家精靈框（左側）
     const sw = Math.floor(W * 0.31), sh = Math.floor(h * 0.52);
+    const frameX = 16, frameY = y + h - sh - 2;
     const sf = new PIXI.Graphics();
-    sf.rect(16, y + h - sh - 2, sw, sh).fill({ color: 0x050910 });
-    sf.rect(16, y + h - sh - 2, sw, sh).stroke({ color: 0x00FF41, width: 1 });
+    sf.rect(frameX, frameY, sw, sh).fill({ color: 0x050910 });
+    sf.rect(frameX, frameY, sw, sh).stroke({ color: 0x00FF41, width: 1 });
     this.addChild(sf);
+
+    if (this._portraitCache.player) {
+      const p  = this._portraitCache.player;
+      p.x      = frameX + 1;
+      p.y      = frameY + 1;
+      p.width  = sw - 2;
+      p.height = sh - 2;
+      this.addChild(p);
+    }
   }
 
   // ── 通用血條（帶輝光） ────────────────────────────────────────────────────
@@ -327,8 +348,13 @@ export class BattleUI extends PIXI.Container {
         def:   eStats.def   ?? 2,
       },
     };
-    this._log      = [`${enemyData.name} 擋住了去路！`];
-    this._isLocked = false;
+    // 保存 visuals 供頭像系統使用
+    this._data.player.visuals = playerData.visuals ?? null;
+    this._data.enemy.visuals  = enemyData.visuals  ?? null;
+
+    this._log             = [`${enemyData.name} 擋住了去路！`];
+    this._isLocked        = false;
+    this._portraitCache   = { player: null, enemy: null }; // 重置快取
 
     // 重新綁定內部戰鬥邏輯（移除舊監聽器後再掛）
     if (this._actHandler) this.off('action', this._actHandler);
@@ -336,6 +362,62 @@ export class BattleUI extends PIXI.Container {
     this.on('action', this._actHandler);
 
     this._build();
+
+    // 非同步載入頭像，完成後重繪（不阻塞戰鬥啟動）
+    this._loadPortraits().catch(() => {});
+  }
+
+  // ─── 頭像系統 ─────────────────────────────────────────────────────────────────
+
+  /**
+   * 並行載入主角與敵方頭像，完成後觸發 _build() 重繪。
+   * player 有 fallback 路徑（即使 visuals 未傳入也能顯示正面圖）。
+   */
+  async _loadPortraits() {
+    const playerPath = this._data.player?.visuals?.mapSprites?.down
+                     ?? 'assets/sprites/entities/player_down.png';
+    const enemyPath  = this._data.enemy?.visuals?.mapSprites?.down ?? null;
+
+    await Promise.allSettled([
+      this._loadOnePortrait('player', playerPath),
+      enemyPath ? this._loadOnePortrait('enemy', enemyPath) : Promise.resolve(),
+    ]);
+
+    this._build();
+  }
+
+  /**
+   * 載入單一頭像：裁切上半身 50% + 套用 VFD 螢光綠濾鏡。
+   * @param {'player'|'enemy'} role
+   * @param {string} path  完整資源路徑
+   */
+  async _loadOnePortrait(role, path) {
+    try {
+      const baseTex  = await PIXI.Assets.load(path);
+
+      // ── 裁切上半身（height × 0.5）──────────────────────────────────────────
+      const cropRect = new PIXI.Rectangle(0, 0, baseTex.width, Math.floor(baseTex.height * 0.5));
+      const tex      = new PIXI.Texture({ source: baseTex.source, frame: cropRect });
+
+      const spr = new PIXI.Sprite(tex);
+
+      // ── VFD 螢光綠濾鏡（ColorMatrix）──────────────────────────────────────
+      // 目標：灰階 → #00FF41（R=0, G=luma, B=0.255×luma）
+      // luma = 0.299R + 0.587G + 0.114B
+      const filter = new PIXI.ColorMatrixFilter();
+      filter.matrix = [
+        0,     0,     0,     0, 0,   // R' = 0
+        0.299, 0.587, 0.114, 0, 0,   // G' = luminance
+        0.076, 0.150, 0.029, 0, 0,   // B' = 0.255 × luminance ≈ #41
+        0,     0,     0,     1, 0,   // A' = 原始 alpha
+      ];
+      spr.filters = [filter];
+
+      this._portraitCache[role] = spr;
+    } catch {
+      console.warn(`[BattleUI] 頭像載入失敗: ${path}`);
+      this._portraitCache[role] = false;
+    }
   }
 
   // ─── 戰鬥輔助 ────────────────────────────────────────────────────────────────
