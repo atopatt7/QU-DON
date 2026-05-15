@@ -6,7 +6,7 @@
  *    才能讓舊快取失效、手機端取得最新版本。
  */
 
-const CACHE_NAME = 'qudon-v19';
+const CACHE_NAME = 'qudon-v20';
 
 // ── 本機檔案：安裝時全數預快取 ────────────────────────────────────────────────
 // 包含所有 JS 模組、資料檔與圖片資源，確保離線 / 弱網路環境也能正常啟動
@@ -48,15 +48,15 @@ const LOCAL_FILES = [
   './src/data/npcs/npcs_black_rock_street.json',
   // ── 圖片資源（預快取後載入速度大幅提升）────────────────────────────────────
   './assets/images/home_bg.jpg',
-  './assets/sprites/player_sheet.png',
-  './assets/ui/cigar_box.png',
-  './assets/ui/cigar_single.png',
-  './assets/ui/warp_arrow_base.png',
-  './assets/ui/warp_door.png',
-  './assets/ui/warp_shutter.png',
-  './assets/ui/mag_base.png',
-  './assets/ui/Wood067_1K-PNG_Color.png',
-  './assets/ui/bullet_single.png',
+  './assets/sprites/entities/player_sheet.png',
+  './assets/ui/interface/cigar_box.png',
+  './assets/ui/interface/cigar_single.png',
+  './assets/ui/interface/warp_arrow_base.png',
+  './assets/ui/interface/warp_door.png',
+  './assets/ui/interface/warp_shutter.png',
+  './assets/ui/interface/mag_base.png',
+  './assets/ui/interface/Wood067_1K-PNG_Color.png',
+  './assets/ui/interface/bullet_single.png',
 ];
 
 // ── CDN 資源：嘗試快取，失敗不阻塞安裝（網路可用時仍可從 CDN 抓取）────────────

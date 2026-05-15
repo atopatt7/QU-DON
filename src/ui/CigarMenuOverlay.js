@@ -87,8 +87,8 @@ export class CigarMenuOverlay extends PIXI.Container {
 
     this._buildDim(W, H);
 
-    const boxTex   = PIXI.Assets.get('assets/ui/cigar_box.png')    ?? null;
-    const cigarTex = PIXI.Assets.get('assets/ui/cigar_single.png') ?? null;
+    const boxTex   = PIXI.Assets.get('assets/ui/interface/cigar_box.png')    ?? null;
+    const cigarTex = PIXI.Assets.get('assets/ui/interface/cigar_single.png') ?? null;
 
     // ── 全域縮放：讓盒子高度佔螢幕 BOX_HEIGHT_RATIO ──────────────────────────
     const boxNativeW = boxTex ? boxTex.width  : 900;

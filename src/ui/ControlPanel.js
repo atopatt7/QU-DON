@@ -87,9 +87,9 @@ export class ControlPanel extends PIXI.Container {
     };
 
     [this._texWood, this._texBtnUp, this._texBtnDn] = await Promise.all([
-      tryLoad('assets/ui/dark_wood_texture.jpg'),
-      tryLoad('assets/ui/btn_membrane_up.png'),
-      tryLoad('assets/ui/btn_membrane_down.png'),
+      tryLoad('assets/ui/interface/dark_wood_texture.jpg'),
+      tryLoad('assets/ui/interface/btn_membrane_up.png'),
+      tryLoad('assets/ui/interface/btn_membrane_down.png'),
     ]);
   }
 

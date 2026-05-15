@@ -924,7 +924,7 @@ export class MapManager {
    * 沒有 `sprite` 的 warp 由 objects layer 的 tile-30 顯示（_drawWarpDoor）。
    *
    * warp JSON 欄位：
-   *   sprite   {string}  圖片檔名，從 assets/ui/ 讀取（例如 "warp_parking_ramp.png"）
+   *   sprite   {string}  相對於 assets/ui/ 的路徑（例如 "interface/warp_arrow_base.png"）
    *   rotation {number}  旋轉角度（度數，選填，例如 90 / -90 / 180）
    */
   _buildWarpOverlays() {

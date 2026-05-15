@@ -6,8 +6,8 @@
     "hp": 50, "maxHp": 50, "atk": 8, "def": 2, "eva": 0.0
   },
   "visuals": {
-    "mapSprite":      "assets/sprites/enemy_thug_move.json",
-    "battleMugshot":  "assets/ui/monochrome_thug_vfd.png"
+    "mapSprite":      "assets/sprites/entities/enemy_thug_move.json",
+    "battleMugshot":  "assets/ui/portraits/monochrome_thug_vfd.png"
   },
   "behavior": {
     "skills": []

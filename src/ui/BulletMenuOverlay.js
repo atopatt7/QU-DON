@@ -84,7 +84,7 @@ export class BulletMenuOverlay extends PIXI.Container {
 
     this._buildDim(W, H);
 
-    const magTex     = PIXI.Assets.get('assets/ui/mag_base.png') ?? null;
+    const magTex     = PIXI.Assets.get('assets/ui/interface/mag_base.png') ?? null;
     const nativeMagW = magTex ? magTex.width  : 90;
     const nativeMagH = magTex ? magTex.height : Math.floor(H / MAG_HEIGHT_RATIO);
 
@@ -146,7 +146,7 @@ export class BulletMenuOverlay extends PIXI.Container {
    * ★ stepY = BULLET_STEP_Y × targetScale（固定值，與圖片尺寸無關）
    */
   _buildBullets(magTex, magX, magY, targetScale, nativeMagW) {
-    const bulletTex   = PIXI.Assets.get('assets/ui/bullet_single.png') ?? null;
+    const bulletTex   = PIXI.Assets.get('assets/ui/interface/bullet_single.png') ?? null;
     const nativeBW    = bulletTex ? bulletTex.width  : 130;
     const nativeBH    = bulletTex ? bulletTex.height : 50;
 

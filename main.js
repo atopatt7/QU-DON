@@ -119,7 +119,7 @@ function buildGameLayer(app) {
 // ─── 載入玩家精靈圖（失敗時回傳 null）─────────────────────────────────────
 async function loadPlayerSheet() {
   try {
-    const tex = await PIXI.Assets.load('./assets/sprites/player_sheet.png');
+    const tex = await PIXI.Assets.load('./assets/sprites/entities/player_sheet.png');
     console.log(`[QU-DON] 玩家精靈圖 ${tex.width}×${tex.height} 載入成功`);
     return tex;
   } catch {
@@ -219,7 +219,7 @@ async function main() {
   bindResize(app);
 
   // 雪茄盒選單素材預載：與首頁顯示並行，不阻塞畫面
-  PIXI.Assets.load(['assets/ui/cigar_box.png', 'assets/ui/cigar_single.png'])
+  PIXI.Assets.load(['assets/ui/interface/cigar_box.png', 'assets/ui/interface/cigar_single.png'])
     .catch(() => console.warn('[QU-DON] CigarMenu 素材預載失敗，選單將使用佔位圖形'));
 
   // ── 1. 顯示首頁 ──────────────────────────────────────────────────────────
