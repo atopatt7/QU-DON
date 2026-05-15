@@ -8,7 +8,7 @@
   "visuals": {
     "mapSprites": {
       "down":  "assets/sprites/entities/pickpocket_down.png",
-      "up":    "assets/sprites/entities/pickpocket_back.png",
+      "up":    "assets/sprites/entities/pickpocket_up.png",
       "left":  "assets/sprites/entities/pickpocket_left.png",
       "right": "assets/sprites/entities/pickpocket_right.png"
     },

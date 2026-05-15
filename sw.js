@@ -67,7 +67,7 @@ const ENTITY_SPRITES = [
   './assets/sprites/entities/player_right.png',
   // 扒手四向
   './assets/sprites/entities/pickpocket_down.png',
-  './assets/sprites/entities/pickpocket_back.png',
+  './assets/sprites/entities/pickpocket_up.png',
   './assets/sprites/entities/pickpocket_left.png',
   './assets/sprites/entities/pickpocket_right.png',
 ];
