@@ -72,37 +72,22 @@ export class BattleUI extends PIXI.Container {
 
     const enemy = this._data.enemy ?? { name: '街頭老大', level: 12, hp: 156, maxHp: 240 };
 
-    const nameTxt = new PIXI.Text({
-      text: `▶ ${enemy.name}  LV.${String(enemy.level ?? 1).padStart(2, '0')}`,
-      style: new PIXI.TextStyle({
-        fontFamily: '"Noto Sans TC", "Microsoft JhengHei", sans-serif',
-        fontSize: Math.floor(W * 0.033), fontWeight: 'bold', fill: 0xFF5555,
-      }),
-    });
-    nameTxt.x = 16;
-    nameTxt.y = y + 10;
-    this.addChild(nameTxt);
-
-    const barY = y + nameTxt.height + 18;
-    this._buildBar(16, barY, W - 32, 22,
-      enemy.hp, enemy.maxHp, 0xFF0040, '生命值');
-
-    // 敵方精靈框（右對齊）
-    const sw = Math.floor(W * 0.38), sh = Math.floor(h * 0.55);
-    const frameX = W - sw - 16, frameY = y + h - sh - 2;
+    // ── 敵方精靈框（右對齊，整欄高）────────────────────────────────────────
+    const sw = Math.floor(W * 0.38), sh = h - 8;
+    const frameX = W - sw - 16, frameY = y + 4;
     const sf = new PIXI.Graphics();
     sf.rect(frameX, frameY, sw, sh).fill({ color: 0x0D0606 });
     sf.rect(frameX, frameY, sw, sh).stroke({ color: 0xFF0040, width: 1 });
     this.addChild(sf);
 
     if (this._portraitCache.enemy) {
-      const p   = this._portraitCache.enemy;
-      const tex = p.texture;
-      const scale = Math.min((sw - 2) / tex.width, (sh - 2) / tex.height);
-      p.scale.set(scale);
-      p.x = frameX + 1 + Math.floor((sw - 2 - tex.width  * scale) / 2);
-      p.y = frameY + 1 + Math.floor((sh - 2 - tex.height * scale) / 2);
-      this.addChild(p);
+      const port = this._portraitCache.enemy;
+      const tex  = port.texture;
+      const scale = Math.min((sw - 4) / tex.width, (sh - 4) / tex.height);
+      port.scale.set(scale);
+      port.x = frameX + 2 + Math.floor((sw - 4 - tex.width  * scale) / 2);
+      port.y = frameY + 2 + Math.floor((sh - 4 - tex.height * scale) / 2);
+      this.addChild(port);
     } else {
       const sl = new PIXI.Text({
         text: 'ENEMY SPRITE',
@@ -114,6 +99,25 @@ export class BattleUI extends PIXI.Container {
       sl.alpha = 0.3;
       this.addChild(sl);
     }
+
+    // ── 名稱＋血條：從左邊界到頭像框左側 5px 為止 ───────────────────────────
+    const barEndX = frameX - 5;
+    const barX    = 16;
+    const barW    = barEndX - barX;
+
+    const nameTxt = new PIXI.Text({
+      text: `▶ ${enemy.name}  LV.${String(enemy.level ?? 1).padStart(2, '0')}`,
+      style: new PIXI.TextStyle({
+        fontFamily: '"Noto Sans TC", "Microsoft JhengHei", sans-serif',
+        fontSize: Math.floor(W * 0.033), fontWeight: 'bold', fill: 0xFF5555,
+      }),
+    });
+    nameTxt.x = barX;
+    nameTxt.y = y + 10;
+    this.addChild(nameTxt);
+
+    const barY = y + nameTxt.height + 18;
+    this._buildBar(barX, barY, barW, 22, enemy.hp, enemy.maxHp, 0xFF0040, '生命值');
   }
 
   // ── 我方區塊 ────────────────────────────────────────────────────────────
@@ -125,6 +129,28 @@ export class BattleUI extends PIXI.Container {
 
     const p = this._data.player ?? { name: '瞿董', level: 8, hp: 204, maxHp: 240, sp: 144, maxSp: 240 };
 
+    // ── 頭像框（左側）──────────────────────────────────────────────────────
+    const sw = Math.floor(W * 0.26), sh = h - 8;
+    const frameX = 16, frameY = y + 4;
+    const sf = new PIXI.Graphics();
+    sf.rect(frameX, frameY, sw, sh).fill({ color: 0x050910 });
+    sf.rect(frameX, frameY, sw, sh).stroke({ color: 0x00FF41, width: 1 });
+    this.addChild(sf);
+
+    if (this._portraitCache.player) {
+      const port = this._portraitCache.player;
+      const tex  = port.texture;
+      const scale = Math.min((sw - 4) / tex.width, (sh - 4) / tex.height);
+      port.scale.set(scale);
+      port.x = frameX + 2 + Math.floor((sw - 4 - tex.width  * scale) / 2);
+      port.y = frameY + 2 + Math.floor((sh - 4 - tex.height * scale) / 2);
+      this.addChild(port);
+    }
+
+    // ── 名稱＋血條：頭像框右側 5px 開始，右側留 16px ──────────────────────
+    const statX = frameX + sw + 5;
+    const statW = W - statX - 16;
+
     const nameTxt = new PIXI.Text({
       text: `${p.name}  LV.${String(p.level ?? 1).padStart(2, '0')}`,
       style: new PIXI.TextStyle({
@@ -132,31 +158,13 @@ export class BattleUI extends PIXI.Container {
         fontSize: Math.floor(W * 0.033), fontWeight: 'bold', fill: 0x00FF41,
       }),
     });
-    nameTxt.x = 16;
+    nameTxt.x = statX;
     nameTxt.y = y + 10;
     this.addChild(nameTxt);
 
     const barY = y + nameTxt.height + 18;
-    this._buildBar(16, barY,      W - 32, 22, p.hp, p.maxHp, 0x00FF41, '生命值');
-    this._buildBar(16, barY + 30, W - 32, 16, p.sp ?? 144, p.maxSp ?? 240, 0x3366FF, 'SP');
-
-    // 玩家精靈框（左側）— 縮小以免與血條重疊
-    const sw = Math.floor(W * 0.26), sh = Math.floor(h * 0.40);
-    const frameX = 16, frameY = y + h - sh - 4;
-    const sf = new PIXI.Graphics();
-    sf.rect(frameX, frameY, sw, sh).fill({ color: 0x050910 });
-    sf.rect(frameX, frameY, sw, sh).stroke({ color: 0x00FF41, width: 1 });
-    this.addChild(sf);
-
-    if (this._portraitCache.player) {
-      const p   = this._portraitCache.player;
-      const tex = p.texture;
-      const scale = Math.min((sw - 2) / tex.width, (sh - 2) / tex.height);
-      p.scale.set(scale);
-      p.x = frameX + 1 + Math.floor((sw - 2 - tex.width  * scale) / 2);
-      p.y = frameY + 1 + Math.floor((sh - 2 - tex.height * scale) / 2);
-      this.addChild(p);
-    }
+    this._buildBar(statX, barY,      statW, 22, p.hp, p.maxHp, 0x00FF41, '生命值');
+    this._buildBar(statX, barY + 30, statW, 16, p.sp ?? 144, p.maxSp ?? 240, 0x3366FF, 'SP');
   }
 
   // ── 通用血條（帶輝光） ────────────────────────────────────────────────────

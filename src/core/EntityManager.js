@@ -83,11 +83,14 @@ export class EntityManager {
     }
 
     // Fallback：色塊佔位（entityRef 缺失或貼圖載入失敗時使用）
+    // 高度與玩家精靈一致（tileSize × 1.7），寬度取 0.5 倍
     if (!spr) {
       const colorMap = { hostile: 0xff4444, recruitable: 0x00ccff, system: 0xffcc00 };
       const fillColor = colorMap[npc.category] ?? 0xaaaaaa;
+      const fbW = Math.floor(s * 0.5);
+      const fbH = Math.floor(s * 1.7);
       const gfx = new PIXI.Graphics();
-      gfx.rect(0, 0, s, s).fill({ color: fillColor });
+      gfx.rect(0, 0, fbW, fbH).fill({ color: fillColor });
       const tex = this.app.renderer.generateTexture({ target: gfx });
       gfx.destroy();
       spr = new PIXI.Sprite(tex);
