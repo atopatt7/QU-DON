@@ -77,7 +77,9 @@ export class EntityManager {
     let spr = null;
 
     if (npc.entityRef) {
-      spr = await this._buildEntitySprite(npc.entityRef, npc.direction ?? 'down', s);
+      const result = await this._buildEntitySprite(npc.entityRef, npc.direction ?? 'down', s);
+      spr = result.sprite;
+      npc.entityData = result.entityData; // 供戰鬥系統使用
     }
 
     // Fallback：色塊佔位（entityRef 缺失或貼圖載入失敗時使用）
@@ -102,17 +104,18 @@ export class EntityManager {
 
   // ─── 從 registry → entity JSON → 載入貼圖 → 建立精靈 ─────────────────────
   // 直接持有 Texture 物件，繞過 PIXI.Assets.cache.get(path) 的 key 對齊問題
+  // 回傳 { sprite, entityData }
   async _buildEntitySprite(entityRef, direction, tileSize) {
     try {
       const regRes   = await fetch('./src/data/entities/registry.json');
       const registry = await regRes.json();
       const entityPath = registry[entityRef];
-      if (!entityPath) return null;
+      if (!entityPath) return { sprite: null, entityData: null };
 
       const entRes  = await fetch(`./src/data/entities/${entityPath}`);
       const entData = await entRes.json();
       const mapSprites = entData?.visuals?.mapSprites;
-      if (!mapSprites) return null;
+      if (!mapSprites) return { sprite: null, entityData: entData };
 
       // 載入所有方向貼圖，直接收集 Texture / Texture[] 物件
       const texMap = {};
@@ -127,7 +130,7 @@ export class EntityManager {
       );
 
       const baseSrc    = texMap[direction] ?? texMap.down ?? Object.values(texMap)[0] ?? null;
-      if (!baseSrc) return null;
+      if (!baseSrc) return { sprite: null, entityData: entData };
       const isAnimated = Array.isArray(baseSrc) && baseSrc.length >= 3;
 
       const refTex = isAnimated ? baseSrc[1] : baseSrc;
@@ -144,15 +147,22 @@ export class EntityManager {
       const scl = refTex?.height ? (tileSize * 1.7) / refTex.height : 1;
       spr.scale.set(scl);
       spr.anchor.set(0.5, 1.0);
-      return spr;
+      return { sprite: spr, entityData: entData };
     } catch {
-      return null;
+      return { sprite: null, entityData: null };
     }
   }
 
   // ─── 查詢指定格子的 NPC ───────────────────────────────────────────────────
   getNpcAt(gx, gy) {
     return this.npcs.find(n => n.position.x === gx && n.position.y === gy) ?? null;
+  }
+
+  // ─── 戰後隱藏 NPC（精靈不可見，從碰撞列表移除）────────────────────────────
+  hideNpc(id) {
+    const spr = this.sprites.get(id);
+    if (spr) spr.visible = false;
+    this.npcs = this.npcs.filter(n => n.id !== id);
   }
 
   // ─── 清除當前地圖所有 NPC ─────────────────────────────────────────────────

@@ -408,6 +408,12 @@ async function main() {
   worldMap.zIndex = 1100;
   app.stage.addChild(worldMap);
 
+  // ── 戰鬥介面（地圖世界用）────────────────────────────────────────────────
+  const battleUI = new BattleUI(app);
+  battleUI.visible = false;
+  battleUI.zIndex = 2000;
+  app.stage.addChild(battleUI);
+
   // 從 actors.json 取得初始玩家數值（已在 Promise.all 平行載入）
   const _quDonData  = _actorsJson?.actors?.find(a => a.id === 'qu_don');
   if (_quDonData) {
@@ -432,6 +438,31 @@ async function main() {
   statusScreen.on('close', () => {
     _showMenu(); // 關閉狀態介面後回到雪茄選單
   });
+
+  // ── 觸發戰鬥：鎖定輸入、顯示 BattleUI、戰後處理 NPC ─────────────────────
+  function _startBattle(npc) {
+    if (!npc.entityData) return;
+    input.lock();
+    panel.visible = false;
+    MapManager.onActorMoveEnd(playerSpr);
+
+    const playerData = _quDonData ?? { name: '瞿董', stats: { hp: 85, maxHp: 85, atk: 10, def: 5 } };
+    battleUI.visible = true;
+    battleUI.startBattle(playerData, npc.entityData);
+
+    const cleanup = (isWin) => {
+      battleUI.off('win',  onWin);
+      battleUI.off('lose', onLose);
+      battleUI.visible = false;
+      panel.visible = true;
+      if (isWin) entityManager.hideNpc(npc.id);
+      input.unlock();
+    };
+    const onWin  = () => cleanup(true);
+    const onLose = () => cleanup(false);
+    battleUI.on('win',  onWin);
+    battleUI.on('lose', onLose);
+  }
 
   // ── 具名事件 Stubs（功能待實作）──────────────────────────────────────────
   cigarMenu.on('resume',    ()              => _hideMenu());
@@ -598,6 +629,16 @@ async function main() {
         player.vy    = player.gy;
         _isAnimating = false;
         _stepPhase   = 0;
+
+        // ── NPC 碰撞檢定：踏入格子時若有敵對 NPC → 觸發戰鬥 ─────────────────
+        const landedNpc = entityManager.getNpcAt(player.gx, player.gy);
+        if (landedNpc?.combatCollidable) {
+          updateSpritePos(player.vx, player.vy);
+          mapManager.setCameraVisual(player.vx, player.vy);
+          mapManager.render();
+          _startBattle(landedNpc);
+          return;
+        }
 
         if (held && !interaction.isActive) {
           const result = tryMovePlayer(held);

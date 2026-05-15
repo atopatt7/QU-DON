@@ -447,6 +447,7 @@ export class BattleUI extends PIXI.Container {
       setTimeout(() => {
         this._isLocked = false;
         this.visible = false;
+        this.emit('win');
         this.emit('close');
       }, 1500);
       return;
@@ -465,6 +466,7 @@ export class BattleUI extends PIXI.Container {
         setTimeout(() => {
           this._isLocked = false;
           this.visible = false;
+          this.emit('lose');
           this.emit('close');
         }, 1500);
         return;
