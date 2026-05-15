@@ -152,7 +152,7 @@ function buildPlayerSprite(tileSize, texMap = {}) {
     const fh = baseTex.height;
 
     const spr   = new PIXI.Sprite(baseTex);
-    const dispH = Math.floor(tileSize * 2.0);
+    const dispH = Math.floor(tileSize * 1.7);
     const dispW = Math.floor(dispH * (fw / fh));
     spr.width  = dispW;
     spr.height = dispH;
@@ -164,7 +164,7 @@ function buildPlayerSprite(tileSize, texMap = {}) {
       if (spr.texture !== t) spr.texture = t;
     };
     spr.resizeTo = (s) => {
-      const h = Math.floor(s * 2.0);
+      const h = Math.floor(s * 1.7);
       spr.height = h;
       spr.width  = Math.floor(h * (fw / fh));
     };
