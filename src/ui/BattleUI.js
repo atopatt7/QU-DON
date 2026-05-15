@@ -96,11 +96,12 @@ export class BattleUI extends PIXI.Container {
     this.addChild(sf);
 
     if (this._portraitCache.enemy) {
-      const p  = this._portraitCache.enemy;
-      p.x      = frameX + 1;
-      p.y      = frameY + 1;
-      p.width  = sw - 2;
-      p.height = sh - 2;
+      const p   = this._portraitCache.enemy;
+      const tex = p.texture;
+      const scale = Math.min((sw - 2) / tex.width, (sh - 2) / tex.height);
+      p.scale.set(scale);
+      p.x = frameX + 1 + Math.floor((sw - 2 - tex.width  * scale) / 2);
+      p.y = frameY + 1 + Math.floor((sh - 2 - tex.height * scale) / 2);
       this.addChild(p);
     } else {
       const sl = new PIXI.Text({
@@ -148,11 +149,12 @@ export class BattleUI extends PIXI.Container {
     this.addChild(sf);
 
     if (this._portraitCache.player) {
-      const p  = this._portraitCache.player;
-      p.x      = frameX + 1;
-      p.y      = frameY + 1;
-      p.width  = sw - 2;
-      p.height = sh - 2;
+      const p   = this._portraitCache.player;
+      const tex = p.texture;
+      const scale = Math.min((sw - 2) / tex.width, (sh - 2) / tex.height);
+      p.scale.set(scale);
+      p.x = frameX + 1 + Math.floor((sw - 2 - tex.width  * scale) / 2);
+      p.y = frameY + 1 + Math.floor((sh - 2 - tex.height * scale) / 2);
       this.addChild(p);
     }
   }
@@ -400,19 +402,6 @@ export class BattleUI extends PIXI.Container {
       const tex      = new PIXI.Texture({ source: baseTex.source, frame: cropRect });
 
       const spr = new PIXI.Sprite(tex);
-
-      // ── VFD 螢光綠濾鏡（ColorMatrix）──────────────────────────────────────
-      // 目標：灰階 → #00FF41（R=0, G=luma, B=0.255×luma）
-      // luma = 0.299R + 0.587G + 0.114B
-      const filter = new PIXI.ColorMatrixFilter();
-      filter.matrix = [
-        0,     0,     0,     0, 0,   // R' = 0
-        0.299, 0.587, 0.114, 0, 0,   // G' = luminance
-        0.076, 0.150, 0.029, 0, 0,   // B' = 0.255 × luminance ≈ #41
-        0,     0,     0,     1, 0,   // A' = 原始 alpha
-      ];
-      spr.filters = [filter];
-
       this._portraitCache[role] = spr;
     } catch {
       console.warn(`[BattleUI] 頭像載入失敗: ${path}`);
