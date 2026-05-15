@@ -1409,4 +1409,66 @@ export class MapManager {
     this._clearMap();
     this._root.destroy({ children: true });
   }
+
+  // ─── Static: 實體精靈工廠 ─────────────────────────────────────────────────
+
+  /**
+   * 根據 visuals.mapSprites[direction] 建立對應的精靈物件。
+   *   - string[]（≥3 項）→ PIXI.AnimatedSprite，預設停在站立幀 [1]
+   *   - string            → PIXI.Sprite
+   * 貼圖必須已在 PIXI.Assets 快取中（先完成 PIXI.Assets.load）。
+   *
+   * @param {Object}  mapSprites  visuals.mapSprites 物件
+   * @param {string}  direction   起始方向 'down'|'up'|'left'|'right'
+   * @param {number}  tileSize    地圖 tile 大小（px）
+   * @returns {PIXI.Sprite|PIXI.AnimatedSprite|null}
+   */
+  static createActorSprite(mapSprites, direction, tileSize) {
+    const src = mapSprites?.[direction] ?? mapSprites?.down ?? null;
+    if (!src) return null;
+
+    const dispH = Math.floor(tileSize * 1.7);
+    let spr;
+
+    if (Array.isArray(src) && src.length >= 3) {
+      const textures = src.map(p => PIXI.Assets.cache.get(p) ?? PIXI.Texture.WHITE);
+      // 0 → 1 → 2 → 1 的循環幀序列
+      spr = new PIXI.AnimatedSprite([textures[0], textures[1], textures[2], textures[1]]);
+      spr.animationSpeed = 0.12;
+      spr.loop           = true;
+      spr.gotoAndStop(1); // 預設停在站立幀（index 1）
+    } else {
+      const path = Array.isArray(src) ? src[0] : src;
+      spr = new PIXI.Sprite(PIXI.Assets.cache.get(path) ?? PIXI.Texture.WHITE);
+    }
+
+    const baseTex = spr.textures ? spr.textures[0] : spr.texture;
+    const dispW   = baseTex?.width
+                  ? Math.floor(dispH * (baseTex.width / baseTex.height))
+                  : dispH;
+    spr.width  = dispW;
+    spr.height = dispH;
+    spr.anchor.set(0.5, 1.0);
+    return spr;
+  }
+
+  /**
+   * 角色開始移動時呼叫：AnimatedSprite 開始播放行走動畫。
+   * @param {PIXI.Sprite|PIXI.AnimatedSprite} sprite
+   */
+  static onActorMoveStart(sprite) {
+    if (sprite instanceof PIXI.AnimatedSprite && !sprite.playing) {
+      sprite.play();
+    }
+  }
+
+  /**
+   * 角色停止移動時呼叫：停止動畫並強制回到站立幀（index 1）。
+   * @param {PIXI.Sprite|PIXI.AnimatedSprite} sprite
+   */
+  static onActorMoveEnd(sprite) {
+    if (sprite instanceof PIXI.AnimatedSprite) {
+      sprite.gotoAndStop(1);
+    }
+  }
 }

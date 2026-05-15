@@ -6,7 +6,7 @@
  *    才能讓舊快取失效、手機端取得最新版本。
  */
 
-const CACHE_NAME = 'qudon-v23';
+const CACHE_NAME = 'qudon-v24';
 
 // ── 本機檔案：安裝時全數預快取 ────────────────────────────────────────────────
 // 包含所有 JS 模組、資料檔與圖片資源，確保離線 / 弱網路環境也能正常啟動
@@ -60,11 +60,24 @@ const LOCAL_FILES = [
 
 // ── 實體貼圖：製作中，失敗不阻塞安裝（缺圖時遊戲以圓形佔位精靈替代）──────────
 const ENTITY_SPRITES = [
-  // 主角四向
+  // 主角四向（靜態單幀，動畫幀製作前的 fallback）
   './assets/sprites/entities/player_down.png',
   './assets/sprites/entities/player_up.png',
   './assets/sprites/entities/player_left.png',
   './assets/sprites/entities/player_right.png',
+  // 主角四向動畫幀（0=左腳, 1=站立, 2=右腳）
+  './assets/sprites/entities/player_down_0.png',
+  './assets/sprites/entities/player_down_1.png',
+  './assets/sprites/entities/player_down_2.png',
+  './assets/sprites/entities/player_up_0.png',
+  './assets/sprites/entities/player_up_1.png',
+  './assets/sprites/entities/player_up_2.png',
+  './assets/sprites/entities/player_left_0.png',
+  './assets/sprites/entities/player_left_1.png',
+  './assets/sprites/entities/player_left_2.png',
+  './assets/sprites/entities/player_right_0.png',
+  './assets/sprites/entities/player_right_1.png',
+  './assets/sprites/entities/player_right_2.png',
   // 扒手四向
   './assets/sprites/entities/pickpocket_down.png',
   './assets/sprites/entities/pickpocket_up.png',

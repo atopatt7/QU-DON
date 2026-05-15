@@ -7,10 +7,10 @@
   },
   "visuals": {
     "mapSprites": {
-      "down":  "assets/sprites/entities/player_down.png",
-      "up":    "assets/sprites/entities/player_up.png",
-      "left":  "assets/sprites/entities/player_left.png",
-      "right": "assets/sprites/entities/player_right.png"
+      "down":  ["assets/sprites/entities/player_down_0.png",  "assets/sprites/entities/player_down_1.png",  "assets/sprites/entities/player_down_2.png"],
+      "up":    ["assets/sprites/entities/player_up_0.png",    "assets/sprites/entities/player_up_1.png",    "assets/sprites/entities/player_up_2.png"],
+      "left":  ["assets/sprites/entities/player_left_0.png",  "assets/sprites/entities/player_left_1.png",  "assets/sprites/entities/player_left_2.png"],
+      "right": ["assets/sprites/entities/player_right_0.png", "assets/sprites/entities/player_right_1.png", "assets/sprites/entities/player_right_2.png"]
     },
     "battleMugshot": "assets/ui/portraits/monochrome_qu_don_vfd.png"
   },

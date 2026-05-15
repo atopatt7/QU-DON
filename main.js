@@ -117,6 +117,7 @@ function buildGameLayer(app) {
 }
 
 // ─── 載入玩家四向獨立貼圖（從 player.json mapSprites 讀取路徑）──────────────
+// src 可為字串（單幀）或字串陣列（多幀動畫），分別回傳 Texture 或 Texture[]
 async function loadPlayerSprites() {
   try {
     const resp       = await fetch('./src/data/entities/actors/player.json');
@@ -125,16 +126,20 @@ async function loadPlayerSprites() {
 
     const texMap = {};
     await Promise.allSettled(
-      Object.entries(mapSprites).map(async ([dir, path]) => {
+      Object.entries(mapSprites).map(async ([dir, src]) => {
         try {
-          texMap[dir] = await PIXI.Assets.load(`./${path}`);
+          if (Array.isArray(src)) {
+            texMap[dir] = await Promise.all(src.map(p => PIXI.Assets.load(`./${p}`)));
+          } else {
+            texMap[dir] = await PIXI.Assets.load(`./${src}`);
+          }
         } catch {
-          console.warn(`[QU-DON] 玩家貼圖載入失敗 (${dir}): ${path}`);
+          console.warn(`[QU-DON] 玩家貼圖載入失敗 (${dir}):`, src);
         }
       })
     );
     const loaded = Object.keys(texMap).length;
-    console.log(`[QU-DON] 玩家四向貼圖 ${loaded}/4 張載入成功`);
+    console.log(`[QU-DON] 玩家四向貼圖 ${loaded}/4 組載入成功`);
     return texMap;
   } catch {
     console.warn('[QU-DON] 無法載入玩家實體資料，使用圓形佔位精靈');
@@ -143,26 +148,52 @@ async function loadPlayerSprites() {
 }
 
 // ─── 建立玩家精靈（四向獨立貼圖版）───────────────────────────────────────────
-// texMap: { down?: Texture, up?: Texture, left?: Texture, right?: Texture }
+// texMap 值為 Texture（靜態）或 Texture[]（動畫幀）；自動選擇 Sprite / AnimatedSprite
 function buildPlayerSprite(tileSize, texMap = {}) {
-  const baseTex = texMap.down ?? Object.values(texMap)[0] ?? null;
+  const baseSrc    = texMap.down ?? Object.values(texMap)[0] ?? null;
+  const isAnimated = Array.isArray(baseSrc) && baseSrc.length >= 3;
 
-  if (baseTex) {
-    const fw = baseTex.width;
-    const fh = baseTex.height;
+  if (baseSrc) {
+    // 以站立幀（index 1）或單幀作為尺寸參考
+    const refTex = isAnimated ? baseSrc[1] : baseSrc;
+    const fw     = refTex.width;
+    const fh     = refTex.height;
+    const dispH  = Math.floor(tileSize * 1.7);
+    const dispW  = Math.floor(dispH * (fw / fh));
 
-    const spr   = new PIXI.Sprite(baseTex);
-    const dispH = Math.floor(tileSize * 1.7);
-    const dispW = Math.floor(dispH * (fw / fh));
+    let spr;
+    if (isAnimated) {
+      // 播放順序 0→1→2→1 模擬左右邁步回中性節奏
+      spr = new PIXI.AnimatedSprite([baseSrc[0], baseSrc[1], baseSrc[2], baseSrc[1]]);
+      spr.animationSpeed = 0.1;
+      spr.loop           = true;
+      spr.gotoAndStop(1); // 預設站立姿
+    } else {
+      spr = new PIXI.Sprite(baseSrc);
+    }
+
     spr.width  = dispW;
     spr.height = dispH;
     spr.anchor.set(0.5, 1.0);
 
-    // 方向切換：直接替換整張獨立貼圖
+    let _dir = 'down';
     spr.setDir = (dir) => {
-      const t = texMap[dir] ?? texMap.down ?? baseTex;
-      if (spr.texture !== t) spr.texture = t;
+      if (dir === _dir) return;
+      _dir = dir;
+      const t = texMap[dir] ?? texMap.down ?? baseSrc;
+      if (isAnimated) {
+        const frames = Array.isArray(t) && t.length >= 3
+          ? [t[0], t[1], t[2], t[1]]
+          : [t, t, t, t];
+        const wasPlaying = spr.playing;
+        spr.textures = frames;
+        if (wasPlaying) spr.play(); else spr.gotoAndStop(1);
+      } else {
+        const tex = Array.isArray(t) ? t[0] : t;
+        if (spr.texture !== tex) spr.texture = tex;
+      }
     };
+
     spr.resizeTo = (s) => {
       const h = Math.floor(s * 1.7);
       spr.height = h;
@@ -514,6 +545,7 @@ async function main() {
         // 啟動（或重啟）lerp：視覺座標從當前位置平滑推進到新格子
         _isAnimating = true;
         _stepPhase   = 0;
+        MapManager.onActorMoveStart(playerSpr);
 
         // 霧視野立即對齊新格（Pixi 自動渲染 alpha 變化）
         mapManager.updateFog(player.gx, player.gy, mapManager.visionRadius);
@@ -559,6 +591,7 @@ async function main() {
         player.vy    = player.gy;
         _isAnimating = false;
         _stepPhase   = 0;
+        MapManager.onActorMoveEnd(playerSpr);
       } else {
         player.vx  += ex * LERP_FACTOR;
         player.vy  += ey * LERP_FACTOR;
