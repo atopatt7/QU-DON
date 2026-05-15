@@ -465,6 +465,15 @@
       "facing": "down"
     }
   ],
+  "npcs": [
+    {
+      "id": "enemy_pickpocket",
+      "gx": 4,
+      "gy": 6,
+      "direction": "down",
+      "behavior": "idle"
+    }
+  ],
   "ambience": {
     "colorTint": "0x0f1510",
     "lightLevel": 0.6,
