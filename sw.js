@@ -6,7 +6,7 @@
  *    才能讓舊快取失效、手機端取得最新版本。
  */
 
-const CACHE_NAME = 'qudon-v31';
+const CACHE_NAME = 'qudon-v32';
 
 // ── 本機檔案：安裝時全數預快取 ────────────────────────────────────────────────
 // 包含所有 JS 模組、資料檔與圖片資源，確保離線 / 弱網路環境也能正常啟動
@@ -40,6 +40,7 @@ const LOCAL_FILES = [
   './src/data/entities/actors/player.json',
   './src/data/entities/actors/enemy_thug.json',
   './src/data/entities/actors/enemy_pickpocket.json',
+  './src/data/entities/actors/npc_clerk.json',
   './src/data/maps/config.json',
   './src/data/maps/map_black_rock_street.json',
   './src/data/maps/map_neon_bar.json',
@@ -50,6 +51,7 @@ const LOCAL_FILES = [
   './src/data/maps/map_convenience_store.json',
   './src/data/npcs/npcs_black_rock_street.json',
   './src/data/npcs/npcs_map_back_alley.json',
+  './src/data/npcs/npcs_map_convenience_store.json',
   // ── 圖片資源（預快取後載入速度大幅提升）────────────────────────────────────
   './assets/sounds/bgm/neon_bar_theme.webm',
   './assets/images/home_bg.jpg',

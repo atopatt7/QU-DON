@@ -503,6 +503,7 @@ async function main() {
   app.stage.addChild(dialogueOverlay);
 
   const interaction = new InteractionManager(mapManager, dialogueOverlay);
+  interaction.setEntityManager(entityManager);
 
   // ── VFD 時鐘（左下角，遊戲區底部）────────────────────────────────────────
   const clock = new VFDClock({ color: 'green', fontSize: 18, showSeconds: false });

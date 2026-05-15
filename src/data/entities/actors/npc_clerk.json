@@ -1,0 +1,25 @@
+{
+  "id": "npc_clerk",
+  "name": "大夜班店員",
+  "level": 1,
+  "stats": {
+    "hp": 60, "maxHp": 60, "atk": 8, "def": 3, "eva": 0.05
+  },
+  "visuals": {
+    "mapSprites": {
+      "down":  "assets/sprites/entities/clerk_down.png",
+      "up":    "assets/sprites/entities/clerk_up.png",
+      "left":  "assets/sprites/entities/clerk_left.png",
+      "right": "assets/sprites/entities/clerk_right.png"
+    },
+    "fallbackColor": "0x3355aa",
+    "battleMugshot": null
+  },
+  "dialogue": [
+    "歡迎光臨...隨便看。",
+    "如果你是來鬧事的，我勸你最好想清楚。",
+    "我今晚已經值十三個小時了。什麼都不怕了。"
+  ],
+  "description": "大夜班店員，臉上寫滿疲憊與警戒。制服皺得像廢紙，眼睛卻還是在盯著你。",
+  "category": "recruitable"
+}
