@@ -1,0 +1,10 @@
+[
+  {
+    "id": "pickpocket_ba_01",
+    "entityRef": "enemy_pickpocket",
+    "category": "hostile",
+    "position": { "x": 4, "y": 6 },
+    "direction": "down",
+    "behavior": "idle"
+  }
+]

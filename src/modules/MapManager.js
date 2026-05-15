@@ -203,7 +203,7 @@ export class MapManager {
 
     // 地圖切換完成後，通知 EntityManager 重新載入 NPC
     if (this.entityManager) {
-      await this.entityManager.init(mapId, this.entityLayer);
+      await this.entityManager.init(mapId, this.entityLayer, this._tileSize);
     }
   }
 

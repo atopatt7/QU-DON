@@ -1,19 +1,35 @@
-// EntityManager.js
-// 負責載入、管理與渲染當前地圖上的所有 NPC
+/**
+ * QU-DON | src/core/EntityManager.js
+ * 負責載入、管理與渲染當前地圖上的所有 NPC 實體。
+ *
+ * NPC JSON 格式（src/data/npcs/npcs_{mapId}.json）：
+ * [
+ *   {
+ *     "id":        "pickpocket_ba_01",   // 場景唯一實例 ID
+ *     "entityRef": "enemy_pickpocket",   // registry.json 的鍵
+ *     "category":  "hostile",            // hostile | recruitable | system
+ *     "position":  { "x": 4, "y": 6 },  // 格子座標
+ *     "direction": "down",               // 初始朝向
+ *     "behavior":  "idle"                // idle | patrol（待實作）
+ *   }
+ * ]
+ */
+
+import { MapManager } from '../modules/MapManager.js';
 
 export class EntityManager {
-  constructor(app, gameStateManager) {
-    this.app = app;
-    this.gsm = gameStateManager;
-    this.npcs = [];           // 當前地圖的 NPC 資料陣列
-    this.sprites = new Map(); // npc.id -> Pixi Sprite
-    this.container = null;    // NPC 專屬的 Pixi Container
+  constructor(app) {
+    this.app      = app;
+    this.npcs     = [];
+    this.sprites  = new Map();
+    this.container = null;
+    this._tileSize = 48;
   }
 
-  // 切換地圖時呼叫，載入對應 NPC
-  // parentContainer 傳入 MapManager.entityLayer
-  async init(mapId, parentContainer) {
+  // ─── 切換地圖時呼叫 ────────────────────────────────────────────────────────
+  async init(mapId, parentContainer, tileSize = 48) {
     this.clear();
+    this._tileSize = tileSize;
 
     this.container = new PIXI.Container();
     parentContainer.addChild(this.container);
@@ -22,94 +38,108 @@ export class EntityManager {
     this.npcs = npcData;
 
     for (const npc of this.npcs) {
-      this._createSprite(npc);
+      await this._createSprite(npc);
     }
   }
 
-  // 根據 mapId 載入對應的 NPC JSON
+  // ─── 從 npcs_{mapId}.json 讀取 NPC 列表 ───────────────────────────────────
   async _loadNpcData(mapId) {
     try {
       const res = await fetch(`./src/data/npcs/npcs_${mapId}.json`);
       if (!res.ok) return [];
       return await res.json();
-    } catch (e) {
+    } catch {
       console.warn(`[EntityManager] 找不到 NPC 資料：npcs_${mapId}.json`);
       return [];
     }
   }
 
-  // 根據 category 為實體掛載預設行為屬性
+  // ─── 依 category 掛載行為屬性 ─────────────────────────────────────────────
   _applyCategory(npc) {
-    const category = npc.category ?? 'system';
-
-    switch (category) {
-      case 'system':
-        // 純互動型：無戰鬥碰撞，僅觸發對話 / 商店
-        npc.combatCollidable = false;
-        npc.interactable    = true;
-        // TODO: 綁定 serviceType 對應的 UI 開啟邏輯
-        break;
-
+    switch (npc.category ?? 'system') {
       case 'hostile':
-        // 敵對型：開啟視野偵測，預設 patrol 巡邏狀態
         npc.combatCollidable = true;
         npc.interactable     = false;
-        npc.aiState          = 'patrol';
-        npc.aggroActive      = true;
-        // TODO: 在 CombatManager 中掛載 aggroRange 與 lootTable
         break;
-
       case 'recruitable':
-        // 可招募型：中立初始狀態，保留好感 / 招募狀態掛鉤
         npc.combatCollidable = false;
         npc.interactable     = true;
-        npc.faction          = npc.faction ?? 'neutral';
-        npc.recruitState     = 'pending'; // pending | recruited | rejected
-        // TODO: 在 NpcInteraction 中檢查 recruitCondition 並更新 recruitState
         break;
-
-      default:
-        console.warn(`[EntityManager] 未知 category：${category}，套用 system 預設值`);
+      default: // system
         npc.combatCollidable = false;
         npc.interactable     = true;
     }
   }
 
-  // 為單一 NPC 建立 Pixi Sprite（暫用色塊佔位）
-  _createSprite(npc) {
-    const TILE_SIZE = 32; // 配合現有地圖 Tile 尺寸調整
-
+  // ─── 建立單一 NPC 精靈 ─────────────────────────────────────────────────────
+  async _createSprite(npc) {
+    const s = this._tileSize;
     this._applyCategory(npc);
 
-    // 依 category 決定佔位顏色：cyan=recruitable, red=hostile, yellow=system
-    const colorMap = { recruitable: 0x00ccff, hostile: 0xff4444, system: 0xffcc00 };
-    const fillColor = colorMap[npc.category] ?? 0xffcc00;
+    let spr = null;
 
-    // 暫用：以純色矩形作為 NPC 佔位 Sprite
-    const gfx = new PIXI.Graphics();
-    gfx.beginFill(fillColor);
-    gfx.drawRect(0, 0, TILE_SIZE, TILE_SIZE);
-    gfx.endFill();
+    if (npc.entityRef) {
+      spr = await this._buildEntitySprite(npc.entityRef, npc.direction ?? 'down', s);
+    }
 
-    const texture = this.app.renderer.generateTexture(gfx);
-    const sprite = new PIXI.Sprite(texture);
+    // Fallback：色塊佔位（entityRef 缺失或貼圖載入失敗時使用）
+    if (!spr) {
+      const colorMap = { hostile: 0xff4444, recruitable: 0x00ccff, system: 0xffcc00 };
+      const fillColor = colorMap[npc.category] ?? 0xaaaaaa;
+      const gfx = new PIXI.Graphics();
+      gfx.rect(0, 0, s, s).fill({ color: fillColor });
+      const tex = this.app.renderer.generateTexture({ target: gfx });
+      gfx.destroy();
+      spr = new PIXI.Sprite(tex);
+      spr.anchor.set(0.5, 1.0);
+    }
 
-    sprite.x = npc.position.x * TILE_SIZE;
-    sprite.y = npc.position.y * TILE_SIZE;
-    sprite.npcId = npc.id;
+    // 格子座標 → entityLayer 局部像素座標（anchor 底部對齊格子底邊）
+    spr.x = npc.position.x * s + s * 0.5;
+    spr.y = npc.position.y * s + s;
 
-    this.container.addChild(sprite);
-    this.sprites.set(npc.id, sprite);
+    this.container.addChild(spr);
+    this.sprites.set(npc.id, spr);
   }
 
-  // 根據玩家座標，找出相鄰的 NPC
-  getNpcAt(x, y) {
-    return this.npcs.find(npc =>
-      npc.position.x === x && npc.position.y === y
-    ) ?? null;
+  // ─── 從 registry → entity JSON → 載入貼圖 → 建立精靈 ─────────────────────
+  async _buildEntitySprite(entityRef, direction, tileSize) {
+    try {
+      const regRes  = await fetch('./src/data/entities/registry.json');
+      const registry = await regRes.json();
+      const entityPath = registry[entityRef];
+      if (!entityPath) return null;
+
+      const entRes   = await fetch(`./src/data/entities/${entityPath}`);
+      const entData  = await entRes.json();
+      const mapSprites = entData?.visuals?.mapSprites;
+      if (!mapSprites) return null;
+
+      // 預載入所有方向貼圖（放入 PIXI.Assets 快取，createActorSprite 會從快取取用）
+      await Promise.allSettled(
+        Object.entries(mapSprites).map(async ([, src]) => {
+          try {
+            if (Array.isArray(src)) {
+              await Promise.all(src.map(p => PIXI.Assets.load(`./${p}`)));
+            } else {
+              await PIXI.Assets.load(`./${src}`);
+            }
+          } catch {}
+        })
+      );
+
+      return MapManager.createActorSprite(mapSprites, direction, tileSize);
+    } catch {
+      return null;
+    }
   }
 
-  // 清除當前地圖的所有 NPC Sprite
+  // ─── 查詢指定格子的 NPC ───────────────────────────────────────────────────
+  getNpcAt(gx, gy) {
+    return this.npcs.find(n => n.position.x === gx && n.position.y === gy) ?? null;
+  }
+
+  // ─── 清除當前地圖所有 NPC ─────────────────────────────────────────────────
   clear() {
     if (this.container) {
       this.container.destroy({ children: true });

@@ -7,6 +7,7 @@
  */
 
 import { InputManager }          from './src/core/Input.js';
+import { EntityManager }         from './src/core/EntityManager.js';
 import { ControlPanel }          from './src/ui/ControlPanel.js';
 import { MapManager, DIR_DELTA } from './src/modules/MapManager.js';
 import { HomeScreen }            from './src/ui/HomeScreen.js';
@@ -308,7 +309,9 @@ async function main() {
   app.stage.sortableChildren = true;
   overlay.zIndex = 99999;
 
-  const mapManager = await MapManager.create(app, gameLayer);
+  const mapManager    = await MapManager.create(app, gameLayer);
+  const entityManager = new EntityManager(app);
+  mapManager.setEntityManager(entityManager); // loadMap 時自動呼叫 entityManager.init
 
   // ⚡ 平行載入：地圖 JSON、玩家貼圖、控制面板、角色資料 同時進行，
   //    大幅縮短黑屏等待時間（原本依序 await，現在同步發出所有請求）
