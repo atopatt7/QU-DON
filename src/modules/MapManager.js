@@ -49,7 +49,7 @@ const FOG_ALPHA = {
 };
 
 // ─── 位置變體快取：這些 tile 每格使用不同亂數種子，視覺多樣 ───────────────────────
-const VARIANT_IDS   = new Set([1, 2, 4, 5, 10, 11, 40, 200, 201, 202]);
+const VARIANT_IDS   = new Set([1, 2, 4, 5, 10, 11, 40, 200, 201, 202, 301]);
 const VARIANT_COUNT = 4;
 
 // ─── 程式繪製 Tile 調色盤（Noir 低飽和深色系）────────────────────────────────────
@@ -98,6 +98,13 @@ const TILE_PALETTE = {
   205: { base: 0x1a2010, hi: 0x222a16, lo: 0x10160a }, // 中藥行/當鋪（墨綠）
   206: { base: 0x2a2010, hi: 0x36281a, lo: 0x1a140a }, // 牌坊石柱（刻龍紋）
   207: { base: 0x141410, hi: 0x1c1c18, lo: 0x0a0a08 }, // 垃圾堆/疊箱（暗巷）
+  // ── Convenience Store (IDs 300-305) ────────────────────────────────────────
+  300: { base: 0x88ccee, hi: 0xaaddf8, lo: 0x5599bb }, // 自動玻璃門（冷白）
+  301: { base: 0xd0e2e8, hi: 0xe4f0f4, lo: 0xb0c8d0 }, // 超商地板（白亮格紋）
+  302: { base: 0x28262e, hi: 0x343240, lo: 0x18161c }, // 超商牆壁（貼滿海報）
+  303: { base: 0x2a1e16, hi: 0x362820, lo: 0x1a120c }, // 零食貨架（彩色包裝）
+  304: { base: 0x1e1c1a, hi: 0x2a2826, lo: 0x0e0c0a }, // 收銀台（磨損鍵盤）
+  305: { base: 0x0c1824, hi: 0x142232, lo: 0x060e14 }, // 飲料冰櫃（藍光透明）
 };
 
 // ─── 確定性偽隨機（LCG，以 tile 位置為種子，保證重複渲染一致）─────────────────────
@@ -326,6 +333,8 @@ export class MapManager {
       case 200: this._drawPuddle(gfx, s, pal, rng);        break;
       case 201: this._drawSidewalk(gfx, s, pal, rng);      break;
       case 202: this._drawAsphalt(gfx, s, pal, rng);       break;
+      // ── Convenience Store variants ──────────────────────────────────────
+      case 301: this._drawStoreFloor(gfx, s, pal, rng);    break;
       default: gfx.rect(0, 0, s, s).fill({ color: pal.base });
     }
     return gfx;
@@ -383,6 +392,13 @@ export class MapManager {
       case 205: this._drawHerbShop(gfx, s, pal, rng);     break; // 中藥行/當鋪
       case 206: this._drawPaifang(gfx, s, pal, rng);      break; // 牌坊石柱
       case 207: this._drawTrashPile(gfx, s, pal, rng);    break; // 垃圾堆
+      // ── Convenience Store (IDs 300-305) ──────────────────────────────────
+      case 300: this._drawStoreDoor(gfx, s, pal);          break; // 自動玻璃門
+      case 301: this._drawStoreFloor(gfx, s, pal, rng);   break; // 超商地板
+      case 302: this._drawStoreWall(gfx, s, pal, rng);    break; // 超商牆壁
+      case 303: this._drawStoreShelf(gfx, s, pal, rng);   break; // 零食貨架
+      case 304: this._drawStoreCounter(gfx, s, pal);       break; // 收銀台
+      case 305: this._drawStoreFridge(gfx, s, pal);        break; // 飲料冰櫃
       default:
         gfx.rect(0, 0, s, s).fill({ color: pal.base });
     }
@@ -1047,6 +1063,150 @@ export class MapManager {
     }
     // 頂部壓暗
     gfx.rect(0, 0, s, 3).fill({ color: 0x000000, alpha: 0.40 });
+  }
+
+  // ── 便利商店系列（IDs 300-305）────────────────────────────────────────────
+
+  // 300 自動玻璃門：金屬框 + 半透明玻璃 + 白光邊緣
+  _drawStoreDoor(gfx, s, pal) {
+    // 背景（深牆）
+    gfx.rect(0, 0, s, s).fill({ color: 0x1a1a20 });
+    const fw = Math.floor(s * 0.08);
+    // 金屬邊框
+    gfx.rect(0, 0, s, fw).fill({ color: 0x888898 });
+    gfx.rect(0, s - fw, s, fw).fill({ color: 0x888898 });
+    gfx.rect(0, 0, fw, s).fill({ color: 0x888898 });
+    gfx.rect(s - fw, 0, fw, s).fill({ color: 0x888898 });
+    // 玻璃左扇
+    const gx1 = fw + 2, gw = Math.floor((s - fw * 2 - 6) / 2);
+    gfx.rect(gx1, fw + 2, gw, s - fw * 2 - 4).fill({ color: 0x88ccee, alpha: 0.45 });
+    // 玻璃右扇
+    gfx.rect(gx1 + gw + 2, fw + 2, gw, s - fw * 2 - 4).fill({ color: 0x88ccee, alpha: 0.45 });
+    // 中間分縫
+    gfx.rect(gx1 + gw, 0, 2, s).fill({ color: 0x666677 });
+    // 白色反光條（頂部）
+    gfx.rect(gx1, fw + 2, gw * 2 + 2, Math.floor(s * 0.06)).fill({ color: 0xffffff, alpha: 0.25 });
+    // 底部門縫光暈
+    gfx.rect(0, s - fw - 1, s, 2).fill({ color: 0xaaccff, alpha: 0.55 });
+  }
+
+  // 301 超商地板：白色亮面 + 灰色格紋
+  _drawStoreFloor(gfx, s, pal, rng) {
+    gfx.rect(0, 0, s, s).fill({ color: pal.base });
+    // 格紋線（每格寬 ~s/2）
+    const half = Math.floor(s / 2);
+    const lc = pal.lo;
+    const la = 0.25 + rng.next() * 0.15;
+    gfx.rect(half, 0, 1, s).fill({ color: lc, alpha: la });
+    gfx.rect(0, half, s, 1).fill({ color: lc, alpha: la });
+    // 偶爾有踩髒的污漬
+    if (rng.next() < 0.18) {
+      const dx = Math.floor(rng.next() * s * 0.6 + s * 0.2);
+      const dy = Math.floor(rng.next() * s * 0.6 + s * 0.2);
+      gfx.ellipse(dx, dy, s * 0.08, s * 0.05).fill({ color: 0xb0c0c0, alpha: 0.35 });
+    }
+    // 頂部高光
+    gfx.rect(0, 0, s, 2).fill({ color: 0xffffff, alpha: 0.18 });
+  }
+
+  // 302 超商牆壁：深灰底 + 隨機色塊海報
+  _drawStoreWall(gfx, s, pal, rng) {
+    gfx.rect(0, 0, s, s).fill({ color: pal.base });
+    // 貼牆海報（1-2 張）
+    const posters = 1 + Math.floor(rng.next() * 2);
+    const posterColors = [0xcc2222, 0x2266cc, 0x228833, 0xcc8800, 0xaa2299];
+    for (let i = 0; i < posters; i++) {
+      const pw = Math.floor(rng.next() * s * 0.35 + s * 0.18);
+      const ph = Math.floor(rng.next() * s * 0.30 + s * 0.15);
+      const px = Math.floor(rng.next() * (s - pw));
+      const py = Math.floor(rng.next() * (s - ph) * 0.5 + s * 0.1);
+      const pc = posterColors[Math.floor(rng.next() * posterColors.length)];
+      gfx.rect(px, py, pw, ph).fill({ color: pc, alpha: 0.55 });
+      // 白色文字條佔位
+      gfx.rect(px + 2, py + ph - Math.floor(ph * 0.3), pw - 4, Math.floor(ph * 0.22))
+         .fill({ color: 0xffffff, alpha: 0.30 });
+    }
+    // 頂部壓線
+    gfx.rect(0, 0, s, 3).fill({ color: 0x000000, alpha: 0.45 });
+  }
+
+  // 303 零食貨架：木製框 + 彩色商品格
+  _drawStoreShelf(gfx, s, pal, rng) {
+    gfx.rect(0, 0, s, s).fill({ color: pal.base });
+    // 貨架板（3 層）
+    const shelf3 = [Math.floor(s * 0.30), Math.floor(s * 0.58), Math.floor(s * 0.86)];
+    for (const sy of shelf3) {
+      gfx.rect(0, sy, s, 3).fill({ color: 0x4a3828, alpha: 0.90 });
+    }
+    // 商品包裝（每層 3 個）
+    const pkgColors = [0xee4422, 0xffcc00, 0x44aacc, 0xee8833, 0x88cc44, 0xcc44aa];
+    for (let row = 0; row < 3; row++) {
+      const baseY = shelf3[row] - Math.floor(s * 0.24);
+      for (let col = 0; col < 3; col++) {
+        const px  = Math.floor(col * s * 0.3 + s * 0.05);
+        const pw  = Math.floor(s * 0.22);
+        const ph  = Math.floor(s * 0.20);
+        const col_idx = Math.floor(rng.next() * pkgColors.length);
+        gfx.rect(px, baseY, pw, ph).fill({ color: pkgColors[col_idx], alpha: 0.70 });
+      }
+    }
+    // 金屬邊框
+    gfx.rect(0, 0, 2, s).fill({ color: 0x666655, alpha: 0.70 });
+    gfx.rect(s - 2, 0, 2, s).fill({ color: 0x666655, alpha: 0.70 });
+  }
+
+  // 304 收銀台：深色台面 + 老收銀機 + 黃色燈
+  _drawStoreCounter(gfx, s, pal) {
+    // 台面底色
+    gfx.rect(0, 0, s, s).fill({ color: pal.base });
+    // 台面表面（淺灰）
+    const topH = Math.floor(s * 0.35);
+    gfx.rect(2, topH, s - 4, s - topH - 2).fill({ color: 0x2e2c2a });
+    // 收銀機外殼（奶白色老機器）
+    const mx = Math.floor(s * 0.15), my = Math.floor(s * 0.08);
+    const mw = Math.floor(s * 0.55), mh = Math.floor(s * 0.38);
+    gfx.rect(mx, my, mw, mh).fill({ color: 0xc8c4b4 });
+    // 螢幕（綠色七段顯示）
+    gfx.rect(mx + 4, my + 4, Math.floor(mw * 0.55), Math.floor(mh * 0.45))
+       .fill({ color: 0x003300 });
+    gfx.rect(mx + 6, my + 6, Math.floor(mw * 0.40), Math.floor(mh * 0.28))
+       .fill({ color: 0x00aa44, alpha: 0.80 });
+    // 鍵盤區（磨損深色）
+    gfx.rect(mx + 4, my + Math.floor(mh * 0.55), Math.floor(mw * 0.75), Math.floor(mh * 0.38))
+       .fill({ color: 0x5a5850 });
+    // 黃色頭頂燈暈
+    gfx.rect(0, 0, s, 4).fill({ color: 0xffee88, alpha: 0.30 });
+  }
+
+  // 305 飲料冰櫃：深背景 + 藍色玻璃反光 + 瓶影
+  _drawStoreFridge(gfx, s, pal) {
+    gfx.rect(0, 0, s, s).fill({ color: pal.base });
+    // 玻璃門面（藍光）
+    gfx.rect(3, 3, s - 6, s - 6).fill({ color: 0x0e2840, alpha: 0.90 });
+    // 金屬邊框
+    gfx.rect(2, 2, 2, s - 4).fill({ color: 0x557788 });
+    gfx.rect(s - 4, 2, 2, s - 4).fill({ color: 0x557788 });
+    gfx.rect(2, 2, s - 4, 2).fill({ color: 0x557788 });
+    gfx.rect(2, s - 4, s - 4, 2).fill({ color: 0x557788 });
+    // 瓶子輪廓（3 排 × 2 列）
+    const bottleColors = [0x2244aa, 0xaa2200, 0x228833, 0xcc8800];
+    for (let row = 0; row < 3; row++) {
+      for (let col = 0; col < 2; col++) {
+        const bx = Math.floor(s * 0.18 + col * s * 0.38);
+        const by = Math.floor(s * 0.12 + row * s * 0.28);
+        const bw = Math.floor(s * 0.22);
+        const bh = Math.floor(s * 0.22);
+        const bc = bottleColors[(row * 2 + col) % bottleColors.length];
+        gfx.rect(bx, by, bw, bh).fill({ color: bc, alpha: 0.55 });
+        // 瓶蓋
+        gfx.rect(bx + Math.floor(bw * 0.3), by - 3, Math.floor(bw * 0.4), 3)
+           .fill({ color: 0xcccccc, alpha: 0.60 });
+      }
+    }
+    // 藍色冷光反射（左側高光）
+    gfx.rect(4, 4, Math.floor(s * 0.15), s - 8).fill({ color: 0x88ccff, alpha: 0.12 });
+    // 地板冷氣漏出（底部）
+    gfx.rect(3, s - 6, s - 6, 3).fill({ color: 0x44aaff, alpha: 0.30 });
   }
 
   // ─── 自訂 Warp 圖片疊加 ───────────────────────────────────────────────────

@@ -402,6 +402,76 @@
       "draw": "crate",
       "color": "0x141410",
       "desc": "雜亂的疊箱與垃圾桶（暗巷用）"
+    },
+    "300": {
+      "name": "store_auto_door",
+      "group": "convenience_store",
+      "walkable": false,
+      "collides": true,
+      "draw": "store_door",
+      "color": "0x88ccee",
+      "_light": {
+        "radius": 3,
+        "color": "0xffffff",
+        "intensity": 0.55
+      },
+      "desc": "便利商店自動玻璃門（帶金屬框，透出白色日光燈）"
+    },
+    "301": {
+      "name": "store_floor",
+      "group": "convenience_store",
+      "walkable": true,
+      "collides": false,
+      "draw": "store_floor",
+      "color": "0xd8e8ec",
+      "sfx": "footstep_tile",
+      "desc": "超商塑膠拋光地板（白底灰格紋）"
+    },
+    "302": {
+      "name": "store_wall",
+      "group": "convenience_store",
+      "walkable": false,
+      "collides": true,
+      "draw": "store_wall",
+      "color": "0x2a2a30",
+      "desc": "超商內牆（貼滿促銷海報與廣告貼紙）"
+    },
+    "303": {
+      "name": "store_shelf",
+      "group": "convenience_store",
+      "walkable": false,
+      "collides": true,
+      "draw": "store_shelf",
+      "color": "0x28201c",
+      "desc": "零食貨架（陳列微波食品、罐頭、泡麵）"
+    },
+    "304": {
+      "name": "store_counter",
+      "group": "convenience_store",
+      "walkable": false,
+      "collides": true,
+      "draw": "store_counter",
+      "color": "0x1c1a18",
+      "_light": {
+        "radius": 2,
+        "color": "0xffee88",
+        "intensity": 0.35
+      },
+      "desc": "收銀台（老舊收銀機，鍵盤磨損，螢光燈在閃爍）"
+    },
+    "305": {
+      "name": "store_fridge",
+      "group": "convenience_store",
+      "walkable": false,
+      "collides": true,
+      "draw": "store_fridge",
+      "color": "0x0e1a28",
+      "_light": {
+        "radius": 3,
+        "color": "0x44aaff",
+        "intensity": 0.45
+      },
+      "desc": "飲料冰櫃（透明玻璃門，透出冷冷的藍光）"
     }
   },
   "_comment_groups": {
@@ -411,6 +481,7 @@
     "wall": "20, 22–25",
     "indoor": "21, 40–45  (21=door_wood, 40=floor, 41=bed, 42=clutter, 43=tv, 44=sink, 45=sofa)",
     "warp": "30",
-    "chinatown": "200-207 (哈卡街唐人街專用 tiles)"
+    "chinatown": "200-207 (哈卡街唐人街專用 tiles)",
+    "convenience_store": "300-305 (便利商店專用 tiles)"
   }
 }
