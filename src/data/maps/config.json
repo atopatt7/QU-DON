@@ -1,334 +1,416 @@
 {
   "_comment": "QU-DON 全域 Tile 定義表 — MapManager 載入後作為繪製 / 碰撞 / 音效的單一來源",
   "version": "1.1",
-
   "tiles": {
-
     "0": {
-      "name":     "void",
-      "group":    "special",
+      "name": "void",
+      "group": "special",
       "walkable": false,
       "collides": true,
-      "draw":     "void",
-      "color":    "0x000000",
-      "desc":     "地圖邊界外 / 建築內部不可見區域"
+      "draw": "void",
+      "color": "0x000000",
+      "desc": "地圖邊界外 / 建築內部不可見區域"
     },
-
     "1": {
-      "name":     "asphalt",
-      "group":    "road",
+      "name": "asphalt",
+      "group": "road",
       "walkable": true,
       "collides": false,
-      "draw":     "asphalt",
-      "color":    "0x1c1c1c",
-      "sfx":      "footstep_asphalt",
-      "desc":     "正常瀝青路面"
+      "draw": "asphalt",
+      "color": "0x1c1c1c",
+      "sfx": "footstep_asphalt",
+      "desc": "正常瀝青路面"
     },
     "2": {
-      "name":     "asphalt_cracked",
-      "group":    "road",
+      "name": "asphalt_cracked",
+      "group": "road",
       "walkable": true,
       "collides": false,
-      "draw":     "cracked",
-      "color":    "0x141414",
-      "sfx":      "footstep_asphalt",
-      "desc":     "龜裂瀝青（老舊路段）"
+      "draw": "cracked",
+      "color": "0x141414",
+      "sfx": "footstep_asphalt",
+      "desc": "龜裂瀝青（老舊路段）"
     },
     "3": {
-      "name":     "asphalt_centerline",
-      "group":    "road",
+      "name": "asphalt_centerline",
+      "group": "road",
       "walkable": true,
       "collides": false,
-      "draw":     "centerline",
-      "color":    "0x1c1c1c",
-      "sfx":      "footstep_asphalt",
-      "desc":     "瀝青 + 黃色雙中心線（雙向行車分界）"
+      "draw": "centerline",
+      "color": "0x1c1c1c",
+      "sfx": "footstep_asphalt",
+      "desc": "瀝青 + 黃色雙中心線（雙向行車分界）"
     },
     "4": {
-      "name":     "asphalt_puddle",
-      "group":    "road",
+      "name": "asphalt_puddle",
+      "group": "road",
       "walkable": true,
       "collides": false,
-      "draw":     "puddle",
-      "color":    "0x0c1018",
-      "sfx":      "footstep_puddle",
-      "desc":     "積水路面（反射霓虹燈光）"
+      "draw": "puddle",
+      "color": "0x0c1018",
+      "sfx": "footstep_puddle",
+      "desc": "積水路面（反射霓虹燈光）"
     },
     "5": {
-      "name":     "asphalt_debris",
-      "group":    "road",
+      "name": "asphalt_debris",
+      "group": "road",
       "walkable": true,
       "collides": false,
-      "draw":     "asphalt",
-      "color":    "0x181818",
-      "sfx":      "footstep_asphalt",
-      "desc":     "碎玻璃 / 殘骸（保留備用）"
+      "draw": "asphalt",
+      "color": "0x181818",
+      "sfx": "footstep_asphalt",
+      "desc": "碎玻璃 / 殘骸（保留備用）"
     },
     "9": {
-      "name":     "asphalt_hline",
-      "group":    "road",
+      "name": "asphalt_hline",
+      "group": "road",
       "walkable": true,
       "collides": false,
-      "draw":     "hline",
-      "color":    "0x1c1c1c",
-      "sfx":      "footstep_asphalt",
-      "desc":     "瀝青 + 水平雙黃線（東西向行車分界）"
+      "draw": "hline",
+      "color": "0x1c1c1c",
+      "sfx": "footstep_asphalt",
+      "desc": "瀝青 + 水平雙黃線（東西向行車分界）"
     },
-
     "10": {
-      "name":     "sidewalk",
-      "group":    "sidewalk",
+      "name": "sidewalk",
+      "group": "sidewalk",
       "walkable": true,
       "collides": false,
-      "draw":     "sidewalk",
-      "color":    "0x2a2620",
-      "sfx":      "footstep_concrete",
-      "desc":     "混凝土人行道"
+      "draw": "sidewalk",
+      "color": "0x2a2620",
+      "sfx": "footstep_concrete",
+      "desc": "混凝土人行道"
     },
     "11": {
-      "name":     "sidewalk_trash",
-      "group":    "sidewalk",
+      "name": "sidewalk_trash",
+      "group": "sidewalk",
       "walkable": true,
       "collides": false,
-      "draw":     "sidewalk_trash",
-      "color":    "0x2a2620",
-      "sfx":      "footstep_concrete",
-      "desc":     "人行道 + 垃圾袋 / 廢紙（裝飾，不阻擋）"
+      "draw": "sidewalk_trash",
+      "color": "0x2a2620",
+      "sfx": "footstep_concrete",
+      "desc": "人行道 + 垃圾袋 / 廢紙（裝飾，不阻擋）"
     },
     "12": {
-      "name":     "sidewalk_lamppost",
-      "group":    "sidewalk",
+      "name": "sidewalk_lamppost",
+      "group": "sidewalk",
       "walkable": false,
       "collides": true,
-      "draw":     "lamppost",
-      "color":    "0x1e1a12",
-      "desc":     "人行道 + 路燈柱（阻擋通行）",
-      "_light":   { "radius": 4, "color": "0xffaa44", "intensity": 0.45 }
+      "draw": "lamppost",
+      "color": "0x1e1a12",
+      "desc": "人行道 + 路燈柱（阻擋通行）",
+      "_light": {
+        "radius": 4,
+        "color": "0xffaa44",
+        "intensity": 0.45
+      }
     },
     "13": {
-      "name":     "sidewalk_hydrant",
-      "group":    "sidewalk",
+      "name": "sidewalk_hydrant",
+      "group": "sidewalk",
       "walkable": false,
       "collides": true,
-      "draw":     "sidewalk",
-      "color":    "0x2a2620",
-      "desc":     "人行道 + 消防栓（保留備用）"
+      "draw": "sidewalk",
+      "color": "0x2a2620",
+      "desc": "人行道 + 消防栓（保留備用）"
     },
     "14": {
-      "name":     "sidewalk_trashcan",
-      "group":    "sidewalk",
+      "name": "sidewalk_trashcan",
+      "group": "sidewalk",
       "walkable": false,
       "collides": true,
-      "draw":     "sidewalk",
-      "color":    "0x2a2620",
-      "desc":     "人行道 + 鐵製垃圾桶（保留備用）"
+      "draw": "sidewalk",
+      "color": "0x2a2620",
+      "desc": "人行道 + 鐵製垃圾桶（保留備用）"
     },
     "15": {
-      "name":     "sidewalk_cracked",
-      "group":    "sidewalk",
+      "name": "sidewalk_cracked",
+      "group": "sidewalk",
       "walkable": true,
       "collides": false,
-      "draw":     "sidewalk",
-      "color":    "0x221e18",
-      "sfx":      "footstep_concrete",
-      "desc":     "破損人行道（保留備用）"
+      "draw": "sidewalk",
+      "color": "0x221e18",
+      "sfx": "footstep_concrete",
+      "desc": "破損人行道（保留備用）"
     },
-
     "20": {
-      "name":     "wall_redbrick",
-      "group":    "wall",
+      "name": "wall_redbrick",
+      "group": "wall",
       "walkable": false,
       "collides": true,
-      "draw":     "brick_wall",
-      "color":    "0x2a1510",
-      "desc":     "標準紅磚牆（建築外牆主體）"
+      "draw": "brick_wall",
+      "color": "0x2a1510",
+      "desc": "標準紅磚牆（建築外牆主體）"
     },
     "21": {
-      "name":     "furniture_door_wood",
-      "group":    "indoor",
+      "name": "furniture_door_wood",
+      "group": "indoor",
       "walkable": false,
       "collides": true,
-      "draw":     "door_wood",
-      "color":    "0x3b2010",
-      "sfx":      "door_creak",
-      "desc":     "室內木門（斑駁、鉸鏈生鏽）"
+      "draw": "door_wood",
+      "color": "0x3b2010",
+      "sfx": "door_creak",
+      "desc": "室內木門（斑駁、鉸鏈生鏽）"
     },
     "22": {
-      "name":     "wall_metalgate",
-      "group":    "wall",
+      "name": "wall_metalgate",
+      "group": "wall",
       "walkable": false,
       "collides": true,
-      "draw":     "metalgate",
-      "color":    "0x1a2018",
-      "desc":     "金屬捲門 / 鐵絲網（倉庫 / 停車場）"
+      "draw": "metalgate",
+      "color": "0x1a2018",
+      "desc": "金屬捲門 / 鐵絲網（倉庫 / 停車場）"
     },
     "23": {
-      "name":     "wall_concrete",
-      "group":    "wall",
+      "name": "wall_concrete",
+      "group": "wall",
       "walkable": false,
       "collides": true,
-      "draw":     "brick_wall",
-      "color":    "0x222220",
-      "desc":     "混凝土牆（保留備用）"
+      "draw": "brick_wall",
+      "color": "0x222220",
+      "desc": "混凝土牆（保留備用）"
     },
     "24": {
-      "name":     "wall_boarded",
-      "group":    "wall",
+      "name": "wall_boarded",
+      "group": "wall",
       "walkable": false,
       "collides": true,
-      "draw":     "crate",
-      "color":    "0x1c1408",
-      "desc":     "釘板窗 / 廢棄建築（保留備用）"
+      "draw": "crate",
+      "color": "0x1c1408",
+      "desc": "釘板窗 / 廢棄建築（保留備用）"
     },
     "25": {
-      "name":     "wall_neon_sign",
-      "group":    "wall",
+      "name": "wall_neon_sign",
+      "group": "wall",
       "walkable": false,
       "collides": true,
-      "draw":     "brick_wall",
-      "color":    "0x1a0a1a",
-      "_light":   { "radius": 3, "color": "0xff00aa", "intensity": 0.6 },
-      "desc":     "霓虹招牌牆（保留備用）"
+      "draw": "brick_wall",
+      "color": "0x1a0a1a",
+      "_light": {
+        "radius": 3,
+        "color": "0xff00aa",
+        "intensity": 0.6
+      },
+      "desc": "霓虹招牌牆（保留備用）"
     },
-
-    "34": {
-      "name":     "asphalt_corner_tl",
-      "group":    "road",
+    "30": {
+      "name": "warp_door",
+      "group": "warp",
       "walkable": true,
       "collides": false,
-      "draw":     "corner_tl",
-      "color":    "0x1c1c1c",
-      "sfx":      "footstep_asphalt",
-      "desc":     "路口轉角標線 — 左上（垂直→水平，往左）"
+      "draw": "warp_door",
+      "color": "0x1a1208",
+      "sfx": "door_open",
+      "desc": "傳送門 — 步入觸發 transitionTo()"
+    },
+    "34": {
+      "name": "asphalt_corner_tl",
+      "group": "road",
+      "walkable": true,
+      "collides": false,
+      "draw": "corner_tl",
+      "color": "0x1c1c1c",
+      "sfx": "footstep_asphalt",
+      "desc": "路口轉角標線 — 左上（垂直→水平，往左）"
     },
     "35": {
-      "name":     "asphalt_corner_tr",
-      "group":    "road",
+      "name": "asphalt_corner_tr",
+      "group": "road",
       "walkable": true,
       "collides": false,
-      "draw":     "corner_tr",
-      "color":    "0x1c1c1c",
-      "sfx":      "footstep_asphalt",
-      "desc":     "路口轉角標線 — 右上（垂直→水平，往右）"
+      "draw": "corner_tr",
+      "color": "0x1c1c1c",
+      "sfx": "footstep_asphalt",
+      "desc": "路口轉角標線 — 右上（垂直→水平，往右）"
     },
     "36": {
-      "name":     "asphalt_corner_bl",
-      "group":    "road",
+      "name": "asphalt_corner_bl",
+      "group": "road",
       "walkable": true,
       "collides": false,
-      "draw":     "corner_bl",
-      "color":    "0x1c1c1c",
-      "sfx":      "footstep_asphalt",
-      "desc":     "路口轉角標線 — 左下（水平→垂直，往左）"
+      "draw": "corner_bl",
+      "color": "0x1c1c1c",
+      "sfx": "footstep_asphalt",
+      "desc": "路口轉角標線 — 左下（水平→垂直，往左）"
     },
     "37": {
-      "name":     "asphalt_corner_br",
-      "group":    "road",
+      "name": "asphalt_corner_br",
+      "group": "road",
       "walkable": true,
       "collides": false,
-      "draw":     "corner_br",
-      "color":    "0x1c1c1c",
-      "sfx":      "footstep_asphalt",
-      "desc":     "路口轉角標線 — 右下（水平→垂直，往右）"
+      "draw": "corner_br",
+      "color": "0x1c1c1c",
+      "sfx": "footstep_asphalt",
+      "desc": "路口轉角標線 — 右下（水平→垂直，往右）"
     },
-
-    "30": {
-      "name":     "warp_door",
-      "group":    "warp",
-      "walkable": true,
-      "collides": false,
-      "draw":     "warp_door",
-      "color":    "0x1a1208",
-      "sfx":      "door_open",
-      "desc":     "傳送門 — 步入觸發 transitionTo()"
-    },
-
     "40": {
-      "name":     "indoor_floor",
-      "group":    "indoor",
+      "name": "indoor_floor",
+      "group": "indoor",
       "walkable": true,
       "collides": false,
-      "draw":     "indoor_floor",
-      "color":    "0x1a1610",
-      "sfx":      "footstep_carpet",
-      "desc":     "室內地毯 — 菸頭燙痕與污漬"
+      "draw": "indoor_floor",
+      "color": "0x1a1610",
+      "sfx": "footstep_carpet",
+      "desc": "室內地毯 — 菸頭燙痕與污漬"
     },
     "41": {
-      "name":     "indoor_bed",
-      "group":    "indoor",
+      "name": "indoor_bed",
+      "group": "indoor",
       "walkable": false,
       "collides": true,
-      "draw":     "indoor_bed",
-      "color":    "0x1a1820",
-      "desc":     "破舊的床（不可通行）"
+      "draw": "indoor_bed",
+      "color": "0x1a1820",
+      "desc": "破舊的床（不可通行）"
     },
     "42": {
-      "name":     "mess_clutter",
-      "group":    "indoor",
+      "name": "mess_clutter",
+      "group": "indoor",
       "walkable": true,
       "collides": false,
-      "draw":     "indoor_table",
-      "color":    "0x1c1208",
-      "desc":     "散落地板的雜物 — 菸蒂、空罐、廢紙（僅視覺裝飾）"
+      "draw": "indoor_table",
+      "color": "0x1c1208",
+      "desc": "散落地板的雜物 — 菸蒂、空罐、廢紙（僅視覺裝飾）"
     },
     "43": {
-      "name":     "indoor_tv",
-      "group":    "indoor",
+      "name": "indoor_tv",
+      "group": "indoor",
       "walkable": false,
       "collides": true,
-      "draw":     "indoor_tv",
-      "color":    "0x0c0e14",
-      "_light":   { "radius": 2, "color": "0x4466cc", "intensity": 0.35 },
-      "desc":     "收不到訊號的老電視（不可通行，藍光）"
+      "draw": "indoor_tv",
+      "color": "0x0c0e14",
+      "_light": {
+        "radius": 2,
+        "color": "0x4466cc",
+        "intensity": 0.35
+      },
+      "desc": "收不到訊號的老電視（不可通行，藍光）"
     },
     "44": {
-      "name":     "indoor_sink",
-      "group":    "indoor",
+      "name": "indoor_sink",
+      "group": "indoor",
       "walkable": false,
       "collides": true,
-      "draw":     "indoor_sink",
-      "color":    "0x181c1c",
-      "desc":     "洗手台與發霉的牆角（不可通行）"
+      "draw": "indoor_sink",
+      "color": "0x181c1c",
+      "desc": "洗手台與發霉的牆角（不可通行）"
     },
-
     "45": {
-      "name":     "furniture_sofa",
-      "group":    "indoor",
+      "name": "furniture_sofa",
+      "group": "indoor",
       "walkable": false,
       "collides": true,
-      "draw":     "indoor_sofa",
-      "color":    "0x2e1a0e",
-      "desc":     "深棕色破舊沙發 — 彈簧外露、沾滿污漬（不可通行）"
+      "draw": "indoor_sofa",
+      "color": "0x2e1a0e",
+      "desc": "深棕色破舊沙發 — 彈簧外露、沾滿污漬（不可通行）"
     },
-
     "46": {
-      "name":     "asphalt_crosswalk_h",
-      "group":    "road",
+      "name": "asphalt_crosswalk_h",
+      "group": "road",
       "walkable": true,
       "collides": false,
-      "draw":     "crosswalk_h",
-      "color":    "0x1c1c1c",
-      "sfx":      "footstep_asphalt",
-      "desc":     "斑馬線 — 橫向白條（供左右向行人穿越，垂直於 Y 軸擺放）"
+      "draw": "crosswalk_h",
+      "color": "0x1c1c1c",
+      "sfx": "footstep_asphalt",
+      "desc": "斑馬線 — 橫向白條（供左右向行人穿越，垂直於 Y 軸擺放）"
     },
     "47": {
-      "name":     "asphalt_crosswalk_v",
-      "group":    "road",
+      "name": "asphalt_crosswalk_v",
+      "group": "road",
       "walkable": true,
       "collides": false,
-      "draw":     "crosswalk_v",
-      "color":    "0x1c1c1c",
-      "sfx":      "footstep_asphalt",
-      "desc":     "斑馬線 — 縱向白條（供上下向行人穿越，垂直於 X 軸擺放）"
+      "draw": "crosswalk_v",
+      "color": "0x1c1c1c",
+      "sfx": "footstep_asphalt",
+      "desc": "斑馬線 — 縱向白條（供上下向行人穿越，垂直於 X 軸擺放）"
+    },
+    "200": {
+      "name": "chinatown_road_wet",
+      "group": "chinatown",
+      "walkable": true,
+      "collides": false,
+      "draw": "puddle",
+      "color": "0x0c1018",
+      "sfx": "footstep_puddle",
+      "desc": "潮濕柏油路（帶有霓虹燈倒影）"
+    },
+    "201": {
+      "name": "chinatown_sidewalk",
+      "group": "chinatown",
+      "walkable": true,
+      "collides": false,
+      "draw": "sidewalk",
+      "color": "0x2a2218",
+      "sfx": "footstep_stone",
+      "desc": "唐人街人行道（六角形青石磚）"
+    },
+    "202": {
+      "name": "chinatown_alley",
+      "group": "chinatown",
+      "walkable": true,
+      "collides": false,
+      "draw": "asphalt",
+      "color": "0x0e0e0c",
+      "sfx": "footstep_asphalt",
+      "desc": "髒污暗巷地磚"
+    },
+    "203": {
+      "name": "chinatown_redbrick",
+      "group": "chinatown",
+      "walkable": false,
+      "collides": true,
+      "draw": "brick_wall",
+      "color": "0x3a1510",
+      "desc": "紅磚牆（建築基座）"
+    },
+    "204": {
+      "name": "chinatown_duck_shop",
+      "group": "chinatown",
+      "walkable": false,
+      "collides": true,
+      "draw": "brick_wall",
+      "color": "0x3a1c08",
+      "_light": {
+        "radius": 3,
+        "color": "0xffaa44",
+        "intensity": 0.5
+      },
+      "desc": "烤鴨店櫥窗（掛著烤鴨，透出暖黃光）"
+    },
+    "205": {
+      "name": "chinatown_herb_shop",
+      "group": "chinatown",
+      "walkable": false,
+      "collides": true,
+      "draw": "brick_wall",
+      "color": "0x1a2010",
+      "desc": "中藥行/當鋪木門（緊閉，帶有鐵花窗）"
+    },
+    "206": {
+      "name": "chinatown_paifang",
+      "group": "chinatown",
+      "walkable": false,
+      "collides": true,
+      "draw": "brick_wall",
+      "color": "0x2a1808",
+      "desc": "中式牌坊石柱（刻有龍紋）"
+    },
+    "207": {
+      "name": "chinatown_trash_pile",
+      "group": "chinatown",
+      "walkable": false,
+      "collides": true,
+      "draw": "crate",
+      "color": "0x141410",
+      "desc": "雜亂的疊箱與垃圾桶（暗巷用）"
     }
   },
-
   "_comment_groups": {
-    "special":  "0",
-    "road":     "1–5, 9, 34–37, 46–47",
+    "special": "0",
+    "road": "1–5, 9, 34–37, 46–47",
     "sidewalk": "10–15",
-    "wall":     "20, 22–25",
-    "indoor":   "21, 40–45  (21=door_wood, 40=floor, 41=bed, 42=clutter, 43=tv, 44=sink, 45=sofa)",
-    "warp":     "30"
+    "wall": "20, 22–25",
+    "indoor": "21, 40–45  (21=door_wood, 40=floor, 41=bed, 42=clutter, 43=tv, 44=sink, 45=sofa)",
+    "warp": "30",
+    "chinatown": "200-207 (哈卡街唐人街專用 tiles)"
   }
 }
