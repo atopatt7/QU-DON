@@ -106,6 +106,7 @@ const TILE_PALETTE = {
   1034: { base: 0x2a1e16, hi: 0x362820, lo: 0x1a120c }, // 零食貨架（彩色包裝）
   1035: { base: 0x1e1c1a, hi: 0x2a2826, lo: 0x0e0c0a }, // 收銀台（磨損鍵盤）
   1036: { base: 0x0c1824, hi: 0x142232, lo: 0x060e14 }, // 飲料冰櫃（藍光透明）
+  1037: { base: 0x1a1820, hi: 0x24222c, lo: 0x100e14 }, // old bed bottom half
 };
 
 // ─── 確定性偽隨機（LCG，以 tile 位置為種子，保證重複渲染一致）─────────────────────
@@ -456,7 +457,8 @@ export class MapManager {
       case 1017:  this._drawGutter(gfx, s, pal);             break;
       // ── Indoor (map_qu_don_room) ───────────────────────────────────────────
       case 1023: this._drawIndoorFloor(gfx, s, pal, rng);  break;
-      case 1024: this._drawIndoorBed(gfx, s, pal, rng);    break;
+      case 1024:
+      case 1037: this._drawIndoorBed(gfx, s, pal, rng);    break;
       case 1025: this._drawIndoorTable(gfx, s, pal, rng);  break;
       case 1026: this._drawIndoorTV(gfx, s, pal);           break;
       case 1027: this._drawIndoorSink(gfx, s, pal);         break;

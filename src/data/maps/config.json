@@ -264,7 +264,7 @@
       "collides": true,
       "draw": "indoor_bed",
       "color": "0x1a1820",
-      "desc": "破舊的床（不可通行）"
+      "desc": "破舊單人床 - 床頭半部（枕頭與被子，不可通行）"
     },
     "1025": {
       "name": "mess_clutter",
@@ -396,6 +396,15 @@
         "intensity": 0.45
       },
       "desc": "飲料冰櫃（透明玻璃門，透出冷冷的藍光）"
+    },
+    "1037": {
+      "name": "indoor_bed_bottom",
+      "group": "indoor",
+      "walkable": false,
+      "collides": true,
+      "draw": "indoor_bed",
+      "color": "0x1a1820",
+      "desc": "破舊單人床 - 床尾半部（被子與床腳，不可通行）"
     },
     "2000": {
       "name": "chinatown_road_wet",
