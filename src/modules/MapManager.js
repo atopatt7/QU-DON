@@ -348,11 +348,14 @@ export class MapManager {
         const idx      = id - region;
         const sx       = (idx % COLS) * SHEET_PX;
         const sy       = Math.floor(idx / COLS) * SHEET_PX;
-        if (id === 1002) console.log('[DEBUG tile1002] sx=%d sy=%d frame=%d', sx, sy, SHEET_PX);
-        const sub      = new PIXI.Texture({
-          source: tileset.source,
-          frame:  new PIXI.Rectangle(sx, sy, SHEET_PX, SHEET_PX),
-        });
+        // PixiJS v8 穩定寫法：clone 後手動設定 frame，強制更新 UV
+        const sub = tileset.clone();
+        sub.frame = new PIXI.Rectangle(sx, sy, SHEET_PX, SHEET_PX);
+        if (typeof sub.updateUvs === 'function') sub.updateUvs();
+        if (id === 1002) {
+          const u = sub._uvs ?? sub.uvs;
+          console.log(`[DEBUG tile1002] sx=${sx} sy=${sy} frame=${SHEET_PX} u0=${u?.x0?.toFixed(4)} u1=${u?.x1?.toFixed(4)} v0=${u?.y0?.toFixed(4)} v1=${u?.y1?.toFixed(4)}`);
+        }
         sub._fromSpritesheet = true; // 標記：cleanup 時不 destroy source
         this._texCache.set(id, sub);
         continue;
