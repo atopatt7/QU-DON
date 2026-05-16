@@ -340,13 +340,8 @@ export class MapManager {
       if (tileset && tileset.complete !== false) {
         // ── [DEBUG] 只印一次，用於排查裁切座標問題 ──
         if (id === region) {
-          console.log('[DEBUG tileset]', {
-            region,
-            sourceW: tileset.source?.width,
-            sourceH: tileset.source?.height,
-            resolution: tileset.source?.resolution,
-            tilesetLoaded: !!tileset,
-          });
+          const src = tileset.source;
+          console.log(`[DEBUG tileset] sourceW=${src?.width} sourceH=${src?.height} resolution=${src?.resolution} pixelW=${src?.pixelWidth} pixelH=${src?.pixelHeight}`);
         }
         const SHEET_PX = 48;
         const COLS     = 30;
