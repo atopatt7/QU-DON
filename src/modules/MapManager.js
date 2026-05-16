@@ -262,9 +262,10 @@ export class MapManager {
     if (!preserveEntities) this.entityLayer.removeChildren();
     this._fogLayer.removeChildren();
 
+    const destroyTex = t => t.destroy(!t._fromSpritesheet);
     this._texCache.forEach(t => {
-      if (Array.isArray(t)) t.forEach(v => v.destroy(true));
-      else t.destroy(true);
+      if (Array.isArray(t)) t.forEach(destroyTex);
+      else destroyTex(t);
     });
     this._texCache.clear();
     if (this._fogTex)     { this._fogTex.destroy(true);     this._fogTex     = null; }
@@ -329,20 +330,15 @@ export class MapManager {
       if (tileset && tileset.complete !== false) {
         const SHEET_PX = 48;
         const COLS = 30;
-        const idx = id - region; // 絕對相對索引
-
+        const idx = id - region;
         const sx = (idx % COLS) * SHEET_PX;
         const sy = Math.floor(idx / COLS) * SHEET_PX;
-
-        const sub  = new PIXI.Texture({
+        const sub = new PIXI.Texture({
           source: tileset.source,
           frame:  new PIXI.Rectangle(sx, sy, SHEET_PX, SHEET_PX),
         });
-        const tmp  = new PIXI.Sprite(sub);
-        tmp.width  = s;
-        tmp.height = s;
-        this._texCache.set(id, this._app.renderer.generateTexture({ target: tmp }));
-        sub.destroy();
+        sub._fromSpritesheet = true; // 標記：cleanup 時不 destroy source
+        this._texCache.set(id, sub);
         continue;
       }
 
@@ -1380,6 +1376,8 @@ export class MapManager {
           : cached;
 
         const spr = new PIXI.Sprite(tex);
+        spr.width  = s;
+        spr.height = s;
         spr.x = x * s;
         spr.y = y * s;
         container.addChild(spr);
@@ -1719,9 +1717,10 @@ export class MapManager {
     this._isDirty  = true; // tileSize 改變，強制鏡頭重算（即使 camGx/Gy 未變）
 
     // 清除舊貼圖快取（支援單一貼圖與變體陣列）
+    const destroyTex = t => t.destroy(!t._fromSpritesheet);
     this._texCache.forEach(t => {
-      if (Array.isArray(t)) t.forEach(v => v.destroy(true));
-      else t.destroy(true);
+      if (Array.isArray(t)) t.forEach(destroyTex);
+      else destroyTex(t);
     });
     this._texCache.clear();
     if (this._fogTex) { this._fogTex.destroy(true); this._fogTex = null; }
