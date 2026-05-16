@@ -49,46 +49,46 @@ const FOG_ALPHA = {
 };
 
 // ─── 位置變體快取：這些 tile 每格使用不同亂數種子，視覺多樣 ───────────────────────
-const VARIANT_IDS   = new Set([1, 2, 4, 5, 10, 11, 40, 200, 201, 202, 301]);
+const VARIANT_IDS   = new Set([1001, 1002, 1004, 1005, 1010, 1011, 1040, 200, 201, 202, 1301]);
 const VARIANT_COUNT = 4;
 
 // ─── 程式繪製 Tile 調色盤（Noir 低飽和深色系）────────────────────────────────────
 const TILE_PALETTE = {
   // ── Road (ground layer, IDs 1-5) ─────────────────────────────────────────
-  1:  { base: 0x1c1c1c, hi: 0x242424, lo: 0x101010 }, // asphalt
-  2:  { base: 0x161616, hi: 0x1c1c1c, lo: 0x080808 }, // cracked asphalt
-  3:  { base: 0x1c1c1c, hi: 0x242424, lo: 0x101010 }, // asphalt + vertical center line
-  4:  { base: 0x0c1018, hi: 0x141820, lo: 0x080c12 }, // asphalt + rain puddle
-  5:  { base: 0x181818, hi: 0x202020, lo: 0x0c0c0c }, // asphalt + debris
-  9:  { base: 0x1c1c1c, hi: 0x242424, lo: 0x101010 }, // asphalt + horizontal center line
+  1001:  { base: 0x1c1c1c, hi: 0x242424, lo: 0x101010 }, // asphalt
+  1002:  { base: 0x161616, hi: 0x1c1c1c, lo: 0x080808 }, // cracked asphalt
+  1003:  { base: 0x1c1c1c, hi: 0x242424, lo: 0x101010 }, // asphalt + vertical center line
+  1004:  { base: 0x0c1018, hi: 0x141820, lo: 0x080c12 }, // asphalt + rain puddle
+  1005:  { base: 0x181818, hi: 0x202020, lo: 0x0c0c0c }, // asphalt + debris
+  1009:  { base: 0x1c1c1c, hi: 0x242424, lo: 0x101010 }, // asphalt + horizontal center line
   // ── Corner centerlines (IDs 34-37) ───────────────────────────────────────
-  34: { base: 0x1c1c1c, hi: 0x242424, lo: 0x101010 }, // corner TL
-  35: { base: 0x1c1c1c, hi: 0x242424, lo: 0x101010 }, // corner TR
-  36: { base: 0x1c1c1c, hi: 0x242424, lo: 0x101010 }, // corner BL
-  37: { base: 0x1c1c1c, hi: 0x242424, lo: 0x101010 }, // corner BR
+  1034: { base: 0x1c1c1c, hi: 0x242424, lo: 0x101010 }, // corner TL
+  1035: { base: 0x1c1c1c, hi: 0x242424, lo: 0x101010 }, // corner TR
+  1036: { base: 0x1c1c1c, hi: 0x242424, lo: 0x101010 }, // corner BL
+  1037: { base: 0x1c1c1c, hi: 0x242424, lo: 0x101010 }, // corner BR
   // ── Sidewalk (ground layer, IDs 10-12) ───────────────────────────────────
-  10: { base: 0x2a2620, hi: 0x322e28, lo: 0x1e1a16 }, // concrete sidewalk
-  11: { base: 0x2a2620, hi: 0x322e28, lo: 0x1e1a16 }, // sidewalk + scattered trash
-  12: { base: 0x1e1a12, hi: 0x28240e, lo: 0x12100a }, // sidewalk + lamp post (blocked)
+  1010: { base: 0x2a2620, hi: 0x322e28, lo: 0x1e1a16 }, // concrete sidewalk
+  1011: { base: 0x2a2620, hi: 0x322e28, lo: 0x1e1a16 }, // sidewalk + scattered trash
+  1012: { base: 0x1e1a12, hi: 0x28240e, lo: 0x12100a }, // sidewalk + lamp post (blocked)
   // ── Walls (objects layer, IDs 20-22) ─────────────────────────────────────
-  20: { base: 0x28150e, hi: 0x321a12, lo: 0x180c08 }, // red brick wall
-  21: { base: 0x1e1830, hi: 0x28203c, lo: 0x141024 }, // graffiti-covered wall
-  22: { base: 0x1a2018, hi: 0x222820, lo: 0x0e1410 }, // corrugated metal gate
+  1020: { base: 0x28150e, hi: 0x321a12, lo: 0x180c08 }, // red brick wall
+  1021: { base: 0x1e1830, hi: 0x28203c, lo: 0x141024 }, // graffiti-covered wall
+  1022: { base: 0x1a2018, hi: 0x222820, lo: 0x0e1410 }, // corrugated metal gate
   // ── Warp (ID 30) ─────────────────────────────────────────────────────────
-  30: { base: 0x1a1410, hi: 0x281c14, lo: 0x100e0a }, // warp door (glowing frame)
+  1030: { base: 0x1a1410, hi: 0x281c14, lo: 0x100e0a }, // warp door (glowing frame)
   // ── Legacy interior objects (map_01 / map_neon_bar) ───────────────────────
-  6:  { base: 0x0e1a10, hi: 0x142018, lo: 0x080e0a }, // metal dumpster / bar counter
-  7:  { base: 0x1c1408, hi: 0x241a0c, lo: 0x100e06 }, // interior door
-  8:  { base: 0x0c0c0c, hi: 0x141414, lo: 0x040404 }, // storm gutter
+  1006:  { base: 0x0e1a10, hi: 0x142018, lo: 0x080e0a }, // metal dumpster / bar counter
+  1007:  { base: 0x1c1408, hi: 0x241a0c, lo: 0x100e06 }, // interior door
+  1008:  { base: 0x0c0c0c, hi: 0x141414, lo: 0x040404 }, // storm gutter
   // ── Crosswalk (IDs 46-47) ─────────────────────────────────────────────────
-  46: { base: 0x1c1c1c, hi: 0x242424, lo: 0x101010 }, // crosswalk: horizontal stripes
-  47: { base: 0x1c1c1c, hi: 0x242424, lo: 0x101010 }, // crosswalk: vertical stripes
+  1046: { base: 0x1c1c1c, hi: 0x242424, lo: 0x101010 }, // crosswalk: horizontal stripes
+  1047: { base: 0x1c1c1c, hi: 0x242424, lo: 0x101010 }, // crosswalk: vertical stripes
   // ── Indoor (IDs 40-44) — 瞿董的房間 ────────────────────────────────────────
-  40: { base: 0x1a1610, hi: 0x221e16, lo: 0x100e08 }, // dirty carpet floor
-  41: { base: 0x1a1820, hi: 0x24222c, lo: 0x100e14 }, // old bed
-  42: { base: 0x1c1208, hi: 0x241a0c, lo: 0x100c04 }, // junk table with bottles
-  43: { base: 0x0c0e14, hi: 0x14161e, lo: 0x06080e }, // old TV (faint blue)
-  44: { base: 0x181c1c, hi: 0x202828, lo: 0x0e1414 }, // sink & mold
+  1040: { base: 0x1a1610, hi: 0x221e16, lo: 0x100e08 }, // dirty carpet floor
+  1041: { base: 0x1a1820, hi: 0x24222c, lo: 0x100e14 }, // old bed
+  1042: { base: 0x1c1208, hi: 0x241a0c, lo: 0x100c04 }, // junk table with bottles
+  1043: { base: 0x0c0e14, hi: 0x14161e, lo: 0x06080e }, // old TV (faint blue)
+  1044: { base: 0x181c1c, hi: 0x202828, lo: 0x0e1414 }, // sink & mold
   // ── Chinatown / Hakka Street (IDs 200-207) ────────────────────────────
   200: { base: 0x0c1018, hi: 0x18202c, lo: 0x060810 }, // 潮濕柏油路（霓虹倒影）
   201: { base: 0x2e2418, hi: 0x3a2e20, lo: 0x201810 }, // 唐人街青石磚人行道
@@ -99,12 +99,12 @@ const TILE_PALETTE = {
   206: { base: 0x2a2010, hi: 0x36281a, lo: 0x1a140a }, // 牌坊石柱（刻龍紋）
   207: { base: 0x141410, hi: 0x1c1c18, lo: 0x0a0a08 }, // 垃圾堆/疊箱（暗巷）
   // ── Convenience Store (IDs 300-305) ────────────────────────────────────────
-  300: { base: 0x88ccee, hi: 0xaaddf8, lo: 0x5599bb }, // 自動玻璃門（冷白）
-  301: { base: 0xd0e2e8, hi: 0xe4f0f4, lo: 0xb0c8d0 }, // 超商地板（白亮格紋）
-  302: { base: 0x28262e, hi: 0x343240, lo: 0x18161c }, // 超商牆壁（貼滿海報）
-  303: { base: 0x2a1e16, hi: 0x362820, lo: 0x1a120c }, // 零食貨架（彩色包裝）
-  304: { base: 0x1e1c1a, hi: 0x2a2826, lo: 0x0e0c0a }, // 收銀台（磨損鍵盤）
-  305: { base: 0x0c1824, hi: 0x142232, lo: 0x060e14 }, // 飲料冰櫃（藍光透明）
+  1300: { base: 0x88ccee, hi: 0xaaddf8, lo: 0x5599bb }, // 自動玻璃門（冷白）
+  1301: { base: 0xd0e2e8, hi: 0xe4f0f4, lo: 0xb0c8d0 }, // 超商地板（白亮格紋）
+  1302: { base: 0x28262e, hi: 0x343240, lo: 0x18161c }, // 超商牆壁（貼滿海報）
+  1303: { base: 0x2a1e16, hi: 0x362820, lo: 0x1a120c }, // 零食貨架（彩色包裝）
+  1304: { base: 0x1e1c1a, hi: 0x2a2826, lo: 0x0e0c0a }, // 收銀台（磨損鍵盤）
+  1305: { base: 0x0c1824, hi: 0x142232, lo: 0x060e14 }, // 飲料冰櫃（藍光透明）
 };
 
 // ─── 確定性偽隨機（LCG，以 tile 位置為種子，保證重複渲染一致）─────────────────────
@@ -322,19 +322,19 @@ export class MapManager {
     const pal = TILE_PALETTE[id] ?? { base: 0x202020, hi: 0x303030, lo: 0x101010 };
     const rng = new TileRng(id + variant * 9973, id * 31 + variant * 7919);
     switch (id) {
-      case 1:  this._drawAsphalt(gfx, s, pal, rng);       break;
-      case 2:  this._drawCracked(gfx, s, pal, rng);       break;
-      case 4:  this._drawPuddle(gfx, s, pal, rng);        break;
-      case 5:  this._drawDebris(gfx, s, pal, rng);        break;
-      case 10:  this._drawSidewalk(gfx, s, pal, rng);      break;
-      case 11:  this._drawSidewalkTrash(gfx, s, pal, rng); break;
-      case 40:  this._drawIndoorFloor(gfx, s, pal, rng);   break;
+      case 1001:  this._drawAsphalt(gfx, s, pal, rng);       break;
+      case 1002:  this._drawCracked(gfx, s, pal, rng);       break;
+      case 1004:  this._drawPuddle(gfx, s, pal, rng);        break;
+      case 1005:  this._drawDebris(gfx, s, pal, rng);        break;
+      case 1010:  this._drawSidewalk(gfx, s, pal, rng);      break;
+      case 1011:  this._drawSidewalkTrash(gfx, s, pal, rng); break;
+      case 1040:  this._drawIndoorFloor(gfx, s, pal, rng);   break;
       // ── Chinatown variants ──────────────────────────────────────────────
       case 200: this._drawPuddle(gfx, s, pal, rng);        break;
       case 201: this._drawSidewalk(gfx, s, pal, rng);      break;
       case 202: this._drawAsphalt(gfx, s, pal, rng);       break;
       // ── Convenience Store variants ──────────────────────────────────────
-      case 301: this._drawStoreFloor(gfx, s, pal, rng);    break;
+      case 1301: this._drawStoreFloor(gfx, s, pal, rng);    break;
       default: gfx.rect(0, 0, s, s).fill({ color: pal.base });
     }
     return gfx;
@@ -349,40 +349,40 @@ export class MapManager {
 
     switch (id) {
       // ── Road ──────────────────────────────────────────────────────────────
-      case 1:  this._drawAsphalt(gfx, s, pal, rng);      break;
-      case 2:  this._drawCracked(gfx, s, pal, rng);      break;
-      case 3:  this._drawCenterLine(gfx, s, pal, rng);   break;
-      case 4:  this._drawPuddle(gfx, s, pal, rng);       break;
-      case 5:  this._drawDebris(gfx, s, pal, rng);       break;
-      case 9:  this._drawHorizontalLine(gfx, s, pal, rng); break;
+      case 1001:  this._drawAsphalt(gfx, s, pal, rng);      break;
+      case 1002:  this._drawCracked(gfx, s, pal, rng);      break;
+      case 1003:  this._drawCenterLine(gfx, s, pal, rng);   break;
+      case 1004:  this._drawPuddle(gfx, s, pal, rng);       break;
+      case 1005:  this._drawDebris(gfx, s, pal, rng);       break;
+      case 1009:  this._drawHorizontalLine(gfx, s, pal, rng); break;
       // ── Corner centerlines ────────────────────────────────────────────────
-      case 34: this._drawCornerLine(gfx, s, 'TL', pal, rng); break;
-      case 35: this._drawCornerLine(gfx, s, 'TR', pal, rng); break;
-      case 36: this._drawCornerLine(gfx, s, 'BL', pal, rng); break;
-      case 37: this._drawCornerLine(gfx, s, 'BR', pal, rng); break;
+      case 1034: this._drawCornerLine(gfx, s, 'TL', pal, rng); break;
+      case 1035: this._drawCornerLine(gfx, s, 'TR', pal, rng); break;
+      case 1036: this._drawCornerLine(gfx, s, 'BL', pal, rng); break;
+      case 1037: this._drawCornerLine(gfx, s, 'BR', pal, rng); break;
       // ── Sidewalk ──────────────────────────────────────────────────────────
-      case 10: this._drawSidewalk(gfx, s, pal, rng);     break;
-      case 11: this._drawSidewalkTrash(gfx, s, pal, rng); break;
-      case 12: this._drawLampPost(gfx, s, pal);           break;
+      case 1010: this._drawSidewalk(gfx, s, pal, rng);     break;
+      case 1011: this._drawSidewalkTrash(gfx, s, pal, rng); break;
+      case 1012: this._drawLampPost(gfx, s, pal);           break;
       // ── Walls ─────────────────────────────────────────────────────────────
-      case 20: this._drawBrickWall(gfx, s, pal, rng);    break;
-      case 21: this._drawGraffiti(gfx, s, pal, rng);     break;
-      case 22: this._drawMetalGate(gfx, s, pal);          break;
+      case 1020: this._drawBrickWall(gfx, s, pal, rng);    break;
+      case 1021: this._drawGraffiti(gfx, s, pal, rng);     break;
+      case 1022: this._drawMetalGate(gfx, s, pal);          break;
       // ── Warp ──────────────────────────────────────────────────────────────
-      case 30: this._drawWarpDoor(gfx, s, pal);           break;
+      case 1030: this._drawWarpDoor(gfx, s, pal);           break;
       // ── Crosswalk (IDs 46-47) ─────────────────────────────────────────────
-      case 46: this._drawCrosswalkH(gfx, s, pal, rng);   break;
-      case 47: this._drawCrosswalkV(gfx, s, pal, rng);   break;
+      case 1046: this._drawCrosswalkH(gfx, s, pal, rng);   break;
+      case 1047: this._drawCrosswalkV(gfx, s, pal, rng);   break;
       // ── Legacy interior (map_01 / map_neon_bar) ───────────────────────────
-      case 6:  this._drawDumpster(gfx, s, pal);           break;
-      case 7:  this._drawDoor(gfx, s, pal);               break;
-      case 8:  this._drawGutter(gfx, s, pal);             break;
+      case 1006:  this._drawDumpster(gfx, s, pal);           break;
+      case 1007:  this._drawDoor(gfx, s, pal);               break;
+      case 1008:  this._drawGutter(gfx, s, pal);             break;
       // ── Indoor (map_qu_don_room) ───────────────────────────────────────────
-      case 40: this._drawIndoorFloor(gfx, s, pal, rng);  break;
-      case 41: this._drawIndoorBed(gfx, s, pal, rng);    break;
-      case 42: this._drawIndoorTable(gfx, s, pal, rng);  break;
-      case 43: this._drawIndoorTV(gfx, s, pal);           break;
-      case 44: this._drawIndoorSink(gfx, s, pal);         break;
+      case 1040: this._drawIndoorFloor(gfx, s, pal, rng);  break;
+      case 1041: this._drawIndoorBed(gfx, s, pal, rng);    break;
+      case 1042: this._drawIndoorTable(gfx, s, pal, rng);  break;
+      case 1043: this._drawIndoorTV(gfx, s, pal);           break;
+      case 1044: this._drawIndoorSink(gfx, s, pal);         break;
       // ── Chinatown / Hakka Street (IDs 200-207) ──────────────────────────
       case 200: this._drawPuddle(gfx, s, pal, rng);       break; // 潮濕柏油路
       case 201: this._drawSidewalk(gfx, s, pal, rng);     break; // 青石磚人行道
@@ -393,12 +393,12 @@ export class MapManager {
       case 206: this._drawPaifang(gfx, s, pal, rng);      break; // 牌坊石柱
       case 207: this._drawTrashPile(gfx, s, pal, rng);    break; // 垃圾堆
       // ── Convenience Store (IDs 300-305) ──────────────────────────────────
-      case 300: this._drawStoreDoor(gfx, s, pal);          break; // 自動玻璃門
-      case 301: this._drawStoreFloor(gfx, s, pal, rng);   break; // 超商地板
-      case 302: this._drawStoreWall(gfx, s, pal, rng);    break; // 超商牆壁
-      case 303: this._drawStoreShelf(gfx, s, pal, rng);   break; // 零食貨架
-      case 304: this._drawStoreCounter(gfx, s, pal);       break; // 收銀台
-      case 305: this._drawStoreFridge(gfx, s, pal);        break; // 飲料冰櫃
+      case 1300: this._drawStoreDoor(gfx, s, pal);          break; // 自動玻璃門
+      case 1301: this._drawStoreFloor(gfx, s, pal, rng);   break; // 超商地板
+      case 1302: this._drawStoreWall(gfx, s, pal, rng);    break; // 超商牆壁
+      case 1303: this._drawStoreShelf(gfx, s, pal, rng);   break; // 零食貨架
+      case 1304: this._drawStoreCounter(gfx, s, pal);       break; // 收銀台
+      case 1305: this._drawStoreFridge(gfx, s, pal);        break; // 飲料冰櫃
       default:
         gfx.rect(0, 0, s, s).fill({ color: pal.base });
     }
