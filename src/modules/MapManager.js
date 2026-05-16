@@ -338,11 +338,22 @@ export class MapManager {
 
       // 只要該區域的雪碧圖載入成功，該區域所有 ID 直接從雪碧圖裁切
       if (tileset && tileset.complete !== false) {
+        // ── [DEBUG] 只印一次，用於排查裁切座標問題 ──
+        if (id === region) {
+          console.log('[DEBUG tileset]', {
+            region,
+            sourceW: tileset.source?.width,
+            sourceH: tileset.source?.height,
+            resolution: tileset.source?.resolution,
+            tilesetLoaded: !!tileset,
+          });
+        }
         const SHEET_PX = 48;
         const COLS     = 30;
         const idx      = id - region;
         const sx       = (idx % COLS) * SHEET_PX;
         const sy       = Math.floor(idx / COLS) * SHEET_PX;
+        if (id === 1002) console.log('[DEBUG tile1002] sx=%d sy=%d frame=%d', sx, sy, SHEET_PX);
         const sub      = new PIXI.Texture({
           source: tileset.source,
           frame:  new PIXI.Rectangle(sx, sy, SHEET_PX, SHEET_PX),
