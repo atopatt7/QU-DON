@@ -272,7 +272,7 @@ export class MapManager {
     if (!preserveEntities) this.entityLayer.removeChildren();
     this._fogLayer.removeChildren();
 
-    const destroyTex = t => t.destroy(!t._fromSpritesheet);
+    const destroyTex = t => t.destroy(true);
     this._texCache.forEach(t => {
       if (Array.isArray(t)) t.forEach(destroyTex);
       else destroyTex(t);
@@ -336,29 +336,21 @@ export class MapManager {
       const region  = Math.floor(id / 1000) * 1000;
       const tileset = this.loadedTilesets[region];
 
-      // 只要該區域的雪碧圖載入成功，該區域所有 ID 直接從雪碧圖裁切
+      // 只要該區域的雪碧圖載入成功，直接用 renderer 把對應格子烘進 RenderTexture
+      // 此方式完全繞過 sub-texture UV 計算，在 PixiJS v8 最穩定
       if (tileset && tileset.complete !== false) {
-        // ── [DEBUG] 只印一次，用於排查裁切座標問題 ──
-        if (id === region) {
-          const src = tileset.source;
-          console.log(`[DEBUG tileset] sourceW=${src?.width} sourceH=${src?.height} resolution=${src?.resolution} pixelW=${src?.pixelWidth} pixelH=${src?.pixelHeight}`);
-        }
         const SHEET_PX = 48;
         const COLS     = 30;
         const idx      = id - region;
         const sx       = (idx % COLS) * SHEET_PX;
         const sy       = Math.floor(idx / COLS) * SHEET_PX;
-        const frame = new PIXI.Rectangle(sx, sy, SHEET_PX, SHEET_PX);
-        const sub   = new PIXI.Texture({ source: tileset.source, frame });
-        // 強制更新 UV（相容 v8 各種私有/公開方法名）
-        if      (typeof sub.updateUvs  === 'function') sub.updateUvs();
-        else if (typeof sub._updateUvs === 'function') sub._updateUvs();
-        if (id === 1002) {
-          const u = sub._uvs ?? sub.uvs;
-          console.log(`[DEBUG UV1002] u0=${u?.x0?.toFixed(5)} u1=${u?.x1?.toFixed(5)} v0=${u?.y0?.toFixed(5)} v1=${u?.y1?.toFixed(5)} (expect u0=0.06667 u1=0.10000)`);
-        }
-        sub._fromSpritesheet = true; // 標記：cleanup 時不 destroy source
-        this._texCache.set(id, sub);
+
+        const rt     = PIXI.RenderTexture.create({ width: SHEET_PX, height: SHEET_PX });
+        const tmpSpr = new PIXI.Sprite(tileset);
+        tmpSpr.x = -sx;
+        tmpSpr.y = -sy;
+        this._app.renderer.render({ container: tmpSpr, target: rt });
+        this._texCache.set(id, rt);
         continue;
       }
 
@@ -1737,7 +1729,7 @@ export class MapManager {
     this._isDirty  = true; // tileSize 改變，強制鏡頭重算（即使 camGx/Gy 未變）
 
     // 清除舊貼圖快取（支援單一貼圖與變體陣列）
-    const destroyTex = t => t.destroy(!t._fromSpritesheet);
+    const destroyTex = t => t.destroy(true);
     this._texCache.forEach(t => {
       if (Array.isArray(t)) t.forEach(destroyTex);
       else destroyTex(t);
