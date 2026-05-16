@@ -348,13 +348,14 @@ export class MapManager {
         const idx      = id - region;
         const sx       = (idx % COLS) * SHEET_PX;
         const sy       = Math.floor(idx / COLS) * SHEET_PX;
-        // PixiJS v8 穩定寫法：clone 後手動設定 frame，強制更新 UV
-        const sub = tileset.clone();
-        sub.frame = new PIXI.Rectangle(sx, sy, SHEET_PX, SHEET_PX);
-        if (typeof sub.updateUvs === 'function') sub.updateUvs();
+        const frame = new PIXI.Rectangle(sx, sy, SHEET_PX, SHEET_PX);
+        const sub   = new PIXI.Texture({ source: tileset.source, frame });
+        // 強制更新 UV（相容 v8 各種私有/公開方法名）
+        if      (typeof sub.updateUvs  === 'function') sub.updateUvs();
+        else if (typeof sub._updateUvs === 'function') sub._updateUvs();
         if (id === 1002) {
           const u = sub._uvs ?? sub.uvs;
-          console.log(`[DEBUG tile1002] sx=${sx} sy=${sy} frame=${SHEET_PX} u0=${u?.x0?.toFixed(4)} u1=${u?.x1?.toFixed(4)} v0=${u?.y0?.toFixed(4)} v1=${u?.y1?.toFixed(4)}`);
+          console.log(`[DEBUG UV1002] u0=${u?.x0?.toFixed(5)} u1=${u?.x1?.toFixed(5)} v0=${u?.y0?.toFixed(5)} v1=${u?.y1?.toFixed(5)} (expect u0=0.06667 u1=0.10000)`);
         }
         sub._fromSpritesheet = true; // 標記：cleanup 時不 destroy source
         this._texCache.set(id, sub);
