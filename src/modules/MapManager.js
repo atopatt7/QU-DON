@@ -375,7 +375,17 @@ export class MapManager {
           const canvas = document.createElement('canvas');
           canvas.width  = SHEET_PX;
           canvas.height = SHEET_PX;
-          canvas.getContext('2d').drawImage(img, sx, sy, SHEET_PX, SHEET_PX, 0, 0, SHEET_PX, SHEET_PX);
+          const ctx2d = canvas.getContext('2d');
+          ctx2d.drawImage(img, sx, sy, SHEET_PX, SHEET_PX, 0, 0, SHEET_PX, SHEET_PX);
+
+          // 視覺診斷：掛前 6 個 tile 到畫面左上角
+          if (idx < 6) {
+            canvas.style.cssText = `position:fixed;top:${idx*50}px;left:0;z-index:9999;
+              border:1px solid red;image-rendering:pixelated;width:48px;height:48px`;
+            canvas.title = `tile ${id} sx=${sx} sy=${sy}`;
+            document.body.appendChild(canvas);
+          }
+
           this._texCache.set(id, PIXI.Texture.from(canvas));
           continue;
         }
