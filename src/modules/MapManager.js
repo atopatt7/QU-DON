@@ -342,13 +342,11 @@ export class MapManager {
       const region  = Math.floor(id / 1000) * 1000;
       const tileset = this.loadedTilesets[region];
 
-      // 白名單：目前擁有真實圖片的 ID，請根據已打包的檔案隨時擴充
-      const READY_TILES = new Set([1000, 1001, 1006, 1029, 1030]);
-
-      if (tileset && READY_TILES.has(id) && tileset.complete !== false) {
+      // 只要該區域的雪碧圖載入成功，該區域所有 ID 直接從雪碧圖裁切
+      if (tileset && tileset.complete !== false) {
         const SHEET_PX = 48;
         const COLS = 30;
-        const idx = id - region; // 相對索引，例如 1006 -> 6
+        const idx = id - region; // 絕對相對索引
 
         const sx = (idx % COLS) * SHEET_PX;
         const sy = Math.floor(idx / COLS) * SHEET_PX;
