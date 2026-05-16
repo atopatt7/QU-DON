@@ -328,7 +328,7 @@ export class MapManager {
 
       // 只要該區域的雪碧圖載入成功，該區域所有 ID 直接從雪碧圖裁切
       if (tileset && tileset.complete !== false) {
-        const SHEET_PX = 48;
+        const SHEET_PX = 16;
         const COLS = 30;
         const idx = id - region;
         const sx = (idx % COLS) * SHEET_PX;
