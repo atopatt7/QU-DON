@@ -161,10 +161,6 @@ export class MapManager {
     // null 表示已嘗試載入但圖片不存在，避免重複請求
     this.loadedTilesets = {};
 
-    // 在 constructor 即發起預載，縮短首次進入黑石街地圖的等待時間
-    this.tileset1000 = new Image();
-    this.tileset1000.src = 'assets/maps/tilesets/tileset_1000.png';
-
     // 轉場 Overlay（全螢幕淡黑遮罩）
     this._overlay   = null;
 
@@ -295,22 +291,9 @@ export class MapManager {
     for (const region of regions) {
       if (region in this.loadedTilesets) continue;
 
-      // region 1000：使用 constructor 預先發起的 HTMLImageElement，等待並轉為 PIXI.Texture
-      if (region === 1000) {
-        const img = this.tileset1000;
-        if (!img.complete) {
-          await new Promise(res => { img.onload = img.onerror = res; });
-        }
-        if (img.complete && img.naturalWidth > 0) {
-          this.loadedTilesets[1000] = PIXI.Texture.from(img);
-        } else {
-          console.warn('[MapManager] tileset_1000.png 不存在，使用程式渲染');
-          this.loadedTilesets[1000] = null;
-        }
-        continue;
-      }
-
-      const url = `./assets/maps/tilesets/tileset_${region}.png`;
+      const url = region === 1000
+        ? './assets/maps/tilesets/tileset_1000.png'
+        : `./assets/maps/tilesets/tileset_${region}.png`;
       try {
         this.loadedTilesets[region] = await PIXI.Assets.load(url);
       } catch {
