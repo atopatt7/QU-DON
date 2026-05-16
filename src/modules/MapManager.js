@@ -317,6 +317,7 @@ export class MapManager {
   // ─── 貼圖快取建置 ─────────────────────────────────────────────────────────
 
   _buildTexCache() {
+    console.log('[DEBUG _buildTexCache] ENTER mapData=', !!this._mapData, 'tileSize=', this._tileSize);
     const s = this._tileSize;
 
     // 掃描 ground + objects 兩層，收集所有非零 tile ID
@@ -328,6 +329,17 @@ export class MapManager {
         if (id !== 0) ids.add(id);
       }
     }
+    console.log('[DEBUG _buildTexCache] ids.size=', ids.size, 'sample=', [...ids].slice(0,5));
+
+    // 診斷：確認每個 region 的載入狀態
+    {
+      const regions = new Set([...ids].map(id => Math.floor(id / 1000) * 1000));
+      for (const r of regions) {
+        const ts = this.loadedTilesets[r];
+        console.log('[DEBUG loadedTilesets] region=', r, 'value=', ts,
+          'type=', ts?.constructor?.name, 'source=', ts?.source?.constructor?.name);
+      }
+    }
 
     for (const id of ids) {
       if (this._texCache.has(id)) continue;
@@ -336,22 +348,37 @@ export class MapManager {
       const region  = Math.floor(id / 1000) * 1000;
       const tileset = this.loadedTilesets[region];
 
-      // 只要該區域的雪碧圖載入成功，直接用 renderer 把對應格子烘進 RenderTexture
-      // 此方式完全繞過 sub-texture UV 計算，在 PixiJS v8 最穩定
-      if (tileset && tileset.complete !== false) {
-        const SHEET_PX = 48;
-        const COLS     = 30;
-        const idx      = id - region;
-        const sx       = (idx % COLS) * SHEET_PX;
-        const sy       = Math.floor(idx / COLS) * SHEET_PX;
+      // Canvas 2D 裁切法：直接從 HTMLImageElement drawImage，完全繞過 PixiJS UV 系統
+      if (tileset) {
+        const src = tileset.source;
+        const img = src?.resource ?? src?.htmlElement ?? src?.bitmap ?? src;
+        // 診斷：只對第一個 tile 打 log
+        if (id === region) {
+          console.log('[DEBUG tileset.source]', JSON.stringify({
+            srcType:    src?.constructor?.name,
+            imgType:    img?.constructor?.name,
+            tagName:    img?.tagName,
+            naturalW:   img?.naturalWidth,
+            naturalH:   img?.naturalHeight,
+            width:      img?.width,
+            height:     img?.height,
+          }));
+        }
+        const hasPixels = img && (img.naturalWidth > 0 || img.width > 0);
+        if (hasPixels) {
+          const SHEET_PX = 48;
+          const COLS     = 30;
+          const idx      = id - region;
+          const sx       = (idx % COLS) * SHEET_PX;
+          const sy       = Math.floor(idx / COLS) * SHEET_PX;
 
-        const rt     = PIXI.RenderTexture.create({ width: SHEET_PX, height: SHEET_PX });
-        const tmpSpr = new PIXI.Sprite(tileset);
-        tmpSpr.x = -sx;
-        tmpSpr.y = -sy;
-        this._app.renderer.render({ container: tmpSpr, target: rt });
-        this._texCache.set(id, rt);
-        continue;
+          const canvas = document.createElement('canvas');
+          canvas.width  = SHEET_PX;
+          canvas.height = SHEET_PX;
+          canvas.getContext('2d').drawImage(img, sx, sy, SHEET_PX, SHEET_PX, 0, 0, SHEET_PX, SHEET_PX);
+          this._texCache.set(id, PIXI.Texture.from(canvas));
+          continue;
+        }
       }
 
       if (VARIANT_IDS.has(id)) {
