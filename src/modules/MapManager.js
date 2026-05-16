@@ -337,10 +337,11 @@ export class MapManager {
     for (const id of ids) {
       if (this._texCache.has(id)) continue;
 
-      // ── 雪碧圖攔截：若對應區域的 tileset 已載入，從中裁切幀 ─────────────────
+      // ── 雪碧圖攔截：僅白名單 ID 從 tileset 裁切，其餘維持程式渲染 ───────────
+      const READY_TILES = new Set([1000, 1001, 1002, 1003, 1004]);
       const region  = Math.floor(id / 1000) * 1000;
       const tileset = this.loadedTilesets[region];
-      if (tileset) {
+      if (tileset && READY_TILES.has(id)) {
         const COLS = 30, SHEET_PX = 48;
         const idx  = id - region;
         const sx   = (idx % COLS) * SHEET_PX;
