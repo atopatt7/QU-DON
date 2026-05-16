@@ -329,7 +329,15 @@ export class MapManager {
         if (id !== 0) ids.add(id);
       }
     }
-    console.log('[DEBUG _buildTexCache] ids.size=', ids.size, 'sample=', [...ids].slice(0,5));
+    const SHEET_PX_LOG = 48, COLS_LOG = 30;
+    const tileLog = [...ids].sort((a,b)=>a-b).map(id => {
+      const region = Math.floor(id/1000)*1000;
+      const idx = id - region;
+      const sx = (idx % COLS_LOG) * SHEET_PX_LOG;
+      const sy = Math.floor(idx / COLS_LOG) * SHEET_PX_LOG;
+      return `${id}(sx=${sx},sy=${sy})`;
+    });
+    console.log('[DEBUG tile coords]', tileLog.join(' | '));
 
     // 診斷：確認每個 region 的載入狀態
     {
