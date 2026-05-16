@@ -373,6 +373,18 @@ export class MapManager {
           }));
         }
         const hasPixels = img && (img.naturalWidth > 0 || img.width > 0);
+
+        // 整張雪碧圖診斷：只執行一次，縮小到 360×360 顯示在右上角
+        if (id === region && hasPixels && !window.__sheetDebugDone) {
+          window.__sheetDebugDone = true;
+          const dbg = document.createElement('canvas');
+          dbg.width = 360; dbg.height = 360;
+          dbg.getContext('2d').drawImage(img, 0, 0, img.width, img.height, 0, 0, 360, 360);
+          dbg.style.cssText = 'position:fixed;top:0;right:0;z-index:9999;border:2px solid blue;width:360px;height:360px';
+          dbg.title = 'Full tileset_1000.png preview';
+          document.body.appendChild(dbg);
+        }
+
         if (hasPixels) {
           const SHEET_PX = 48;
           const COLS     = 30;
@@ -383,17 +395,7 @@ export class MapManager {
           const canvas = document.createElement('canvas');
           canvas.width  = SHEET_PX;
           canvas.height = SHEET_PX;
-          const ctx2d = canvas.getContext('2d');
-          ctx2d.drawImage(img, sx, sy, SHEET_PX, SHEET_PX, 0, 0, SHEET_PX, SHEET_PX);
-
-          // 視覺診斷：掛前 6 個 tile 到畫面左上角
-          if (idx < 6) {
-            canvas.style.cssText = `position:fixed;top:${idx*50}px;left:0;z-index:9999;
-              border:1px solid red;image-rendering:pixelated;width:48px;height:48px`;
-            canvas.title = `tile ${id} sx=${sx} sy=${sy}`;
-            document.body.appendChild(canvas);
-          }
-
+          canvas.getContext('2d').drawImage(img, sx, sy, SHEET_PX, SHEET_PX, 0, 0, SHEET_PX, SHEET_PX);
           this._texCache.set(id, PIXI.Texture.from(canvas));
           continue;
         }
