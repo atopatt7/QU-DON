@@ -49,47 +49,48 @@ const FOG_ALPHA = {
 };
 
 // ─── 位置變體快取：這些 tile 每格使用不同亂數種子，視覺多樣 ───────────────────────
-const VARIANT_IDS   = new Set([1001, 1002, 1004, 1005, 1010, 1011, 1040, 2000, 2001, 2002, 1301]);
+const VARIANT_IDS   = new Set([1000, 1001, 1003, 1004, 1006, 1007, 1023, 2000, 2001, 2002, 1032]);
 const VARIANT_COUNT = 4;
 
 // ─── 程式繪製 Tile 調色盤（Noir 低飽和深色系）────────────────────────────────────
 const TILE_PALETTE = {
-  // ── Road (ground layer, IDs 1-5) ─────────────────────────────────────────
-  1001:  { base: 0x1c1c1c, hi: 0x242424, lo: 0x101010 }, // asphalt
-  1002:  { base: 0x161616, hi: 0x1c1c1c, lo: 0x080808 }, // cracked asphalt
-  1003:  { base: 0x1c1c1c, hi: 0x242424, lo: 0x101010 }, // asphalt + vertical center line
-  1004:  { base: 0x0c1018, hi: 0x141820, lo: 0x080c12 }, // asphalt + rain puddle
-  1005:  { base: 0x181818, hi: 0x202020, lo: 0x0c0c0c }, // asphalt + debris
-  1009:  { base: 0x1c1c1c, hi: 0x242424, lo: 0x101010 }, // asphalt + horizontal center line
-  // ── Corner centerlines (IDs 34-37) ───────────────────────────────────────
-  1034: { base: 0x1c1c1c, hi: 0x242424, lo: 0x101010 }, // corner TL
-  1035: { base: 0x1c1c1c, hi: 0x242424, lo: 0x101010 }, // corner TR
-  1036: { base: 0x1c1c1c, hi: 0x242424, lo: 0x101010 }, // corner BL
-  1037: { base: 0x1c1c1c, hi: 0x242424, lo: 0x101010 }, // corner BR
-  // ── Sidewalk (ground layer, IDs 10-12) ───────────────────────────────────
-  1010: { base: 0x2a2620, hi: 0x322e28, lo: 0x1e1a16 }, // concrete sidewalk
-  1011: { base: 0x2a2620, hi: 0x322e28, lo: 0x1e1a16 }, // sidewalk + scattered trash
-  1012: { base: 0x1e1a12, hi: 0x28240e, lo: 0x12100a }, // sidewalk + lamp post (blocked)
-  // ── Walls (objects layer, IDs 20-22) ─────────────────────────────────────
-  1020: { base: 0x28150e, hi: 0x321a12, lo: 0x180c08 }, // red brick wall
-  1021: { base: 0x1e1830, hi: 0x28203c, lo: 0x141024 }, // graffiti-covered wall
-  1022: { base: 0x1a2018, hi: 0x222820, lo: 0x0e1410 }, // corrugated metal gate
-  // ── Warp (ID 30) ─────────────────────────────────────────────────────────
-  1030: { base: 0x1a1410, hi: 0x281c14, lo: 0x100e0a }, // warp door (glowing frame)
+  // ── Road (ground layer) ───────────────────────────────────────────────────
+  1000:  { base: 0x1c1c1c, hi: 0x242424, lo: 0x101010 }, // asphalt
+  1001:  { base: 0x161616, hi: 0x1c1c1c, lo: 0x080808 }, // cracked asphalt
+  1002:  { base: 0x1c1c1c, hi: 0x242424, lo: 0x101010 }, // asphalt + vertical center line
+  1003:  { base: 0x0c1018, hi: 0x141820, lo: 0x080c12 }, // asphalt + rain puddle
+  1004:  { base: 0x181818, hi: 0x202020, lo: 0x0c0c0c }, // asphalt + debris
+  1005:  { base: 0x1c1c1c, hi: 0x242424, lo: 0x101010 }, // asphalt + horizontal center line
+  // ── Corner centerlines ───────────────────────────────────────────────────
+  1019: { base: 0x1c1c1c, hi: 0x242424, lo: 0x101010 }, // corner TL
+  1020: { base: 0x1c1c1c, hi: 0x242424, lo: 0x101010 }, // corner TR
+  1021: { base: 0x1c1c1c, hi: 0x242424, lo: 0x101010 }, // corner BL
+  1022: { base: 0x1c1c1c, hi: 0x242424, lo: 0x101010 }, // corner BR
+  // ── Sidewalk (ground layer) ───────────────────────────────────────────────
+  1006: { base: 0x2a2620, hi: 0x322e28, lo: 0x1e1a16 }, // concrete sidewalk
+  1007: { base: 0x2a2620, hi: 0x322e28, lo: 0x1e1a16 }, // sidewalk + scattered trash
+  1008: { base: 0x1e1a12, hi: 0x28240e, lo: 0x12100a }, // sidewalk + lamp post (blocked)
+  // ── Walls (objects layer) ─────────────────────────────────────────────────
+  1012: { base: 0x28150e, hi: 0x321a12, lo: 0x180c08 }, // red brick wall
+  1013: { base: 0x1e1830, hi: 0x28203c, lo: 0x141024 }, // graffiti-covered wall
+  1014: { base: 0x1a2018, hi: 0x222820, lo: 0x0e1410 }, // corrugated metal gate
+  // ── Warp ─────────────────────────────────────────────────────────────────
+  1018: { base: 0x1a1410, hi: 0x281c14, lo: 0x100e0a }, // warp door (glowing frame)
   // ── Legacy interior objects (map_01 / map_neon_bar) ───────────────────────
-  1006:  { base: 0x0e1a10, hi: 0x142018, lo: 0x080e0a }, // metal dumpster / bar counter
-  1007:  { base: 0x1c1408, hi: 0x241a0c, lo: 0x100e06 }, // interior door
-  1008:  { base: 0x0c0c0c, hi: 0x141414, lo: 0x040404 }, // storm gutter
-  // ── Crosswalk (IDs 46-47) ─────────────────────────────────────────────────
-  1046: { base: 0x1c1c1c, hi: 0x242424, lo: 0x101010 }, // crosswalk: horizontal stripes
-  1047: { base: 0x1c1c1c, hi: 0x242424, lo: 0x101010 }, // crosswalk: vertical stripes
-  // ── Indoor (IDs 40-44) — 瞿董的房間 ────────────────────────────────────────
-  1040: { base: 0x1a1610, hi: 0x221e16, lo: 0x100e08 }, // dirty carpet floor
-  1041: { base: 0x1a1820, hi: 0x24222c, lo: 0x100e14 }, // old bed
-  1042: { base: 0x1c1208, hi: 0x241a0c, lo: 0x100c04 }, // junk table with bottles
-  1043: { base: 0x0c0e14, hi: 0x14161e, lo: 0x06080e }, // old TV (faint blue)
-  1044: { base: 0x181c1c, hi: 0x202828, lo: 0x0e1414 }, // sink & mold
-  // ── Chinatown / Hakka Street (IDs 200-207) ────────────────────────────
+  1015:  { base: 0x0e1a10, hi: 0x142018, lo: 0x080e0a }, // metal dumpster / bar counter
+  1016:  { base: 0x1c1408, hi: 0x241a0c, lo: 0x100e06 }, // interior door
+  1017:  { base: 0x0c0c0c, hi: 0x141414, lo: 0x040404 }, // storm gutter
+  // ── Crosswalk ─────────────────────────────────────────────────────────────
+  1029: { base: 0x1c1c1c, hi: 0x242424, lo: 0x101010 }, // crosswalk: horizontal stripes
+  1030: { base: 0x1c1c1c, hi: 0x242424, lo: 0x101010 }, // crosswalk: vertical stripes
+  // ── Indoor (IDs 40-45) — 瞿董的房間 ────────────────────────────────────────
+  1023: { base: 0x1a1610, hi: 0x221e16, lo: 0x100e08 }, // dirty carpet floor
+  1024: { base: 0x1a1820, hi: 0x24222c, lo: 0x100e14 }, // old bed
+  1025: { base: 0x1c1208, hi: 0x241a0c, lo: 0x100c04 }, // junk table with bottles
+  1026: { base: 0x0c0e14, hi: 0x14161e, lo: 0x06080e }, // old TV (faint blue)
+  1027: { base: 0x181c1c, hi: 0x202828, lo: 0x0e1414 }, // sink & mold
+  1028: { base: 0x2a1e18, hi: 0x362822, lo: 0x1a1210 }, // sofa (cracked leather)
+  // ── Chinatown / Hakka Street ──────────────────────────────────────────────
   2000: { base: 0x0c1018, hi: 0x18202c, lo: 0x060810 }, // 潮濕柏油路（霓虹倒影）
   2001: { base: 0x2e2418, hi: 0x3a2e20, lo: 0x201810 }, // 唐人街青石磚人行道
   2002: { base: 0x0e0e0c, hi: 0x161612, lo: 0x060604 }, // 髒污暗巷地磚
@@ -98,13 +99,13 @@ const TILE_PALETTE = {
   2005: { base: 0x1a2010, hi: 0x222a16, lo: 0x10160a }, // 中藥行/當鋪（墨綠）
   2006: { base: 0x2a2010, hi: 0x36281a, lo: 0x1a140a }, // 牌坊石柱（刻龍紋）
   2007: { base: 0x141410, hi: 0x1c1c18, lo: 0x0a0a08 }, // 垃圾堆/疊箱（暗巷）
-  // ── Convenience Store (IDs 300-305) ────────────────────────────────────────
-  1300: { base: 0x88ccee, hi: 0xaaddf8, lo: 0x5599bb }, // 自動玻璃門（冷白）
-  1301: { base: 0xd0e2e8, hi: 0xe4f0f4, lo: 0xb0c8d0 }, // 超商地板（白亮格紋）
-  1302: { base: 0x28262e, hi: 0x343240, lo: 0x18161c }, // 超商牆壁（貼滿海報）
-  1303: { base: 0x2a1e16, hi: 0x362820, lo: 0x1a120c }, // 零食貨架（彩色包裝）
-  1304: { base: 0x1e1c1a, hi: 0x2a2826, lo: 0x0e0c0a }, // 收銀台（磨損鍵盤）
-  1305: { base: 0x0c1824, hi: 0x142232, lo: 0x060e14 }, // 飲料冰櫃（藍光透明）
+  // ── Convenience Store ────────────────────────────────────────────────────
+  1031: { base: 0x88ccee, hi: 0xaaddf8, lo: 0x5599bb }, // 自動玻璃門（冷白）
+  1032: { base: 0xd0e2e8, hi: 0xe4f0f4, lo: 0xb0c8d0 }, // 超商地板（白亮格紋）
+  1033: { base: 0x28262e, hi: 0x343240, lo: 0x18161c }, // 超商牆壁（貼滿海報）
+  1034: { base: 0x2a1e16, hi: 0x362820, lo: 0x1a120c }, // 零食貨架（彩色包裝）
+  1035: { base: 0x1e1c1a, hi: 0x2a2826, lo: 0x0e0c0a }, // 收銀台（磨損鍵盤）
+  1036: { base: 0x0c1824, hi: 0x142232, lo: 0x060e14 }, // 飲料冰櫃（藍光透明）
 };
 
 // ─── 確定性偽隨機（LCG，以 tile 位置為種子，保證重複渲染一致）─────────────────────
@@ -154,6 +155,14 @@ export class MapManager {
     this._texCache    = new Map();
     this._fogTex      = null;  // 霧用純黑貼圖
     this._defaultTex  = null;  // 快取 miss 備援（預設深灰格）
+
+    // 區域雪碧圖快取：key = region（千位數，如 1000/2000），value = PIXI.Texture | null
+    // null 表示已嘗試載入但圖片不存在，避免重複請求
+    this.loadedTilesets = {};
+
+    // 在 constructor 即發起預載，縮短首次進入黑石街地圖的等待時間
+    this.tileset1000 = new Image();
+    this.tileset1000.src = 'assets/maps/tilesets/tileset_1000.png';
 
     // 轉場 Overlay（全螢幕淡黑遮罩）
     this._overlay   = null;
@@ -222,6 +231,7 @@ export class MapManager {
     if (bgmUrl) AudioManager.playBGM(bgmUrl);
     else AudioManager.stopBGM();
 
+    await this._loadTilesets();
     this._buildTexCache();
     this._renderLayer(this._groundLayer, data.layers.ground,  'ground');
     this._renderLayer(this._objectLayer, data.layers.objects, 'object');
@@ -269,6 +279,46 @@ export class MapManager {
     this._lastFogGy  = -1;
   }
 
+  // ─── 區域雪碧圖載入（靜默失敗）────────────────────────────────────────────
+
+  async _loadTilesets() {
+    // 掃描當前地圖所有 tile ID，找出涉及的千位數區域
+    const regions = new Set();
+    for (const layer of [this._mapData.layers.ground, this._mapData.layers.objects]) {
+      if (!layer) continue;
+      for (const id of layer) {
+        if (id > 0) regions.add(Math.floor(id / 1000) * 1000);
+      }
+    }
+    // 逐區域嘗試載入；已嘗試過（null 或有值）的區域直接跳過
+    for (const region of regions) {
+      if (region in this.loadedTilesets) continue;
+
+      // region 1000：使用 constructor 預先發起的 HTMLImageElement，等待並轉為 PIXI.Texture
+      if (region === 1000) {
+        const img = this.tileset1000;
+        if (!img.complete) {
+          await new Promise(res => { img.onload = img.onerror = res; });
+        }
+        if (img.complete && img.naturalWidth > 0) {
+          this.loadedTilesets[1000] = PIXI.Texture.from(img);
+        } else {
+          console.warn('[MapManager] tileset_1000.png 不存在，使用程式渲染');
+          this.loadedTilesets[1000] = null;
+        }
+        continue;
+      }
+
+      const url = `./assets/maps/tilesets/tileset_${region}.png`;
+      try {
+        this.loadedTilesets[region] = await PIXI.Assets.load(url);
+      } catch {
+        console.warn(`[MapManager] 區域雪碧圖不存在，使用程式渲染: tileset_${region}.png`);
+        this.loadedTilesets[region] = null;
+      }
+    }
+  }
+
   // ─── 貼圖快取建置 ─────────────────────────────────────────────────────────
 
   _buildTexCache() {
@@ -286,6 +336,26 @@ export class MapManager {
 
     for (const id of ids) {
       if (this._texCache.has(id)) continue;
+
+      // ── 雪碧圖攔截：若對應區域的 tileset 已載入，從中裁切幀 ─────────────────
+      const region  = Math.floor(id / 1000) * 1000;
+      const tileset = this.loadedTilesets[region];
+      if (tileset) {
+        const COLS = 30, SHEET_PX = 48;
+        const idx  = id - region;
+        const sx   = (idx % COLS) * SHEET_PX;
+        const sy   = Math.floor(idx / COLS) * SHEET_PX;
+        const sub  = new PIXI.Texture({
+          source: tileset.source,
+          frame:  new PIXI.Rectangle(sx, sy, SHEET_PX, SHEET_PX),
+        });
+        const tmp  = new PIXI.Sprite(sub);
+        tmp.width  = s;
+        tmp.height = s;
+        this._texCache.set(id, this._app.renderer.generateTexture({ target: tmp }));
+        sub.destroy();
+        continue; // 略過後續程式渲染
+      }
 
       if (VARIANT_IDS.has(id)) {
         // 多變體：每個 variant 用不同種子，_renderLayer 依位置挑選
@@ -322,19 +392,19 @@ export class MapManager {
     const pal = TILE_PALETTE[id] ?? { base: 0x202020, hi: 0x303030, lo: 0x101010 };
     const rng = new TileRng(id + variant * 9973, id * 31 + variant * 7919);
     switch (id) {
-      case 1001:  this._drawAsphalt(gfx, s, pal, rng);       break;
-      case 1002:  this._drawCracked(gfx, s, pal, rng);       break;
-      case 1004:  this._drawPuddle(gfx, s, pal, rng);        break;
-      case 1005:  this._drawDebris(gfx, s, pal, rng);        break;
-      case 1010:  this._drawSidewalk(gfx, s, pal, rng);      break;
-      case 1011:  this._drawSidewalkTrash(gfx, s, pal, rng); break;
-      case 1040:  this._drawIndoorFloor(gfx, s, pal, rng);   break;
+      case 1000:  this._drawAsphalt(gfx, s, pal, rng);       break;
+      case 1001:  this._drawCracked(gfx, s, pal, rng);       break;
+      case 1003:  this._drawPuddle(gfx, s, pal, rng);        break;
+      case 1004:  this._drawDebris(gfx, s, pal, rng);        break;
+      case 1006:  this._drawSidewalk(gfx, s, pal, rng);      break;
+      case 1007:  this._drawSidewalkTrash(gfx, s, pal, rng); break;
+      case 1023:  this._drawIndoorFloor(gfx, s, pal, rng);   break;
       // ── Chinatown variants ──────────────────────────────────────────────
       case 2000: this._drawPuddle(gfx, s, pal, rng);        break;
       case 2001: this._drawSidewalk(gfx, s, pal, rng);      break;
       case 2002: this._drawAsphalt(gfx, s, pal, rng);       break;
       // ── Convenience Store variants ──────────────────────────────────────
-      case 1301: this._drawStoreFloor(gfx, s, pal, rng);    break;
+      case 1032: this._drawStoreFloor(gfx, s, pal, rng);    break;
       default: gfx.rect(0, 0, s, s).fill({ color: pal.base });
     }
     return gfx;
@@ -349,41 +419,41 @@ export class MapManager {
 
     switch (id) {
       // ── Road ──────────────────────────────────────────────────────────────
-      case 1001:  this._drawAsphalt(gfx, s, pal, rng);      break;
-      case 1002:  this._drawCracked(gfx, s, pal, rng);      break;
-      case 1003:  this._drawCenterLine(gfx, s, pal, rng);   break;
-      case 1004:  this._drawPuddle(gfx, s, pal, rng);       break;
-      case 1005:  this._drawDebris(gfx, s, pal, rng);       break;
-      case 1009:  this._drawHorizontalLine(gfx, s, pal, rng); break;
+      case 1000:  this._drawAsphalt(gfx, s, pal, rng);      break;
+      case 1001:  this._drawCracked(gfx, s, pal, rng);      break;
+      case 1002:  this._drawCenterLine(gfx, s, pal, rng);   break;
+      case 1003:  this._drawPuddle(gfx, s, pal, rng);       break;
+      case 1004:  this._drawDebris(gfx, s, pal, rng);       break;
+      case 1005:  this._drawHorizontalLine(gfx, s, pal, rng); break;
       // ── Corner centerlines ────────────────────────────────────────────────
-      case 1034: this._drawCornerLine(gfx, s, 'TL', pal, rng); break;
-      case 1035: this._drawCornerLine(gfx, s, 'TR', pal, rng); break;
-      case 1036: this._drawCornerLine(gfx, s, 'BL', pal, rng); break;
-      case 1037: this._drawCornerLine(gfx, s, 'BR', pal, rng); break;
+      case 1019: this._drawCornerLine(gfx, s, 'TL', pal, rng); break;
+      case 1020: this._drawCornerLine(gfx, s, 'TR', pal, rng); break;
+      case 1021: this._drawCornerLine(gfx, s, 'BL', pal, rng); break;
+      case 1022: this._drawCornerLine(gfx, s, 'BR', pal, rng); break;
       // ── Sidewalk ──────────────────────────────────────────────────────────
-      case 1010: this._drawSidewalk(gfx, s, pal, rng);     break;
-      case 1011: this._drawSidewalkTrash(gfx, s, pal, rng); break;
-      case 1012: this._drawLampPost(gfx, s, pal);           break;
+      case 1006: this._drawSidewalk(gfx, s, pal, rng);     break;
+      case 1007: this._drawSidewalkTrash(gfx, s, pal, rng); break;
+      case 1008: this._drawLampPost(gfx, s, pal);           break;
       // ── Walls ─────────────────────────────────────────────────────────────
-      case 1020: this._drawBrickWall(gfx, s, pal, rng);    break;
-      case 1021: this._drawGraffiti(gfx, s, pal, rng);     break;
-      case 1022: this._drawMetalGate(gfx, s, pal);          break;
+      case 1012: this._drawBrickWall(gfx, s, pal, rng);    break;
+      case 1013: this._drawGraffiti(gfx, s, pal, rng);     break;
+      case 1014: this._drawMetalGate(gfx, s, pal);          break;
       // ── Warp ──────────────────────────────────────────────────────────────
-      case 1030: this._drawWarpDoor(gfx, s, pal);           break;
-      // ── Crosswalk (IDs 46-47) ─────────────────────────────────────────────
-      case 1046: this._drawCrosswalkH(gfx, s, pal, rng);   break;
-      case 1047: this._drawCrosswalkV(gfx, s, pal, rng);   break;
+      case 1018: this._drawWarpDoor(gfx, s, pal);           break;
+      // ── Crosswalk ─────────────────────────────────────────────────────────
+      case 1029: this._drawCrosswalkH(gfx, s, pal, rng);   break;
+      case 1030: this._drawCrosswalkV(gfx, s, pal, rng);   break;
       // ── Legacy interior (map_01 / map_neon_bar) ───────────────────────────
-      case 1006:  this._drawDumpster(gfx, s, pal);           break;
-      case 1007:  this._drawDoor(gfx, s, pal);               break;
-      case 1008:  this._drawGutter(gfx, s, pal);             break;
+      case 1015:  this._drawDumpster(gfx, s, pal);           break;
+      case 1016:  this._drawDoor(gfx, s, pal);               break;
+      case 1017:  this._drawGutter(gfx, s, pal);             break;
       // ── Indoor (map_qu_don_room) ───────────────────────────────────────────
-      case 1040: this._drawIndoorFloor(gfx, s, pal, rng);  break;
-      case 1041: this._drawIndoorBed(gfx, s, pal, rng);    break;
-      case 1042: this._drawIndoorTable(gfx, s, pal, rng);  break;
-      case 1043: this._drawIndoorTV(gfx, s, pal);           break;
-      case 1044: this._drawIndoorSink(gfx, s, pal);         break;
-      // ── Chinatown / Hakka Street (IDs 200-207) ──────────────────────────
+      case 1023: this._drawIndoorFloor(gfx, s, pal, rng);  break;
+      case 1024: this._drawIndoorBed(gfx, s, pal, rng);    break;
+      case 1025: this._drawIndoorTable(gfx, s, pal, rng);  break;
+      case 1026: this._drawIndoorTV(gfx, s, pal);           break;
+      case 1027: this._drawIndoorSink(gfx, s, pal);         break;
+      // ── Chinatown / Hakka Street ──────────────────────────────────────────
       case 2000: this._drawPuddle(gfx, s, pal, rng);       break; // 潮濕柏油路
       case 2001: this._drawSidewalk(gfx, s, pal, rng);     break; // 青石磚人行道
       case 2002: this._drawAsphalt(gfx, s, pal, rng);      break; // 暗巷地磚
@@ -392,13 +462,13 @@ export class MapManager {
       case 2005: this._drawHerbShop(gfx, s, pal, rng);     break; // 中藥行/當鋪
       case 2006: this._drawPaifang(gfx, s, pal, rng);      break; // 牌坊石柱
       case 2007: this._drawTrashPile(gfx, s, pal, rng);    break; // 垃圾堆
-      // ── Convenience Store (IDs 300-305) ──────────────────────────────────
-      case 1300: this._drawStoreDoor(gfx, s, pal);          break; // 自動玻璃門
-      case 1301: this._drawStoreFloor(gfx, s, pal, rng);   break; // 超商地板
-      case 1302: this._drawStoreWall(gfx, s, pal, rng);    break; // 超商牆壁
-      case 1303: this._drawStoreShelf(gfx, s, pal, rng);   break; // 零食貨架
-      case 1304: this._drawStoreCounter(gfx, s, pal);       break; // 收銀台
-      case 1305: this._drawStoreFridge(gfx, s, pal);        break; // 飲料冰櫃
+      // ── Convenience Store ─────────────────────────────────────────────────
+      case 1031: this._drawStoreDoor(gfx, s, pal);          break; // 自動玻璃門
+      case 1032: this._drawStoreFloor(gfx, s, pal, rng);   break; // 超商地板
+      case 1033: this._drawStoreWall(gfx, s, pal, rng);    break; // 超商牆壁
+      case 1034: this._drawStoreShelf(gfx, s, pal, rng);   break; // 零食貨架
+      case 1035: this._drawStoreCounter(gfx, s, pal);       break; // 收銀台
+      case 1036: this._drawStoreFridge(gfx, s, pal);        break; // 飲料冰櫃
       default:
         gfx.rect(0, 0, s, s).fill({ color: pal.base });
     }
@@ -1019,7 +1089,7 @@ export class MapManager {
         .fill({ color: 0x2a3820, alpha: 0.70 });
     }
     // 微弱招牌紅（頂部條帶）
-    gfx.rect(wx, wy - 5, ww, 5).fill({ color: 0x8c1010, alpha: 0.55 });
+    gfx.rect(wx, wy - 5, ww, 5).fill({ color: 0x8c1006, alpha: 0.55 });
   }
 
   // 206 牌坊石柱：石灰色厚實方柱 + 龍紋刻線

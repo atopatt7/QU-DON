@@ -6,7 +6,7 @@
  *    才能讓舊快取失效、手機端取得最新版本。
  */
 
-const CACHE_NAME = 'qudon-v35';
+const CACHE_NAME = 'qudon-v38';
 
 // ── 本機檔案：安裝時全數預快取 ────────────────────────────────────────────────
 // 包含所有 JS 模組、資料檔與圖片資源，確保離線 / 弱網路環境也能正常啟動
@@ -63,6 +63,7 @@ const LOCAL_FILES = [
   './assets/ui/interface/mag_base.png',
   './assets/ui/interface/Wood067_1K-PNG_Color.png',
   './assets/ui/interface/bullet_single.png',
+  './assets/maps/tilesets/tileset_1000.png',
 ];
 
 // ── 實體貼圖：製作中，失敗不阻塞安裝（缺圖時遊戲以圓形佔位精靈替代）──────────

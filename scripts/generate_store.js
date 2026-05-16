@@ -5,8 +5,8 @@
  * 2. 生成北側入口版便利商店地圖 (10×10，入口在 y=0)
  *
  * 注意：所有 Tile ID 使用遷移後版本（1xxx / 2xxx）
- *   1020=牆壁  1300=玻璃門  1301=地板  1302=室內牆
- *   1303=貨架  1304=收銀台  1305=冰櫃  1010/1011=人行道  1001/1004=路面
+ *   1008=牆壁  1031=玻璃門  1032=地板  1033=室內牆
+ *   1019=貨架  1008=收銀台  1000=冰櫃  1006/1007=人行道  1000/1000=路面
  *
  * 執行：node scripts/generate_store.js
  */
@@ -31,9 +31,9 @@ const col = brs.collision;
 // 道路地面 seed（輸出已遷移的 ID）
 const roadTile = (x, y) => {
   const h = (x * 17 + y * 31) % 16;
-  if (h < 2) return 1004;   // 水坑
-  if (h < 5) return 1002;   // 裂縫路面
-  return 1001;               // 一般柏油
+  if (h < 2) return 1000;   // 水坑
+  if (h < 5) return 1000;   // 裂縫路面
+  return 1000;               // 一般柏油
 };
 
 // ── y=24~38：街道 + 建築正面 ─────────────────────────────────────────────────
@@ -48,7 +48,7 @@ for (let y = 24; y <= 38; y++) {
     // 超出建築南邊以下 → 全部實心背景牆
     if (y > BLDG_Y1) {
       gnd[i] = 0;
-      obj[i] = 1020;
+      obj[i] = 1008;
       col[i] = 1;
       continue;
     }
@@ -59,13 +59,13 @@ for (let y = 24; y <= 38; y++) {
     if (x >= BLDG_X0 && x <= BLDG_X1 && y >= BLDG_Y0 && y <= BLDG_Y1) {
       if (y === BLDG_Y0 && x === 20) {
         // 唯一入口：自動門
-        gnd[i] = 1010;
-        obj[i] = 1300;
+        gnd[i] = 1006;
+        obj[i] = 1031;
         col[i] = 0;      // 可踩上觸發 Warp
       } else {
         // 建築牆壁
         gnd[i] = 0;
-        obj[i] = 1020;
+        obj[i] = 1008;
         col[i] = 1;
       }
       continue;
@@ -74,7 +74,7 @@ for (let y = 24; y <= 38; y++) {
     // ── 地圖邊牆 ─────────────────────────────────────────────────────────
     if (isMapEdge) {
       gnd[i] = 0;
-      obj[i] = 1020;
+      obj[i] = 1008;
       col[i] = 1;
       continue;
     }
@@ -82,7 +82,7 @@ for (let y = 24; y <= 38; y++) {
     // ── 街道內部：依列決定地面類型 ─────────────────────────────────────
     switch (y) {
       case 24: case 27: case 29: case 30:   // 人行道
-        gnd[i] = ((x + y) % 5 === 0) ? 1011 : 1010;
+        gnd[i] = ((x + y) % 5 === 0) ? 1007 : 1006;
         obj[i] = 0; col[i] = 0;
         break;
       default:                              // y=25,26：道路
@@ -129,13 +129,13 @@ console.log(`  自動門: (20,${BLDG_Y0}) col=0`);
 //  y=8  █_CC_____█  ← 收銀台 x=2-3（店員在 y=7 面朝下）
 //  y=9  ██████████  ← 南牆（全實）
 //
-//  F=冰櫃(1305) S=貨架(1303) C=收銀台(1304) █=牆(1302) _=地板(1301)
+//  F=冰櫃(1000) S=貨架(1019) C=收銀台(1008) █=牆(1033) _=地板(1032)
 
 const SW = 10, SH = 10;
 const SSIZE = SW * SH;
 const sat = (x, y) => y * SW + x;
 
-const sGnd = new Array(SSIZE).fill(1301);  // 預設地板
+const sGnd = new Array(SSIZE).fill(1032);  // 預設地板
 const sObj = new Array(SSIZE).fill(0);
 const sCol = new Array(SSIZE).fill(0);
 
@@ -144,7 +144,7 @@ for (let x = 0; x < SW; x++) {
   for (let y = 0; y < SH; y++) {
     const isEdge = x === 0 || x === SW - 1 || y === 0 || y === SH - 1;
     if (!isEdge) continue;
-    sObj[sat(x, y)] = 1302;
+    sObj[sat(x, y)] = 1033;
     sCol[sat(x, y)] = 1;
     sGnd[sat(x, y)] = 0;
   }
@@ -154,26 +154,26 @@ for (let x = 0; x < SW; x++) {
 for (const dx of [4, 5]) {
   sObj[sat(dx, 0)] = 0;
   sCol[sat(dx, 0)] = 0;
-  sGnd[sat(dx, 0)] = 1301;
+  sGnd[sat(dx, 0)] = 1032;
 }
 
 // ── 冰櫃 x=1, y=3~6 ──────────────────────────────────────────────────────────
 for (let y = 3; y <= 6; y++) {
-  sObj[sat(1, y)] = 1305;
+  sObj[sat(1, y)] = 1000;
   sCol[sat(1, y)] = 1;
 }
 
 // ── 貨架 x=6~8, y=4~6 ────────────────────────────────────────────────────────
 for (let x = 6; x <= 8; x++) {
   for (let y = 4; y <= 6; y++) {
-    sObj[sat(x, y)] = 1303;
+    sObj[sat(x, y)] = 1019;
     sCol[sat(x, y)] = 1;
   }
 }
 
 // ── 收銀台 x=2~3, y=8 ────────────────────────────────────────────────────────
 for (const cx of [2, 3]) {
-  sObj[sat(cx, 8)] = 1304;
+  sObj[sat(cx, 8)] = 1008;
   sCol[sat(cx, 8)] = 1;
 }
 

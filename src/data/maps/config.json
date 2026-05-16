@@ -1,6 +1,10 @@
 {
   "_comment": "QU-DON 全域 Tile 定義表 — MapManager 載入後作為繪製 / 碰撞 / 音效的單一來源",
   "version": "1.1",
+  "tilesets": {
+    "1000": "assets/maps/tilesets/tileset_1000.png",
+    "2000": "assets/maps/tilesets/tileset_2000.png"
+  },
   "tiles": {
     "0": {
       "name": "void",
@@ -11,7 +15,7 @@
       "color": "0x000000",
       "desc": "地圖邊界外 / 建築內部不可見區域"
     },
-    "1001": {
+    "1000": {
       "name": "asphalt",
       "group": "road",
       "walkable": true,
@@ -21,7 +25,7 @@
       "sfx": "footstep_asphalt",
       "desc": "正常瀝青路面"
     },
-    "1002": {
+    "1001": {
       "name": "asphalt_cracked",
       "group": "road",
       "walkable": true,
@@ -31,7 +35,7 @@
       "sfx": "footstep_asphalt",
       "desc": "龜裂瀝青（老舊路段）"
     },
-    "1003": {
+    "1002": {
       "name": "asphalt_centerline",
       "group": "road",
       "walkable": true,
@@ -41,7 +45,7 @@
       "sfx": "footstep_asphalt",
       "desc": "瀝青 + 黃色雙中心線（雙向行車分界）"
     },
-    "1004": {
+    "1003": {
       "name": "asphalt_puddle",
       "group": "road",
       "walkable": true,
@@ -51,7 +55,7 @@
       "sfx": "footstep_puddle",
       "desc": "積水路面（反射霓虹燈光）"
     },
-    "1005": {
+    "1004": {
       "name": "asphalt_debris",
       "group": "road",
       "walkable": true,
@@ -61,7 +65,7 @@
       "sfx": "footstep_asphalt",
       "desc": "碎玻璃 / 殘骸（保留備用）"
     },
-    "1009": {
+    "1005": {
       "name": "asphalt_hline",
       "group": "road",
       "walkable": true,
@@ -71,7 +75,7 @@
       "sfx": "footstep_asphalt",
       "desc": "瀝青 + 水平雙黃線（東西向行車分界）"
     },
-    "1010": {
+    "1006": {
       "name": "sidewalk",
       "group": "sidewalk",
       "walkable": true,
@@ -81,7 +85,7 @@
       "sfx": "footstep_concrete",
       "desc": "混凝土人行道"
     },
-    "1011": {
+    "1007": {
       "name": "sidewalk_trash",
       "group": "sidewalk",
       "walkable": true,
@@ -91,7 +95,7 @@
       "sfx": "footstep_concrete",
       "desc": "人行道 + 垃圾袋 / 廢紙（裝飾，不阻擋）"
     },
-    "1012": {
+    "1008": {
       "name": "sidewalk_lamppost",
       "group": "sidewalk",
       "walkable": false,
@@ -105,7 +109,7 @@
         "intensity": 0.45
       }
     },
-    "1013": {
+    "1009": {
       "name": "sidewalk_hydrant",
       "group": "sidewalk",
       "walkable": false,
@@ -114,7 +118,7 @@
       "color": "0x2a2620",
       "desc": "人行道 + 消防栓（保留備用）"
     },
-    "1014": {
+    "1010": {
       "name": "sidewalk_trashcan",
       "group": "sidewalk",
       "walkable": false,
@@ -123,7 +127,7 @@
       "color": "0x2a2620",
       "desc": "人行道 + 鐵製垃圾桶（保留備用）"
     },
-    "1015": {
+    "1011": {
       "name": "sidewalk_cracked",
       "group": "sidewalk",
       "walkable": true,
@@ -133,7 +137,7 @@
       "sfx": "footstep_concrete",
       "desc": "破損人行道（保留備用）"
     },
-    "1020": {
+    "1012": {
       "name": "wall_redbrick",
       "group": "wall",
       "walkable": false,
@@ -142,7 +146,7 @@
       "color": "0x2a1510",
       "desc": "標準紅磚牆（建築外牆主體）"
     },
-    "1021": {
+    "1013": {
       "name": "furniture_door_wood",
       "group": "indoor",
       "walkable": false,
@@ -152,7 +156,7 @@
       "sfx": "door_creak",
       "desc": "室內木門（斑駁、鉸鏈生鏽）"
     },
-    "1022": {
+    "1014": {
       "name": "wall_metalgate",
       "group": "wall",
       "walkable": false,
@@ -161,7 +165,7 @@
       "color": "0x1a2018",
       "desc": "金屬捲門 / 鐵絲網（倉庫 / 停車場）"
     },
-    "1023": {
+    "1015": {
       "name": "wall_concrete",
       "group": "wall",
       "walkable": false,
@@ -170,7 +174,7 @@
       "color": "0x222220",
       "desc": "混凝土牆（保留備用）"
     },
-    "1024": {
+    "1016": {
       "name": "wall_boarded",
       "group": "wall",
       "walkable": false,
@@ -179,7 +183,7 @@
       "color": "0x1c1408",
       "desc": "釘板窗 / 廢棄建築（保留備用）"
     },
-    "1025": {
+    "1017": {
       "name": "wall_neon_sign",
       "group": "wall",
       "walkable": false,
@@ -193,7 +197,7 @@
       },
       "desc": "霓虹招牌牆（保留備用）"
     },
-    "1030": {
+    "1018": {
       "name": "warp_door",
       "group": "warp",
       "walkable": true,
@@ -203,7 +207,7 @@
       "sfx": "door_open",
       "desc": "傳送門 — 步入觸發 transitionTo()"
     },
-    "1034": {
+    "1019": {
       "name": "asphalt_corner_tl",
       "group": "road",
       "walkable": true,
@@ -213,7 +217,7 @@
       "sfx": "footstep_asphalt",
       "desc": "路口轉角標線 — 左上（垂直→水平，往左）"
     },
-    "1035": {
+    "1020": {
       "name": "asphalt_corner_tr",
       "group": "road",
       "walkable": true,
@@ -223,7 +227,7 @@
       "sfx": "footstep_asphalt",
       "desc": "路口轉角標線 — 右上（垂直→水平，往右）"
     },
-    "1036": {
+    "1021": {
       "name": "asphalt_corner_bl",
       "group": "road",
       "walkable": true,
@@ -233,7 +237,7 @@
       "sfx": "footstep_asphalt",
       "desc": "路口轉角標線 — 左下（水平→垂直，往左）"
     },
-    "1037": {
+    "1022": {
       "name": "asphalt_corner_br",
       "group": "road",
       "walkable": true,
@@ -243,7 +247,7 @@
       "sfx": "footstep_asphalt",
       "desc": "路口轉角標線 — 右下（水平→垂直，往右）"
     },
-    "1040": {
+    "1023": {
       "name": "indoor_floor",
       "group": "indoor",
       "walkable": true,
@@ -253,7 +257,7 @@
       "sfx": "footstep_carpet",
       "desc": "室內地毯 — 菸頭燙痕與污漬"
     },
-    "1041": {
+    "1024": {
       "name": "indoor_bed",
       "group": "indoor",
       "walkable": false,
@@ -262,7 +266,7 @@
       "color": "0x1a1820",
       "desc": "破舊的床（不可通行）"
     },
-    "1042": {
+    "1025": {
       "name": "mess_clutter",
       "group": "indoor",
       "walkable": true,
@@ -271,7 +275,7 @@
       "color": "0x1c1208",
       "desc": "散落地板的雜物 — 菸蒂、空罐、廢紙（僅視覺裝飾）"
     },
-    "1043": {
+    "1026": {
       "name": "indoor_tv",
       "group": "indoor",
       "walkable": false,
@@ -285,7 +289,7 @@
       },
       "desc": "收不到訊號的老電視（不可通行，藍光）"
     },
-    "1044": {
+    "1027": {
       "name": "indoor_sink",
       "group": "indoor",
       "walkable": false,
@@ -294,7 +298,7 @@
       "color": "0x181c1c",
       "desc": "洗手台與發霉的牆角（不可通行）"
     },
-    "1045": {
+    "1028": {
       "name": "furniture_sofa",
       "group": "indoor",
       "walkable": false,
@@ -303,7 +307,7 @@
       "color": "0x2e1a0e",
       "desc": "深棕色破舊沙發 — 彈簧外露、沾滿污漬（不可通行）"
     },
-    "1046": {
+    "1029": {
       "name": "asphalt_crosswalk_h",
       "group": "road",
       "walkable": true,
@@ -313,7 +317,7 @@
       "sfx": "footstep_asphalt",
       "desc": "斑馬線 — 橫向白條（供左右向行人穿越，垂直於 Y 軸擺放）"
     },
-    "1047": {
+    "1030": {
       "name": "asphalt_crosswalk_v",
       "group": "road",
       "walkable": true,
@@ -323,7 +327,7 @@
       "sfx": "footstep_asphalt",
       "desc": "斑馬線 — 縱向白條（供上下向行人穿越，垂直於 X 軸擺放）"
     },
-    "1300": {
+    "1031": {
       "name": "store_auto_door",
       "group": "convenience_store",
       "walkable": false,
@@ -337,7 +341,7 @@
       },
       "desc": "便利商店自動玻璃門（帶金屬框，透出白色日光燈）"
     },
-    "1301": {
+    "1032": {
       "name": "store_floor",
       "group": "convenience_store",
       "walkable": true,
@@ -347,7 +351,7 @@
       "sfx": "footstep_tile",
       "desc": "超商塑膠拋光地板（白底灰格紋）"
     },
-    "1302": {
+    "1033": {
       "name": "store_wall",
       "group": "convenience_store",
       "walkable": false,
@@ -356,7 +360,7 @@
       "color": "0x2a2a30",
       "desc": "超商內牆（貼滿促銷海報與廣告貼紙）"
     },
-    "1303": {
+    "1034": {
       "name": "store_shelf",
       "group": "convenience_store",
       "walkable": false,
@@ -365,7 +369,7 @@
       "color": "0x28201c",
       "desc": "零食貨架（陳列微波食品、罐頭、泡麵）"
     },
-    "1304": {
+    "1035": {
       "name": "store_counter",
       "group": "convenience_store",
       "walkable": false,
@@ -379,7 +383,7 @@
       },
       "desc": "收銀台（老舊收銀機，鍵盤磨損，螢光燈在閃爍）"
     },
-    "1305": {
+    "1036": {
       "name": "store_fridge",
       "group": "convenience_store",
       "walkable": false,
