@@ -3,7 +3,7 @@
     "id":        "clerk_01",
     "entityRef": "npc_clerk",
     "category":  "recruitable",
-    "position":  { "x": 2, "y": 7 },
+    "position":  { "x": 2, "y": 8 },
     "direction": "down",
     "behavior":  "idle"
   }
