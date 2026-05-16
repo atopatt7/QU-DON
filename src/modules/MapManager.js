@@ -49,7 +49,7 @@ const FOG_ALPHA = {
 };
 
 // ─── 位置變體快取：這些 tile 每格使用不同亂數種子，視覺多樣 ───────────────────────
-const VARIANT_IDS   = new Set([1001, 1002, 1004, 1005, 1010, 1011, 1040, 200, 201, 202, 1301]);
+const VARIANT_IDS   = new Set([1001, 1002, 1004, 1005, 1010, 1011, 1040, 2000, 2001, 2002, 1301]);
 const VARIANT_COUNT = 4;
 
 // ─── 程式繪製 Tile 調色盤（Noir 低飽和深色系）────────────────────────────────────
@@ -90,14 +90,14 @@ const TILE_PALETTE = {
   1043: { base: 0x0c0e14, hi: 0x14161e, lo: 0x06080e }, // old TV (faint blue)
   1044: { base: 0x181c1c, hi: 0x202828, lo: 0x0e1414 }, // sink & mold
   // ── Chinatown / Hakka Street (IDs 200-207) ────────────────────────────
-  200: { base: 0x0c1018, hi: 0x18202c, lo: 0x060810 }, // 潮濕柏油路（霓虹倒影）
-  201: { base: 0x2e2418, hi: 0x3a2e20, lo: 0x201810 }, // 唐人街青石磚人行道
-  202: { base: 0x0e0e0c, hi: 0x161612, lo: 0x060604 }, // 髒污暗巷地磚
-  203: { base: 0x3a1510, hi: 0x4a1c14, lo: 0x240e08 }, // 唐人街紅磚牆
-  204: { base: 0x3a1c08, hi: 0x4a2a0c, lo: 0x281404 }, // 烤鴨店（暖黃燈光）
-  205: { base: 0x1a2010, hi: 0x222a16, lo: 0x10160a }, // 中藥行/當鋪（墨綠）
-  206: { base: 0x2a2010, hi: 0x36281a, lo: 0x1a140a }, // 牌坊石柱（刻龍紋）
-  207: { base: 0x141410, hi: 0x1c1c18, lo: 0x0a0a08 }, // 垃圾堆/疊箱（暗巷）
+  2000: { base: 0x0c1018, hi: 0x18202c, lo: 0x060810 }, // 潮濕柏油路（霓虹倒影）
+  2001: { base: 0x2e2418, hi: 0x3a2e20, lo: 0x201810 }, // 唐人街青石磚人行道
+  2002: { base: 0x0e0e0c, hi: 0x161612, lo: 0x060604 }, // 髒污暗巷地磚
+  2003: { base: 0x3a1510, hi: 0x4a1c14, lo: 0x240e08 }, // 唐人街紅磚牆
+  2004: { base: 0x3a1c08, hi: 0x4a2a0c, lo: 0x281404 }, // 烤鴨店（暖黃燈光）
+  2005: { base: 0x1a2010, hi: 0x222a16, lo: 0x10160a }, // 中藥行/當鋪（墨綠）
+  2006: { base: 0x2a2010, hi: 0x36281a, lo: 0x1a140a }, // 牌坊石柱（刻龍紋）
+  2007: { base: 0x141410, hi: 0x1c1c18, lo: 0x0a0a08 }, // 垃圾堆/疊箱（暗巷）
   // ── Convenience Store (IDs 300-305) ────────────────────────────────────────
   1300: { base: 0x88ccee, hi: 0xaaddf8, lo: 0x5599bb }, // 自動玻璃門（冷白）
   1301: { base: 0xd0e2e8, hi: 0xe4f0f4, lo: 0xb0c8d0 }, // 超商地板（白亮格紋）
@@ -330,9 +330,9 @@ export class MapManager {
       case 1011:  this._drawSidewalkTrash(gfx, s, pal, rng); break;
       case 1040:  this._drawIndoorFloor(gfx, s, pal, rng);   break;
       // ── Chinatown variants ──────────────────────────────────────────────
-      case 200: this._drawPuddle(gfx, s, pal, rng);        break;
-      case 201: this._drawSidewalk(gfx, s, pal, rng);      break;
-      case 202: this._drawAsphalt(gfx, s, pal, rng);       break;
+      case 2000: this._drawPuddle(gfx, s, pal, rng);        break;
+      case 2001: this._drawSidewalk(gfx, s, pal, rng);      break;
+      case 2002: this._drawAsphalt(gfx, s, pal, rng);       break;
       // ── Convenience Store variants ──────────────────────────────────────
       case 1301: this._drawStoreFloor(gfx, s, pal, rng);    break;
       default: gfx.rect(0, 0, s, s).fill({ color: pal.base });
@@ -384,14 +384,14 @@ export class MapManager {
       case 1043: this._drawIndoorTV(gfx, s, pal);           break;
       case 1044: this._drawIndoorSink(gfx, s, pal);         break;
       // ── Chinatown / Hakka Street (IDs 200-207) ──────────────────────────
-      case 200: this._drawPuddle(gfx, s, pal, rng);       break; // 潮濕柏油路
-      case 201: this._drawSidewalk(gfx, s, pal, rng);     break; // 青石磚人行道
-      case 202: this._drawAsphalt(gfx, s, pal, rng);      break; // 暗巷地磚
-      case 203: this._drawBrickWall(gfx, s, pal, rng);    break; // 紅磚牆
-      case 204: this._drawDuckShop(gfx, s, pal, rng);     break; // 烤鴨店
-      case 205: this._drawHerbShop(gfx, s, pal, rng);     break; // 中藥行/當鋪
-      case 206: this._drawPaifang(gfx, s, pal, rng);      break; // 牌坊石柱
-      case 207: this._drawTrashPile(gfx, s, pal, rng);    break; // 垃圾堆
+      case 2000: this._drawPuddle(gfx, s, pal, rng);       break; // 潮濕柏油路
+      case 2001: this._drawSidewalk(gfx, s, pal, rng);     break; // 青石磚人行道
+      case 2002: this._drawAsphalt(gfx, s, pal, rng);      break; // 暗巷地磚
+      case 2003: this._drawBrickWall(gfx, s, pal, rng);    break; // 紅磚牆
+      case 2004: this._drawDuckShop(gfx, s, pal, rng);     break; // 烤鴨店
+      case 2005: this._drawHerbShop(gfx, s, pal, rng);     break; // 中藥行/當鋪
+      case 2006: this._drawPaifang(gfx, s, pal, rng);      break; // 牌坊石柱
+      case 2007: this._drawTrashPile(gfx, s, pal, rng);    break; // 垃圾堆
       // ── Convenience Store (IDs 300-305) ──────────────────────────────────
       case 1300: this._drawStoreDoor(gfx, s, pal);          break; // 自動玻璃門
       case 1301: this._drawStoreFloor(gfx, s, pal, rng);   break; // 超商地板

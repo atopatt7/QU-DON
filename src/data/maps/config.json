@@ -11,86 +11,6 @@
       "color": "0x000000",
       "desc": "地圖邊界外 / 建築內部不可見區域"
     },
-    "200": {
-      "name": "chinatown_road_wet",
-      "group": "chinatown",
-      "walkable": true,
-      "collides": false,
-      "draw": "puddle",
-      "color": "0x0c1018",
-      "sfx": "footstep_puddle",
-      "desc": "潮濕柏油路（帶有霓虹燈倒影）"
-    },
-    "201": {
-      "name": "chinatown_sidewalk",
-      "group": "chinatown",
-      "walkable": true,
-      "collides": false,
-      "draw": "sidewalk",
-      "color": "0x2a2218",
-      "sfx": "footstep_stone",
-      "desc": "唐人街人行道（六角形青石磚）"
-    },
-    "202": {
-      "name": "chinatown_alley",
-      "group": "chinatown",
-      "walkable": true,
-      "collides": false,
-      "draw": "asphalt",
-      "color": "0x0e0e0c",
-      "sfx": "footstep_asphalt",
-      "desc": "髒污暗巷地磚"
-    },
-    "203": {
-      "name": "chinatown_redbrick",
-      "group": "chinatown",
-      "walkable": false,
-      "collides": true,
-      "draw": "brick_wall",
-      "color": "0x3a1510",
-      "desc": "紅磚牆（建築基座）"
-    },
-    "204": {
-      "name": "chinatown_duck_shop",
-      "group": "chinatown",
-      "walkable": false,
-      "collides": true,
-      "draw": "brick_wall",
-      "color": "0x3a1c08",
-      "_light": {
-        "radius": 3,
-        "color": "0xffaa44",
-        "intensity": 0.5
-      },
-      "desc": "烤鴨店櫥窗（掛著烤鴨，透出暖黃光）"
-    },
-    "205": {
-      "name": "chinatown_herb_shop",
-      "group": "chinatown",
-      "walkable": false,
-      "collides": true,
-      "draw": "brick_wall",
-      "color": "0x1a2010",
-      "desc": "中藥行/當鋪木門（緊閉，帶有鐵花窗）"
-    },
-    "206": {
-      "name": "chinatown_paifang",
-      "group": "chinatown",
-      "walkable": false,
-      "collides": true,
-      "draw": "brick_wall",
-      "color": "0x2a1808",
-      "desc": "中式牌坊石柱（刻有龍紋）"
-    },
-    "207": {
-      "name": "chinatown_trash_pile",
-      "group": "chinatown",
-      "walkable": false,
-      "collides": true,
-      "draw": "crate",
-      "color": "0x141410",
-      "desc": "雜亂的疊箱與垃圾桶（暗巷用）"
-    },
     "1001": {
       "name": "asphalt",
       "group": "road",
@@ -472,6 +392,156 @@
         "intensity": 0.45
       },
       "desc": "飲料冰櫃（透明玻璃門，透出冷冷的藍光）"
+    },
+    "2000": {
+      "name": "chinatown_road_wet",
+      "group": "chinatown",
+      "walkable": true,
+      "collides": false,
+      "draw": "puddle",
+      "color": "0x0c1018",
+      "sfx": "footstep_puddle",
+      "desc": "潮濕柏油路（帶有霓虹燈倒影）"
+    },
+    "2001": {
+      "name": "chinatown_sidewalk",
+      "group": "chinatown",
+      "walkable": true,
+      "collides": false,
+      "draw": "sidewalk",
+      "color": "0x2a2218",
+      "sfx": "footstep_stone",
+      "desc": "唐人街人行道（六角形青石磚）"
+    },
+    "2002": {
+      "name": "chinatown_alley",
+      "group": "chinatown",
+      "walkable": true,
+      "collides": false,
+      "draw": "asphalt",
+      "color": "0x0e0e0c",
+      "sfx": "footstep_asphalt",
+      "desc": "髒污暗巷地磚"
+    },
+    "2003": {
+      "name": "chinatown_redbrick",
+      "group": "chinatown",
+      "walkable": false,
+      "collides": true,
+      "draw": "brick_wall",
+      "color": "0x3a1510",
+      "desc": "紅磚牆（建築基座）"
+    },
+    "2004": {
+      "name": "chinatown_duck_shop",
+      "group": "chinatown",
+      "walkable": false,
+      "collides": true,
+      "draw": "brick_wall",
+      "color": "0x3a1c08",
+      "_light": {
+        "radius": 3,
+        "color": "0xffaa44",
+        "intensity": 0.5
+      },
+      "desc": "烤鴨店櫥窗（掛著烤鴨，透出暖黃光）"
+    },
+    "2005": {
+      "name": "chinatown_herb_shop",
+      "group": "chinatown",
+      "walkable": false,
+      "collides": true,
+      "draw": "brick_wall",
+      "color": "0x1a2010",
+      "desc": "中藥行/當鋪木門（緊閉，帶有鐵花窗）"
+    },
+    "2006": {
+      "name": "chinatown_paifang",
+      "group": "chinatown",
+      "walkable": false,
+      "collides": true,
+      "draw": "brick_wall",
+      "color": "0x2a1808",
+      "desc": "中式牌坊石柱（刻有龍紋）"
+    },
+    "2007": {
+      "name": "chinatown_trash_pile",
+      "group": "chinatown",
+      "walkable": false,
+      "collides": true,
+      "draw": "crate",
+      "color": "0x141410",
+      "desc": "雜亂的疊箱與垃圾桶（暗巷用）"
+    },
+    "20001": {
+      "name": "chinatown_sidewalk",
+      "group": "chinatown",
+      "walkable": true,
+      "collides": false,
+      "draw": "sidewalk",
+      "color": "0x2a2218",
+      "sfx": "footstep_stone",
+      "desc": "唐人街人行道（六角形青石磚）"
+    },
+    "20002": {
+      "name": "chinatown_alley",
+      "group": "chinatown",
+      "walkable": true,
+      "collides": false,
+      "draw": "asphalt",
+      "color": "0x0e0e0c",
+      "sfx": "footstep_asphalt",
+      "desc": "髒污暗巷地磚"
+    },
+    "20003": {
+      "name": "chinatown_redbrick",
+      "group": "chinatown",
+      "walkable": false,
+      "collides": true,
+      "draw": "brick_wall",
+      "color": "0x3a1510",
+      "desc": "紅磚牆（建築基座）"
+    },
+    "20004": {
+      "name": "chinatown_duck_shop",
+      "group": "chinatown",
+      "walkable": false,
+      "collides": true,
+      "draw": "brick_wall",
+      "color": "0x3a1c08",
+      "_light": {
+        "radius": 3,
+        "color": "0xffaa44",
+        "intensity": 0.5
+      },
+      "desc": "烤鴨店櫥窗（掛著烤鴨，透出暖黃光）"
+    },
+    "20005": {
+      "name": "chinatown_herb_shop",
+      "group": "chinatown",
+      "walkable": false,
+      "collides": true,
+      "draw": "brick_wall",
+      "color": "0x1a200010",
+      "desc": "中藥行/當鋪木門（緊閉，帶有鐵花窗）"
+    },
+    "20006": {
+      "name": "chinatown_paifang",
+      "group": "chinatown",
+      "walkable": false,
+      "collides": true,
+      "draw": "brick_wall",
+      "color": "0x2a1808",
+      "desc": "中式牌坊石柱（刻有龍紋）"
+    },
+    "20007": {
+      "name": "chinatown_trash_pile",
+      "group": "chinatown",
+      "walkable": false,
+      "collides": true,
+      "draw": "crate",
+      "color": "0x141410",
+      "desc": "雜亂的疊箱與垃圾桶（暗巷用）"
     }
   },
   "_comment_groups": {
@@ -481,7 +551,7 @@
     "wall": "20, 22–25",
     "indoor": "21, 40–45  (21=door_wood, 40=floor, 41=bed, 42=clutter, 43=tv, 44=sink, 45=sofa)",
     "warp": "30",
-    "chinatown": "200-207 (哈卡街唐人街專用 tiles)",
+    "chinatown": "2000-2007 (哈卡街唐人街專用 tiles)",
     "convenience_store": "300-305 (便利商店專用 tiles)"
   }
 }
