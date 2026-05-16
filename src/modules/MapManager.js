@@ -317,11 +317,9 @@ export class MapManager {
   // ─── 貼圖快取建置 ─────────────────────────────────────────────────────────
 
   _buildTexCache() {
-    console.log('[DEBUG _buildTexCache] ENTER mapData=', !!this._mapData, 'tileSize=', this._tileSize);
     const s = this._tileSize;
 
     // 掃描 ground + objects 兩層，收集所有非零 tile ID
-    // （不依賴 map JSON 中的 tileset 欄位，兼容新舊地圖格式）
     const ids = new Set();
     for (const layer of [this._mapData.layers.ground, this._mapData.layers.objects]) {
       if (!layer) continue;
@@ -329,61 +327,18 @@ export class MapManager {
         if (id !== 0) ids.add(id);
       }
     }
-    const SHEET_PX_LOG = 48, COLS_LOG = 30;
-    const tileLog = [...ids].sort((a,b)=>a-b).map(id => {
-      const region = Math.floor(id/1000)*1000;
-      const idx = id - region;
-      const sx = (idx % COLS_LOG) * SHEET_PX_LOG;
-      const sy = Math.floor(idx / COLS_LOG) * SHEET_PX_LOG;
-      return `${id}(sx=${sx},sy=${sy})`;
-    });
-    console.log('[DEBUG tile coords]', tileLog.join(' | '));
-
-    // 診斷：確認每個 region 的載入狀態
-    {
-      const regions = new Set([...ids].map(id => Math.floor(id / 1000) * 1000));
-      for (const r of regions) {
-        const ts = this.loadedTilesets[r];
-        console.log('[DEBUG loadedTilesets] region=', r, 'value=', ts,
-          'type=', ts?.constructor?.name, 'source=', ts?.source?.constructor?.name);
-      }
-    }
 
     for (const id of ids) {
       if (this._texCache.has(id)) continue;
 
-      // ── 雪碧圖攔截：標準網格絕對座標 ──────────────────────────────
+      // ── 雪碧圖攔截：Canvas 2D 裁切，完全繞過 PixiJS UV 系統 ────────────────
       const region  = Math.floor(id / 1000) * 1000;
       const tileset = this.loadedTilesets[region];
 
-      // Canvas 2D 裁切法：直接從 HTMLImageElement drawImage，完全繞過 PixiJS UV 系統
       if (tileset) {
         const src = tileset.source;
         const img = src?.resource ?? src?.htmlElement ?? src?.bitmap ?? src;
-        // 診斷：只對第一個 tile 打 log
-        if (id === region) {
-          console.log('[DEBUG tileset.source]', JSON.stringify({
-            srcType:    src?.constructor?.name,
-            imgType:    img?.constructor?.name,
-            tagName:    img?.tagName,
-            naturalW:   img?.naturalWidth,
-            naturalH:   img?.naturalHeight,
-            width:      img?.width,
-            height:     img?.height,
-          }));
-        }
         const hasPixels = img && (img.naturalWidth > 0 || img.width > 0);
-
-        // 整張雪碧圖診斷：只執行一次，縮小到 360×360 顯示在右上角
-        if (id === region && hasPixels && !window.__sheetDebugDone) {
-          window.__sheetDebugDone = true;
-          const dbg = document.createElement('canvas');
-          dbg.width = 360; dbg.height = 360;
-          dbg.getContext('2d').drawImage(img, 0, 0, img.width, img.height, 0, 0, 360, 360);
-          dbg.style.cssText = 'position:fixed;top:0;right:0;z-index:9999;border:2px solid blue;width:360px;height:360px';
-          dbg.title = 'Full tileset_1000.png preview';
-          document.body.appendChild(dbg);
-        }
 
         if (hasPixels) {
           const SHEET_PX = 48;
