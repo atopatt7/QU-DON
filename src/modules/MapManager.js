@@ -229,12 +229,22 @@ export class MapManager {
     else AudioManager.stopBGM();
 
     await this._loadTilesets();
+    await new Promise(r => setTimeout(r, 10)); // 讓出主執行緒，允許轉場動畫渲染
+
     this._buildTexCache();
+    await new Promise(r => setTimeout(r, 10));
+
     this._renderLayer(this._groundLayer, data.layers.ground,  'ground');
+    await new Promise(r => setTimeout(r, 10));
+
     this._renderLayer(this._objectLayer, data.layers.objects, 'object');
+    await new Promise(r => setTimeout(r, 10));
+
     await this._preloadWarpSprites(data.warps);
     this._buildWarpOverlays();
+
     this._buildFogLayer();
+    await new Promise(r => setTimeout(r, 10));
 
     // 地圖切換完成後，通知 EntityManager 重新載入 NPC
     if (this.entityManager) {
@@ -328,14 +338,14 @@ export class MapManager {
 
       // 只要該區域的雪碧圖載入成功，該區域所有 ID 直接從雪碧圖裁切
       if (tileset && tileset.complete !== false) {
-        const COLS  = 30;
-        const tileW = tileset.source.width / COLS; // 自動適應 DPR（1x=48, 3x=16）
-        const idx   = id - region;
-        const sx    = (idx % COLS) * tileW;
-        const sy    = Math.floor(idx / COLS) * tileW;
-        const sub   = new PIXI.Texture({
+        const SHEET_PX = 48;
+        const COLS     = 30;
+        const idx      = id - region;
+        const sx       = (idx % COLS) * SHEET_PX;
+        const sy       = Math.floor(idx / COLS) * SHEET_PX;
+        const sub      = new PIXI.Texture({
           source: tileset.source,
-          frame:  new PIXI.Rectangle(sx, sy, tileW, tileW),
+          frame:  new PIXI.Rectangle(sx, sy, SHEET_PX, SHEET_PX),
         });
         sub._fromSpritesheet = true; // 標記：cleanup 時不 destroy source
         this._texCache.set(id, sub);
