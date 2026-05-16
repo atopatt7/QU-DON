@@ -337,15 +337,21 @@ export class MapManager {
     for (const id of ids) {
       if (this._texCache.has(id)) continue;
 
-      // ── 雪碧圖攔截：僅白名單 ID 從 tileset 裁切，其餘維持程式渲染 ───────────
-      const READY_TILES = new Set([1000, 1001, 1002, 1003, 1004]);
+      // ── 雪碧圖攔截：標準網格絕對座標 ──────────────────────────────
       const region  = Math.floor(id / 1000) * 1000;
       const tileset = this.loadedTilesets[region];
-      if (tileset && READY_TILES.has(id)) {
-        const COLS = 30, SHEET_PX = 48;
-        const idx  = id - region;
-        const sx   = (idx % COLS) * SHEET_PX;
-        const sy   = Math.floor(idx / COLS) * SHEET_PX;
+
+      // 白名單：目前擁有真實圖片的 ID，請根據已打包的檔案隨時擴充
+      const READY_TILES = new Set([1000, 1001, 1006, 1029, 1030]);
+
+      if (tileset && READY_TILES.has(id) && tileset.complete !== false) {
+        const SHEET_PX = 48;
+        const COLS = 30;
+        const idx = id - region; // 相對索引，例如 1006 -> 6
+
+        const sx = (idx % COLS) * SHEET_PX;
+        const sy = Math.floor(idx / COLS) * SHEET_PX;
+
         const sub  = new PIXI.Texture({
           source: tileset.source,
           frame:  new PIXI.Rectangle(sx, sy, SHEET_PX, SHEET_PX),
@@ -355,7 +361,7 @@ export class MapManager {
         tmp.height = s;
         this._texCache.set(id, this._app.renderer.generateTexture({ target: tmp }));
         sub.destroy();
-        continue; // 略過後續程式渲染
+        continue;
       }
 
       if (VARIANT_IDS.has(id)) {
