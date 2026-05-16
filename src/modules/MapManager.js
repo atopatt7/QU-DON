@@ -328,14 +328,14 @@ export class MapManager {
 
       // 只要該區域的雪碧圖載入成功，該區域所有 ID 直接從雪碧圖裁切
       if (tileset && tileset.complete !== false) {
-        const SHEET_PX = 16;
-        const COLS = 30;
-        const idx = id - region;
-        const sx = (idx % COLS) * SHEET_PX;
-        const sy = Math.floor(idx / COLS) * SHEET_PX;
-        const sub = new PIXI.Texture({
+        const COLS  = 30;
+        const tileW = tileset.source.width / COLS; // 自動適應 DPR（1x=48, 3x=16）
+        const idx   = id - region;
+        const sx    = (idx % COLS) * tileW;
+        const sy    = Math.floor(idx / COLS) * tileW;
+        const sub   = new PIXI.Texture({
           source: tileset.source,
-          frame:  new PIXI.Rectangle(sx, sy, SHEET_PX, SHEET_PX),
+          frame:  new PIXI.Rectangle(sx, sy, tileW, tileW),
         });
         sub._fromSpritesheet = true; // 標記：cleanup 時不 destroy source
         this._texCache.set(id, sub);
