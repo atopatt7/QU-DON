@@ -6,7 +6,7 @@
  *    才能讓舊快取失效、手機端取得最新版本。
  */
 
-const CACHE_NAME = 'qudon-v64';
+const CACHE_NAME = 'qudon-v65';
 
 // ── 本機檔案：安裝時全數預快取 ────────────────────────────────────────────────
 // 包含所有 JS 模組、資料檔與圖片資源，確保離線 / 弱網路環境也能正常啟動
@@ -93,6 +93,11 @@ const ENTITY_SPRITES = [
   './assets/sprites/entities/pickpocket_up.png',
   './assets/sprites/entities/pickpocket_left.png',
   './assets/sprites/entities/pickpocket_right.png',
+  // 店員四向
+  './assets/sprites/entities/clerk_down.png',
+  './assets/sprites/entities/clerk_up.png',
+  './assets/sprites/entities/clerk_left.png',
+  './assets/sprites/entities/clerk_right.png',
 ];
 
 // ── CDN 資源：嘗試快取，失敗不阻塞安裝（網路可用時仍可從 CDN 抓取）────────────
