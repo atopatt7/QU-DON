@@ -406,6 +406,52 @@
       "color": "0x1a1820",
       "desc": "破舊單人床 - 床尾半部（被子與床腳，不可通行）"
     },
+    "1038": {
+      "name": "dirt_ground",
+      "group": "suburb",
+      "walkable": true,
+      "collides": false,
+      "draw": "indoor_floor",
+      "color": "0x2a2015",
+      "sfx": "footstep_dirt",
+      "desc": "郊區泥土與碎石地"
+    },
+    "1039": {
+      "name": "construction_pipes",
+      "group": "suburb",
+      "walkable": false,
+      "collides": true,
+      "draw": "crate",
+      "color": "0x404040",
+      "desc": "大型水泥管堆（不可通行）"
+    },
+    "1040": {
+      "name": "metal_fence",
+      "group": "suburb",
+      "walkable": false,
+      "collides": true,
+      "draw": "metalgate",
+      "color": "0x302820",
+      "desc": "生鏽鐵皮圍籬（不可通行）"
+    },
+    "1041": {
+      "name": "homeless_tent",
+      "group": "suburb",
+      "walkable": false,
+      "collides": true,
+      "draw": "indoor_bed",
+      "color": "0x203020",
+      "desc": "破舊防水布帳篷（不可通行）"
+    },
+    "1042": {
+      "name": "burning_barrel",
+      "group": "suburb",
+      "walkable": false,
+      "collides": true,
+      "draw": "crate",
+      "color": "0x502010",
+      "desc": "燃燒的鐵桶火堆（不可通行）"
+    },
     "2000": {
       "name": "chinatown_road_wet",
       "group": "chinatown",

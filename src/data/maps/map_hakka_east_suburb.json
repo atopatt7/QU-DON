@@ -4825,8 +4825,6 @@
       "targetGy": 19,
       "direction": "left",
       "label": "哈卡街",
-      "sprite": "interface/warp_arrow_base.png",
-      "rotation": 0,
       "active": true
     },
     {
@@ -4838,16 +4836,27 @@
       "targetGy": 19,
       "direction": "right",
       "label": "Black Rock 西郊",
-      "sprite": "interface/warp_arrow_base.png",
-      "rotation": 90,
       "active": true
     }
   ],
   "triggers": [],
-  "spawnPoints": [],
+  "spawnPoints": [
+    {
+      "id": "spawn_from_west",
+      "gx": 1,
+      "gy": 19,
+      "facing": "right"
+    },
+    {
+      "id": "spawn_from_east",
+      "gx": 38,
+      "gy": 19,
+      "facing": "left"
+    }
+  ],
   "ambience": {
-    "colorTint": "0x101010",
-    "lightLevel": 0.7
+    "colorTint": "0x101018",
+    "lightLevel": 0.6
   },
   "metadata": {
     "author": "QU-DON dev",
