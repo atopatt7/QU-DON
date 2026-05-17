@@ -6,7 +6,7 @@
  *    才能讓舊快取失效、手機端取得最新版本。
  */
 
-const CACHE_NAME = 'qudon-v62';
+const CACHE_NAME = 'qudon-v63';
 
 // ── 本機檔案：安裝時全數預快取 ────────────────────────────────────────────────
 // 包含所有 JS 模組、資料檔與圖片資源，確保離線 / 弱網路環境也能正常啟動
@@ -49,6 +49,8 @@ const LOCAL_FILES = [
   './src/data/maps/map_back_alley.json',
   './src/data/maps/map_underground_parking.json',
   './src/data/maps/map_convenience_store.json',
+  './src/data/maps/map_black_rock_west_suburb.json',
+  './src/data/maps/map_hakka_east_suburb.json',
   './src/data/npcs/npcs_black_rock_street.json',
   './src/data/npcs/npcs_map_back_alley.json',
   './src/data/npcs/npcs_map_convenience_store.json',
