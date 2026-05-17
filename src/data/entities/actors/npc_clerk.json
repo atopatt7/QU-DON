@@ -21,5 +21,8 @@
     "我今晚已經值十三個小時了。什麼都不怕了。"
   ],
   "description": "大夜班店員，臉上寫滿疲憊與警戒。制服皺得像廢紙，眼睛卻還是在盯著你。",
+  "visual": {
+    "heightInTiles": 1.7
+  },
   "category": "recruitable"
 }

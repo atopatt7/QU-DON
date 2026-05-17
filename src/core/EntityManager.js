@@ -147,7 +147,8 @@ export class EntityManager {
         spr = new PIXI.Sprite(baseSrc);
       }
 
-      const scl = refTex?.height ? (tileSize * 1.7) / refTex.height : 1;
+      const heightInTiles = entData?.visual?.heightInTiles ?? 1.7;
+      const scl = refTex?.height ? (tileSize * heightInTiles) / refTex.height : 1;
       spr.scale.set(scl);
       spr.anchor.set(0.5, 1.0);
       return { sprite: spr, entityData: entData };
