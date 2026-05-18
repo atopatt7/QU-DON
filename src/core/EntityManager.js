@@ -105,12 +105,10 @@ export class EntityManager {
     this.sprites.set(npc.id, spr);
   }
 
-  // ─── 從 registry → entity JSON → 載入貼圖 → 建立精靈 ─────────────────────
-  // 支援兩種格式：
-  //   新格式：visuals.spriteSheet — 4×N HD-2D 矩陣，Canvas 2D 裁切
-  //             X軸(欄, fw)=方向：0=down 1=up 2=left 3=right
-  //             Y軸(列, fh)=動作：0=idle 1=walkA 2=walkB
-  //   舊格式：visuals.mapSprites  — 逐檔載入（向下相容）
+  // ─── registry → entity JSON → spriteSheet 裁切 → 建立精靈 ────────────────
+  // X 軸（col）= 方向：0=down 1=up 2=left 3=right
+  // Y 軸（row）= 動作：0=idle 1=walkA 2=walkB
+  // 找不到 vis.spriteSheet 時回傳 { sprite: null }，由呼叫端降級至色塊佔位
   // 回傳 { sprite, entityData }
   async _buildEntitySprite(entityRef, direction, tileSize) {
     try {
@@ -119,123 +117,75 @@ export class EntityManager {
       const entityPath = registry[entityRef];
       if (!entityPath) return { sprite: null, entityData: null };
 
-      const entRes  = await fetch(`./src/data/entities/${entityPath}`);
-      const entData = await entRes.json();
-      const vis     = entData?.visuals ?? {};
-      // 支援 visuals.heightInTiles（新）與 visual.heightInTiles（舊，typo 相容）
-      const heightInTiles = vis.heightInTiles ?? entData?.visual?.heightInTiles ?? 1.7;
+      const entRes        = await fetch(`./src/data/entities/${entityPath}`);
+      const entData       = await entRes.json();
+      const vis           = entData?.visuals ?? {};
+      const heightInTiles = vis.heightInTiles ?? 1.7;
 
-      // ── 新格式：spriteSheet（Canvas 2D 裁切，與主角系統相同原則）──────────
-      if (vis.spriteSheet) {
-        const sheet = await PIXI.Assets.load(`./${vis.spriteSheet}`);
-        const src   = sheet.source;
-        const img   = src?.resource ?? src?.htmlElement ?? src?.bitmap ?? src;
-        const fw    = vis.frameWidth  ?? 128;
-        const fh    = vis.frameHeight ?? 256;
+      if (!vis.spriteSheet) return { sprite: null, entityData: entData };
 
-        if (!img || !(img.width > 0 || img.naturalWidth > 0)) {
-          return { sprite: null, entityData: entData };
-        }
+      const sheet = await PIXI.Assets.load(`./${vis.spriteSheet}`);
+      const src   = sheet.source;
+      const img   = src?.resource ?? src?.htmlElement ?? src?.bitmap ?? src;
+      const fw    = vis.frameWidth  ?? 128;
+      const fh    = vis.frameHeight ?? 256;
 
-        // 4×N 矩陣裁切：外層迴圈=方向欄，內層迴圈=動作列
-        const DIR_COLS   = { down: 0, up: 1, left: 2, right: 3 };
-        const FRAME_ROWS = 3; // 0=idle  1=walkA  2=walkB
-        const texMap     = {};
-
-        for (const [dir, col] of Object.entries(DIR_COLS)) {
-          const frames = [];
-          for (let row = 0; row < FRAME_ROWS; row++) {
-            const canvas = document.createElement('canvas');
-            canvas.width  = fw;
-            canvas.height = fh;
-            canvas.getContext('2d').drawImage(img, col * fw, row * fh, fw, fh, 0, 0, fw, fh);
-            frames.push(PIXI.Texture.from(canvas));
-          }
-          texMap[dir] = frames; // [idle, walkA, walkB]
-        }
-
-        const base  = texMap[direction] ?? texMap.down;
-        let _dir     = direction;
-        let _walking = false;
-
-        // 初始狀態：顯示 idle 幀（row 0）
-        const spr = new PIXI.AnimatedSprite([base[0]]);
-        spr.animationSpeed = 0.1;
-        spr.loop           = true;
-        spr.gotoAndStop(0);
-
-        spr.scale.set((tileSize * heightInTiles) / fh);
-        spr.anchor.set(0.5, 1.0);
-
-        // 4 步循環：邁左腿 → 站立 → 邁右腿 → 站立
-        // walkSequence 索引 → row：[1, 0, 2, 0]
-        const walkSequence = [1, 0, 2, 0];
-        const getFrames = (dir, walk) => {
-          const t = texMap[dir] ?? texMap.down ?? base;
-          return walk
-            ? walkSequence.map(row => t[row]) // [walkA, idle, walkB, idle]
-            : [t[0]];                          // 靜止：只顯示 idle
-        };
-
-        // 開始行走：切換至 [walkA, walkB] 並播放
-        spr.startWalk = () => {
-          if (_walking) return;
-          _walking = true;
-          spr.textures = getFrames(_dir, true);
-          spr.play();
-        };
-
-        // 停止行走：切換至 [idle] 並定格
-        spr.stopWalk = () => {
-          _walking = false;
-          spr.textures = getFrames(_dir, false);
-          spr.gotoAndStop(0);
-        };
-
-        // setDir：切換方向時保持當前行走/站立狀態
-        spr.setDir = (dir) => {
-          _dir = dir;
-          spr.textures = getFrames(dir, _walking);
-          if (_walking) spr.play(); else spr.gotoAndStop(0);
-        };
-
-        return { sprite: spr, entityData: entData };
+      if (!img || !(img.width > 0 || img.naturalWidth > 0)) {
+        return { sprite: null, entityData: entData };
       }
 
-      // ── 舊格式：mapSprites（向下相容，逐檔載入）────────────────────────────
-      const mapSprites = vis.mapSprites;
-      if (!mapSprites) return { sprite: null, entityData: entData };
+      const DIR_COLS   = { down: 0, up: 1, left: 2, right: 3 };
+      const FRAME_ROWS = 3;
+      const texMap     = {};
 
-      // 載入所有方向貼圖，直接收集 Texture / Texture[] 物件
-      const texMap = {};
-      await Promise.allSettled(
-        Object.entries(mapSprites).map(async ([dir, src]) => {
-          try {
-            texMap[dir] = Array.isArray(src)
-              ? await Promise.all(src.map(p => PIXI.Assets.load(p)))
-              : await PIXI.Assets.load(src);
-          } catch {}
-        })
-      );
-
-      const baseSrc    = texMap[direction] ?? texMap.down ?? Object.values(texMap)[0] ?? null;
-      if (!baseSrc) return { sprite: null, entityData: entData };
-      const isAnimated = Array.isArray(baseSrc) && baseSrc.length >= 3;
-
-      const refTex = isAnimated ? baseSrc[1] : baseSrc;
-      let spr;
-      if (isAnimated) {
-        spr = new PIXI.AnimatedSprite([baseSrc[0], baseSrc[1], baseSrc[2], baseSrc[1]]);
-        spr.animationSpeed = 0.12;
-        spr.loop           = true;
-        spr.gotoAndStop(1);
-      } else {
-        spr = new PIXI.Sprite(baseSrc);
+      for (const [dir, col] of Object.entries(DIR_COLS)) {
+        const frames = [];
+        for (let row = 0; row < FRAME_ROWS; row++) {
+          const canvas = document.createElement('canvas');
+          canvas.width  = fw;
+          canvas.height = fh;
+          canvas.getContext('2d').drawImage(img, col * fw, row * fh, fw, fh, 0, 0, fw, fh);
+          frames.push(PIXI.Texture.from(canvas));
+        }
+        texMap[dir] = frames;
       }
 
-      const scl = refTex?.height ? (tileSize * heightInTiles) / refTex.height : 1;
-      spr.scale.set(scl);
+      const base = texMap[direction] ?? texMap.down;
+      let _dir     = direction;
+      let _walking = false;
+
+      const walkSequence = [1, 0, 2, 0];
+      const getFrames = (dir, walk) => {
+        const t = texMap[dir] ?? texMap.down ?? base;
+        return walk ? walkSequence.map(row => t[row]) : [t[0]];
+      };
+
+      const spr = new PIXI.AnimatedSprite([base[0]]);
+      spr.animationSpeed = 0.1;
+      spr.loop           = true;
+      spr.gotoAndStop(0);
+      spr.scale.set((tileSize * heightInTiles) / fh);
       spr.anchor.set(0.5, 1.0);
+
+      spr.startWalk = () => {
+        if (_walking) return;
+        _walking = true;
+        spr.textures = getFrames(_dir, true);
+        spr.play();
+      };
+
+      spr.stopWalk = () => {
+        _walking = false;
+        spr.textures = getFrames(_dir, false);
+        spr.gotoAndStop(0);
+      };
+
+      spr.setDir = (dir) => {
+        _dir = dir;
+        spr.textures = getFrames(dir, _walking);
+        if (_walking) spr.play(); else spr.gotoAndStop(0);
+      };
+
       return { sprite: spr, entityData: entData };
 
     } catch {

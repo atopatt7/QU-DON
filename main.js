@@ -129,141 +129,87 @@ async function loadPlayerSprites() {
     const playerJson = await resp.json();
     const vis        = playerJson?.visuals ?? {};
 
-    // ── 新格式：spriteSheet ───────────────────────────────────────────────
-    if (vis.spriteSheet) {
-      const sheet = await PIXI.Assets.load(`./${vis.spriteSheet}`);
-      const src   = sheet.source;
-      const img   = src?.resource ?? src?.htmlElement ?? src?.bitmap ?? src;
-      const fw    = vis.frameWidth  ?? 128;
-      const fh    = vis.frameHeight ?? 256;
+    const sheet = await PIXI.Assets.load(`./${vis.spriteSheet}`);
+    const src   = sheet.source;
+    const img   = src?.resource ?? src?.htmlElement ?? src?.bitmap ?? src;
+    const fw    = vis.frameWidth  ?? 128;
+    const fh    = vis.frameHeight ?? 256;
 
-      if (!img || !(img.width > 0 || img.naturalWidth > 0)) {
-        throw new Error('spriteSheet ImageBitmap 無效');
-      }
-
-      // 4×6 HD-2D 矩陣規格：
-      //   X 軸（欄 col, 128px）= 方向：0=down, 1=up, 2=left, 3=right
-      //   Y 軸（列 row, 256px）= 動作幀：0=idle, 1=walkA(左腳), 2=walkB(右腳)
-      const DIR_COLS    = { down: 0, up: 1, left: 2, right: 3 };
-      const FRAME_ROWS  = 3; // 0=idle, 1=walkA, 2=walkB
-      const texMap      = {};
-
-      for (const [dir, col] of Object.entries(DIR_COLS)) {
-        const frames = [];
-        for (let row = 0; row < FRAME_ROWS; row++) {
-          const canvas = document.createElement('canvas');
-          canvas.width  = fw;
-          canvas.height = fh;
-          canvas.getContext('2d').drawImage(img, col * fw, row * fh, fw, fh, 0, 0, fw, fh);
-          frames.push(PIXI.Texture.from(canvas));
-        }
-        texMap[dir] = frames; // [idle, walkA, walkB]
-      }
-
-      console.log(`[QU-DON] 玩家雪碧圖載入成功 (${fw}×${fh} × 4方向 × ${FRAME_ROWS}幀)`);
-      return { texMap, playerJson };
+    if (!img || !(img.width > 0 || img.naturalWidth > 0)) {
+      throw new Error('spriteSheet ImageBitmap 無效');
     }
 
-    // ── 舊格式：mapSprites（向下相容）───────────────────────────────────
-    const mapSprites = vis.mapSprites ?? {};
+    // X 軸（col）= 方向：0=down 1=up 2=left 3=right
+    // Y 軸（row）= 動作：0=idle 1=walkA 2=walkB
+    const DIR_COLS   = { down: 0, up: 1, left: 2, right: 3 };
+    const FRAME_ROWS = 3;
     const texMap     = {};
-    await Promise.allSettled(
-      Object.entries(mapSprites).map(async ([dir, src]) => {
-        try {
-          texMap[dir] = Array.isArray(src)
-            ? await Promise.all(src.map(p => PIXI.Assets.load(`./${p}`)))
-            : await PIXI.Assets.load(`./${src}`);
-        } catch {
-          console.warn(`[QU-DON] 玩家貼圖載入失敗 (${dir}):`, src);
-        }
-      })
-    );
-    console.log(`[QU-DON] 玩家四向貼圖 ${Object.keys(texMap).length}/4 組載入成功`);
+
+    for (const [dir, col] of Object.entries(DIR_COLS)) {
+      const frames = [];
+      for (let row = 0; row < FRAME_ROWS; row++) {
+        const canvas = document.createElement('canvas');
+        canvas.width  = fw;
+        canvas.height = fh;
+        canvas.getContext('2d').drawImage(img, col * fw, row * fh, fw, fh, 0, 0, fw, fh);
+        frames.push(PIXI.Texture.from(canvas));
+      }
+      texMap[dir] = frames;
+    }
     return { texMap, playerJson };
 
   } catch (e) {
-    console.warn('[QU-DON] 無法載入玩家實體資料，使用圓形佔位精靈', e);
+    console.warn('[QU-DON] 無法載入玩家雪碧圖，使用圓形佔位精靈', e);
     return { texMap: {}, playerJson: null };
   }
 }
 
-// ─── 建立玩家精靈（四向 spriteSheet / 四向獨立貼圖 均支援）─────────────────
-// texMap 值為 Texture（靜態）或 Texture[]（動畫幀）；自動選擇 Sprite / AnimatedSprite
-// 動畫分離策略：
-//   停止 → textures=[idle]，gotoAndStop(0)
-//   行走 → textures=[walkA, walkB]，play()
+// ─── 建立玩家精靈（HD-2D spriteSheet 專用）────────────────────────────────
+// texMap[dir] = [idle, walkA, walkB]（Canvas 2D 從 spriteSheet 裁切而來）
+// 停止 → textures=[idle]；行走 → 4 步循環 [walkA, idle, walkB, idle]
 function buildPlayerSprite(tileSize, texMap = {}, playerJson = null) {
   const heightInTiles = playerJson?.visuals?.heightInTiles ?? 1.7;
-  const baseSrc    = texMap.down ?? Object.values(texMap)[0] ?? null;
-  const isAnimated = Array.isArray(baseSrc) && baseSrc.length >= 3;
+  const baseSrc = texMap.down ?? Object.values(texMap)[0] ?? null;
 
   if (baseSrc) {
-    // 以 walkA（index 1）或單幀作為縮放基準
-    const refTex = isAnimated ? baseSrc[1] : baseSrc;
-    const fh     = refTex.height;
-
-    let spr;
+    const fh     = baseSrc[1].height;
     let _dir     = 'down';
     let _walking = false;
 
-    if (isAnimated) {
-      // 初始狀態：顯示 idle 幀
-      spr = new PIXI.AnimatedSprite([baseSrc[0]]);
-      spr.animationSpeed = 0.1;
-      spr.loop           = true;
+    const walkSequence = [1, 0, 2, 0];
+    const getFrames = (dir, walk) => {
+      const t = texMap[dir] ?? texMap.down ?? baseSrc;
+      return walk ? walkSequence.map(row => t[row]) : [t[0]];
+    };
+
+    const spr = new PIXI.AnimatedSprite([baseSrc[0]]);
+    spr.animationSpeed = 0.1;
+    spr.loop           = true;
+    spr.gotoAndStop(0);
+
+    spr.startWalk = () => {
+      if (_walking) return;
+      _walking = true;
+      spr.textures = getFrames(_dir, true);
+      spr.play();
+    };
+
+    spr.stopWalk = () => {
+      _walking = false;
+      spr.textures = getFrames(_dir, false);
       spr.gotoAndStop(0);
+    };
 
-      // 4 步循環：邁左腿 → 站立 → 邁右腿 → 站立
-      // walkSequence 索引 → row：[1, 0, 2, 0]
-      const walkSequence = [1, 0, 2, 0];
-      const getFrames = (dir, walk) => {
-        const t = texMap[dir] ?? texMap.down ?? baseSrc;
-        return walk
-          ? walkSequence.map(row => t[row]) // [walkA, idle, walkB, idle]
-          : [t[0]];                          // 靜止：只顯示 idle
-      };
+    spr.setDir = (dir) => {
+      if (dir === _dir) return;
+      _dir = dir;
+      spr.textures = getFrames(dir, _walking);
+      if (_walking) spr.play(); else spr.gotoAndStop(0);
+    };
 
-      // 開始行走：切換至 [walkA, walkB] 並播放
-      spr.startWalk = () => {
-        if (_walking) return;
-        _walking = true;
-        spr.textures = getFrames(_dir, true);
-        spr.play();
-      };
-
-      // 停止行走：切換至 [idle] 並定格
-      spr.stopWalk = () => {
-        _walking = false;
-        spr.textures = getFrames(_dir, false);
-        spr.gotoAndStop(0);
-      };
-
-      spr.setDir = (dir) => {
-        if (dir === _dir) return;
-        _dir = dir;
-        spr.textures = getFrames(dir, _walking);
-        if (_walking) spr.play(); else spr.gotoAndStop(0);
-      };
-    } else {
-      spr = new PIXI.Sprite(baseSrc);
-      spr.startWalk = () => {};
-      spr.stopWalk  = () => {};
-      spr.setDir = (dir) => {
-        if (dir === _dir) return;
-        _dir = dir;
-        const t   = texMap[dir] ?? texMap.down ?? baseSrc;
-        const tex = Array.isArray(t) ? t[0] : t;
-        if (spr.texture !== tex) spr.texture = tex;
-      };
-    }
-
-    // 均等縮放：鎖高度，寬度隨各幀原始比例自然延伸，不壓縮
     spr.scale.set((tileSize * heightInTiles) / fh);
     spr.anchor.set(0.5, 1.0);
-
-    spr.resizeTo = (s) => {
-      spr.scale.set((s * heightInTiles) / fh);
-    };
+    spr.resizeTo = (s) => spr.scale.set((s * heightInTiles) / fh);
     return spr;
   }
 
