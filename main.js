@@ -141,24 +141,26 @@ async function loadPlayerSprites() {
         throw new Error('spriteSheet ImageBitmap 無效');
       }
 
-      // 標準列順序：row 0=down, 1=up, 2=left, 3=right，每方向 4 幀
-      const DIR_ROWS    = { down: 0, up: 1, left: 2, right: 3 };
-      const FRAME_COUNT = 4;
+      // 4×6 HD-2D 矩陣規格：
+      //   X 軸（欄 col, 128px）= 方向：0=down, 1=up, 2=left, 3=right
+      //   Y 軸（列 row, 256px）= 動作幀：0=idle, 1=walkA(左腳), 2=walkB(右腳)
+      const DIR_COLS    = { down: 0, up: 1, left: 2, right: 3 };
+      const FRAME_ROWS  = 3; // 0=idle, 1=walkA, 2=walkB
       const texMap      = {};
 
-      for (const [dir, row] of Object.entries(DIR_ROWS)) {
+      for (const [dir, col] of Object.entries(DIR_COLS)) {
         const frames = [];
-        for (let col = 0; col < FRAME_COUNT; col++) {
+        for (let row = 0; row < FRAME_ROWS; row++) {
           const canvas = document.createElement('canvas');
           canvas.width  = fw;
           canvas.height = fh;
           canvas.getContext('2d').drawImage(img, col * fw, row * fh, fw, fh, 0, 0, fw, fh);
           frames.push(PIXI.Texture.from(canvas));
         }
-        texMap[dir] = frames;
+        texMap[dir] = frames; // [idle, walkA, walkB]
       }
 
-      console.log(`[QU-DON] 玩家雪碧圖載入成功 (${fw}×${fh} × 4方向 × ${FRAME_COUNT}幀)`);
+      console.log(`[QU-DON] 玩家雪碧圖載入成功 (${fw}×${fh} × 4方向 × ${FRAME_ROWS}幀)`);
       return { texMap, playerJson };
     }
 
@@ -192,15 +194,15 @@ function buildPlayerSprite(tileSize, texMap = {}, playerJson = null) {
   const baseSrc    = texMap.down ?? Object.values(texMap)[0] ?? null;
   const isAnimated = Array.isArray(baseSrc) && baseSrc.length >= 3;
 
-  // 幀陣列 → AnimatedSprite 播放列表（3幀: 0→1→2→1，4幀: 0→1→2→3）
+  // 幀陣列 → AnimatedSprite 播放列表
+  // 3幀規格 [idle, walkA, walkB]：行走時播放 walkA→walkB→walkA，停止回 idle(0)
   const toFrameList = (t) => {
     if (!Array.isArray(t)) return [t, t, t, t];
-    if (t.length >= 4)     return [t[0], t[1], t[2], t[3]];
-    if (t.length === 3)    return [t[0], t[1], t[2], t[1]];
+    if (t.length >= 3)     return [t[1], t[2], t[1], t[0]]; // walkA→walkB→walkA→idle
     return [t[0], t[0], t[0], t[0]];
   };
-  // 站立姿 index（預設取第 2 幀，即中間靜止幀）
-  const standFrame = baseSrc && Array.isArray(baseSrc) && baseSrc.length >= 4 ? 1 : 1;
+  // 站立姿 index = 3（toFrameList 最後一幀為 idle）
+  const standFrame = 3;
 
   if (baseSrc) {
     // 以站立幀（index 1）或單幀作為縮放基準
