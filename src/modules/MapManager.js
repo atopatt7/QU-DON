@@ -1836,22 +1836,28 @@ export class MapManager {
   }
 
   /**
-   * 角色開始移動時呼叫：AnimatedSprite 開始播放行走動畫。
+   * 角色開始移動時呼叫：優先呼叫精靈自帶的 startWalk()，
+   * 否則退回舊版 AnimatedSprite.play()。
    * @param {PIXI.Sprite|PIXI.AnimatedSprite} sprite
    */
   static onActorMoveStart(sprite) {
-    if (sprite instanceof PIXI.AnimatedSprite && !sprite.playing) {
+    if (typeof sprite.startWalk === 'function') {
+      sprite.startWalk();
+    } else if (sprite instanceof PIXI.AnimatedSprite && !sprite.playing) {
       sprite.play();
     }
   }
 
   /**
-   * 角色停止移動時呼叫：停止動畫並強制回到站立幀（index 1）。
+   * 角色停止移動時呼叫：優先呼叫精靈自帶的 stopWalk()，
+   * 否則退回舊版 AnimatedSprite.gotoAndStop(0)。
    * @param {PIXI.Sprite|PIXI.AnimatedSprite} sprite
    */
   static onActorMoveEnd(sprite) {
-    if (sprite instanceof PIXI.AnimatedSprite) {
-      sprite.gotoAndStop(1);
+    if (typeof sprite.stopWalk === 'function') {
+      sprite.stopWalk();
+    } else if (sprite instanceof PIXI.AnimatedSprite) {
+      sprite.gotoAndStop(0);
     }
   }
 }

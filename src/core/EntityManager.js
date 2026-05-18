@@ -154,22 +154,44 @@ export class EntityManager {
           texMap[dir] = frames; // [idle, walkA, walkB]
         }
 
-        const base = texMap[direction] ?? texMap.down;
-        // 播放序：walkA→walkB→walkA→idle；停止時 gotoAndStop(3)=idle
-        const spr  = new PIXI.AnimatedSprite([base[1], base[2], base[1], base[0]]);
+        const base  = texMap[direction] ?? texMap.down;
+        let _dir     = direction;
+        let _walking = false;
+
+        // 初始狀態：顯示 idle 幀（row 0）
+        const spr = new PIXI.AnimatedSprite([base[0]]);
         spr.animationSpeed = 0.1;
         spr.loop           = true;
-        spr.gotoAndStop(3);
+        spr.gotoAndStop(0);
 
         spr.scale.set((tileSize * heightInTiles) / fh);
         spr.anchor.set(0.5, 1.0);
 
-        // setDir：切換方向時重建幀列表，保持播放狀態不變
-        spr.setDir = (dir) => {
+        const getFrames = (dir, walk) => {
           const t = texMap[dir] ?? texMap.down ?? base;
-          const wasPlaying = spr.playing;
-          spr.textures = [t[1], t[2], t[1], t[0]];
-          if (wasPlaying) spr.play(); else spr.gotoAndStop(3);
+          return walk ? [t[1], t[2]] : [t[0]];
+        };
+
+        // 開始行走：切換至 [walkA, walkB] 並播放
+        spr.startWalk = () => {
+          if (_walking) return;
+          _walking = true;
+          spr.textures = getFrames(_dir, true);
+          spr.play();
+        };
+
+        // 停止行走：切換至 [idle] 並定格
+        spr.stopWalk = () => {
+          _walking = false;
+          spr.textures = getFrames(_dir, false);
+          spr.gotoAndStop(0);
+        };
+
+        // setDir：切換方向時保持當前行走/站立狀態
+        spr.setDir = (dir) => {
+          _dir = dir;
+          spr.textures = getFrames(dir, _walking);
+          if (_walking) spr.play(); else spr.gotoAndStop(0);
         };
 
         return { sprite: spr, entityData: entData };

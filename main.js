@@ -189,54 +189,73 @@ async function loadPlayerSprites() {
 
 // ─── 建立玩家精靈（四向 spriteSheet / 四向獨立貼圖 均支援）─────────────────
 // texMap 值為 Texture（靜態）或 Texture[]（動畫幀）；自動選擇 Sprite / AnimatedSprite
+// 動畫分離策略：
+//   停止 → textures=[idle]，gotoAndStop(0)
+//   行走 → textures=[walkA, walkB]，play()
 function buildPlayerSprite(tileSize, texMap = {}, playerJson = null) {
   const heightInTiles = playerJson?.visuals?.heightInTiles ?? 1.7;
   const baseSrc    = texMap.down ?? Object.values(texMap)[0] ?? null;
   const isAnimated = Array.isArray(baseSrc) && baseSrc.length >= 3;
 
-  // 幀陣列 → AnimatedSprite 播放列表
-  // 3幀規格 [idle, walkA, walkB]：行走時播放 walkA→walkB→walkA，停止回 idle(0)
-  const toFrameList = (t) => {
-    if (!Array.isArray(t)) return [t, t, t, t];
-    if (t.length >= 3)     return [t[1], t[2], t[1], t[0]]; // walkA→walkB→walkA→idle
-    return [t[0], t[0], t[0], t[0]];
-  };
-  // 站立姿 index = 3（toFrameList 最後一幀為 idle）
-  const standFrame = 3;
-
   if (baseSrc) {
-    // 以站立幀（index 1）或單幀作為縮放基準
+    // 以 walkA（index 1）或單幀作為縮放基準
     const refTex = isAnimated ? baseSrc[1] : baseSrc;
     const fh     = refTex.height;
 
     let spr;
+    let _dir     = 'down';
+    let _walking = false;
+
     if (isAnimated) {
-      spr = new PIXI.AnimatedSprite(toFrameList(baseSrc));
+      // 初始狀態：顯示 idle 幀
+      spr = new PIXI.AnimatedSprite([baseSrc[0]]);
       spr.animationSpeed = 0.1;
       spr.loop           = true;
-      spr.gotoAndStop(standFrame); // 預設站立姿
+      spr.gotoAndStop(0);
+
+      // 取得當前方向的 idle 或 walk 幀陣列
+      const getFrames = (dir, walk) => {
+        const t = texMap[dir] ?? texMap.down ?? baseSrc;
+        return walk ? [t[1], t[2]] : [t[0]];
+      };
+
+      // 開始行走：切換至 [walkA, walkB] 並播放
+      spr.startWalk = () => {
+        if (_walking) return;
+        _walking = true;
+        spr.textures = getFrames(_dir, true);
+        spr.play();
+      };
+
+      // 停止行走：切換至 [idle] 並定格
+      spr.stopWalk = () => {
+        _walking = false;
+        spr.textures = getFrames(_dir, false);
+        spr.gotoAndStop(0);
+      };
+
+      spr.setDir = (dir) => {
+        if (dir === _dir) return;
+        _dir = dir;
+        spr.textures = getFrames(dir, _walking);
+        if (_walking) spr.play(); else spr.gotoAndStop(0);
+      };
     } else {
       spr = new PIXI.Sprite(baseSrc);
+      spr.startWalk = () => {};
+      spr.stopWalk  = () => {};
+      spr.setDir = (dir) => {
+        if (dir === _dir) return;
+        _dir = dir;
+        const t   = texMap[dir] ?? texMap.down ?? baseSrc;
+        const tex = Array.isArray(t) ? t[0] : t;
+        if (spr.texture !== tex) spr.texture = tex;
+      };
     }
 
     // 均等縮放：鎖高度，寬度隨各幀原始比例自然延伸，不壓縮
     spr.scale.set((tileSize * heightInTiles) / fh);
     spr.anchor.set(0.5, 1.0);
-
-    let _dir = 'down';
-    spr.setDir = (dir) => {
-      if (dir === _dir) return;
-      _dir = dir;
-      const t = texMap[dir] ?? texMap.down ?? baseSrc;
-      if (isAnimated) {
-        const wasPlaying = spr.playing;
-        spr.textures = toFrameList(t);
-        if (wasPlaying) spr.play(); else spr.gotoAndStop(standFrame);
-      } else {
-        const tex = Array.isArray(t) ? t[0] : t;
-        if (spr.texture !== tex) spr.texture = tex;
-      }
-    };
 
     spr.resizeTo = (s) => {
       spr.scale.set((s * heightInTiles) / fh);
