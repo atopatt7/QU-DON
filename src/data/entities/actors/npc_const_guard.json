@@ -1,0 +1,14 @@
+{
+  "id": "npc_const_guard",
+  "name": "工地守衛",
+  "type": "npc",
+  "visuals": {
+    "spriteSheet":   "assets/sprites/entities/const_guard_sheet.png",
+    "frameWidth":    128,
+    "frameHeight":   256,
+    "heightInTiles": 1.7
+  },
+  "stats": {
+    "moveSpeed": 0.5
+  }
+}

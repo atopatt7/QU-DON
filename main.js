@@ -609,6 +609,9 @@ async function main() {
       return; // 揭幕幀不處理輸入，避免「按新遊戲」的 pointerup 殘留觸發移動
     }
 
+    // NPC 巡邏動畫（patrol 行為的插值移動，不受輸入鎖定影響）
+    entityManager.update(app.ticker.deltaMS);
+
     const state = input.update();
 
     // ── 座標顯示更新 ──────────────────────────────────────────────────────────

@@ -3,5 +3,6 @@
   "player":            "actors/player.json",
   "enemy_thug":        "actors/enemy_thug.json",
   "enemy_pickpocket":  "actors/enemy_pickpocket.json",
-  "npc_clerk":         "actors/npc_clerk.json"
+  "npc_clerk":         "actors/npc_clerk.json",
+  "npc_const_guard":   "actors/npc_const_guard.json"
 }

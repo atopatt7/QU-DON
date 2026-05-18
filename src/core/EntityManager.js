@@ -5,14 +5,18 @@
  * NPC JSON 格式（src/data/npcs/npcs_{mapId}.json）：
  * [
  *   {
- *     "id":        "pickpocket_ba_01",   // 場景唯一實例 ID
- *     "entityRef": "enemy_pickpocket",   // registry.json 的鍵
- *     "category":  "hostile",            // hostile | recruitable | system
- *     "position":  { "x": 4, "y": 6 },  // 格子座標
- *     "direction": "down",               // 初始朝向
- *     "behavior":  "idle"                // idle | patrol（待實作）
+ *     "id":        "suburb_guard_01",          // 場景唯一實例 ID
+ *     "entityRef": "npc_const_guard",          // registry.json 的鍵
+ *     "category":  "hostile",                  // hostile | recruitable | system
+ *     "position":  { "x": 10, "y": 16 },      // 初始格子座標
+ *     "direction": "right",                    // 初始朝向
+ *     "behavior":  "patrol",                   // idle | patrol
+ *     "path":      [[10,16],[14,16],[14,15],[10,15]],  // 巡邏路徑（循環）
+ *     "moveSpeed": 0.5                         // 格/秒（0.5 = 每 2 秒一格）
  *   }
  * ]
+ *
+ * 每幀呼叫 update(deltaMS) 以驅動 patrol 動畫插值。
  */
 
 export class EntityManager {
@@ -191,6 +195,70 @@ export class EntityManager {
     } catch {
       return { sprite: null, entityData: null };
     }
+  }
+
+  // ─── 每幀驅動巡邏動畫（由 main.js ticker 呼叫）────────────────────────────
+  // deltaMS：自上一幀的毫秒數（app.ticker.deltaMS）
+  update(deltaMS) {
+    const s = this._tileSize;
+    for (const npc of this.npcs) {
+      if (npc.behavior !== 'patrol' || !npc.path?.length) continue;
+
+      if (!npc._patrol) npc._patrol = this._initPatrol(npc);
+      const p   = npc._patrol;
+      const spr = this.sprites.get(npc.id);
+
+      p.timer += deltaMS;
+
+      if (p.moving) {
+        // 插值移動：0→1 映射至 fromXY → toXY
+        const t = Math.min(p.timer / p.walkDur, 1);
+        if (spr) {
+          spr.x = p.fromX + (p.toX - p.fromX) * t;
+          spr.y = p.fromY + (p.toY - p.fromY) * t;
+        }
+        if (t >= 1) {
+          // 抵達路徑點：更新邏輯座標，停止動畫
+          p.idx          = (p.idx + 1) % npc.path.length;
+          npc.position.x = npc.path[p.idx][0];
+          npc.position.y = npc.path[p.idx][1];
+          if (spr) { spr.x = p.toX; spr.y = p.toY; spr.stopWalk?.(); }
+          p.moving = false;
+          p.timer  = 0;
+        }
+      } else {
+        // 在路徑點等待 pauseDur 後啟動下一步
+        if (p.timer >= p.pauseDur) {
+          const nextIdx    = (p.idx + 1) % npc.path.length;
+          const [nx, ny]   = npc.path[nextIdx];
+          const [cx, cy]   = [npc.position.x, npc.position.y];
+          const dir        = nx > cx ? 'right' : nx < cx ? 'left'
+                           : ny < cy ? 'up'    : 'down';
+          p.fromX  = cx * s + s * 0.5;
+          p.fromY  = cy * s + s;
+          p.toX    = nx * s + s * 0.5;
+          p.toY    = ny * s + s;
+          p.moving = true;
+          p.timer  = 0;
+          if (spr) { spr.setDir?.(dir); spr.startWalk?.(); }
+        }
+      }
+    }
+  }
+
+  // ─── 初始化巡邏狀態物件 ────────────────────────────────────────────────────
+  _initPatrol(npc) {
+    const speed   = npc.moveSpeed ?? npc.entityData?.stats?.moveSpeed ?? 0.5;
+    const totalMs = 1000 / speed; // ms per tile（0.5 格/秒 → 2000 ms/格）
+    return {
+      idx:      0,            // 當前所在路徑點索引
+      timer:    0,            // 計時器（ms）
+      walkDur:  totalMs * 0.65, // 移動佔 65% 時間
+      pauseDur: totalMs * 0.35, // 停頓佔 35% 時間
+      moving:   false,
+      fromX: 0, fromY: 0,
+      toX:   0, toY:   0,
+    };
   }
 
   // ─── 查詢指定格子的 NPC ───────────────────────────────────────────────────

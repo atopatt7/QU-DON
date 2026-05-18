@@ -1,0 +1,13 @@
+[
+  {
+    "id":        "suburb_guard_01",
+    "entityRef": "npc_const_guard",
+    "category":  "hostile",
+    "position":  { "x": 10, "y": 16 },
+    "direction": "right",
+    "behavior":  "patrol",
+    "path":      [[10, 16], [14, 16], [14, 15], [10, 15]],
+    "moveSpeed": 0.5,
+    "dialogue":  ["這裡現在是管制區，沒事快滾。"]
+  }
+]
