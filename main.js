@@ -213,10 +213,14 @@ function buildPlayerSprite(tileSize, texMap = {}, playerJson = null) {
       spr.loop           = true;
       spr.gotoAndStop(0);
 
-      // 取得當前方向的 idle 或 walk 幀陣列
+      // 4 步循環：邁左腿 → 站立 → 邁右腿 → 站立
+      // walkSequence 索引 → row：[1, 0, 2, 0]
+      const walkSequence = [1, 0, 2, 0];
       const getFrames = (dir, walk) => {
         const t = texMap[dir] ?? texMap.down ?? baseSrc;
-        return walk ? [t[1], t[2]] : [t[0]];
+        return walk
+          ? walkSequence.map(row => t[row]) // [walkA, idle, walkB, idle]
+          : [t[0]];                          // 靜止：只顯示 idle
       };
 
       // 開始行走：切換至 [walkA, walkB] 並播放

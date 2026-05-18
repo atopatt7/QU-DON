@@ -167,9 +167,14 @@ export class EntityManager {
         spr.scale.set((tileSize * heightInTiles) / fh);
         spr.anchor.set(0.5, 1.0);
 
+        // 4 步循環：邁左腿 → 站立 → 邁右腿 → 站立
+        // walkSequence 索引 → row：[1, 0, 2, 0]
+        const walkSequence = [1, 0, 2, 0];
         const getFrames = (dir, walk) => {
           const t = texMap[dir] ?? texMap.down ?? base;
-          return walk ? [t[1], t[2]] : [t[0]];
+          return walk
+            ? walkSequence.map(row => t[row]) // [walkA, idle, walkB, idle]
+            : [t[0]];                          // 靜止：只顯示 idle
         };
 
         // 開始行走：切換至 [walkA, walkB] 並播放
