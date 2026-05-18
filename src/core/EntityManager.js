@@ -106,18 +106,77 @@ export class EntityManager {
   }
 
   // ─── 從 registry → entity JSON → 載入貼圖 → 建立精靈 ─────────────────────
-  // 直接持有 Texture 物件，繞過 PIXI.Assets.cache.get(path) 的 key 對齊問題
+  // 支援兩種格式：
+  //   新格式：visuals.spriteSheet — 4×N HD-2D 矩陣，Canvas 2D 裁切
+  //             X軸(欄, fw)=方向：0=down 1=up 2=left 3=right
+  //             Y軸(列, fh)=動作：0=idle 1=walkA 2=walkB
+  //   舊格式：visuals.mapSprites  — 逐檔載入（向下相容）
   // 回傳 { sprite, entityData }
   async _buildEntitySprite(entityRef, direction, tileSize) {
     try {
-      const regRes   = await fetch('./src/data/entities/registry.json');
-      const registry = await regRes.json();
+      const regRes     = await fetch('./src/data/entities/registry.json');
+      const registry   = await regRes.json();
       const entityPath = registry[entityRef];
       if (!entityPath) return { sprite: null, entityData: null };
 
       const entRes  = await fetch(`./src/data/entities/${entityPath}`);
       const entData = await entRes.json();
-      const mapSprites = entData?.visuals?.mapSprites;
+      const vis     = entData?.visuals ?? {};
+      // 支援 visuals.heightInTiles（新）與 visual.heightInTiles（舊，typo 相容）
+      const heightInTiles = vis.heightInTiles ?? entData?.visual?.heightInTiles ?? 1.7;
+
+      // ── 新格式：spriteSheet（Canvas 2D 裁切，與主角系統相同原則）──────────
+      if (vis.spriteSheet) {
+        const sheet = await PIXI.Assets.load(`./${vis.spriteSheet}`);
+        const src   = sheet.source;
+        const img   = src?.resource ?? src?.htmlElement ?? src?.bitmap ?? src;
+        const fw    = vis.frameWidth  ?? 128;
+        const fh    = vis.frameHeight ?? 256;
+
+        if (!img || !(img.width > 0 || img.naturalWidth > 0)) {
+          return { sprite: null, entityData: entData };
+        }
+
+        // 4×N 矩陣裁切：外層迴圈=方向欄，內層迴圈=動作列
+        const DIR_COLS   = { down: 0, up: 1, left: 2, right: 3 };
+        const FRAME_ROWS = 3; // 0=idle  1=walkA  2=walkB
+        const texMap     = {};
+
+        for (const [dir, col] of Object.entries(DIR_COLS)) {
+          const frames = [];
+          for (let row = 0; row < FRAME_ROWS; row++) {
+            const canvas = document.createElement('canvas');
+            canvas.width  = fw;
+            canvas.height = fh;
+            canvas.getContext('2d').drawImage(img, col * fw, row * fh, fw, fh, 0, 0, fw, fh);
+            frames.push(PIXI.Texture.from(canvas));
+          }
+          texMap[dir] = frames; // [idle, walkA, walkB]
+        }
+
+        const base = texMap[direction] ?? texMap.down;
+        // 播放序：walkA→walkB→walkA→idle；停止時 gotoAndStop(3)=idle
+        const spr  = new PIXI.AnimatedSprite([base[1], base[2], base[1], base[0]]);
+        spr.animationSpeed = 0.1;
+        spr.loop           = true;
+        spr.gotoAndStop(3);
+
+        spr.scale.set((tileSize * heightInTiles) / fh);
+        spr.anchor.set(0.5, 1.0);
+
+        // setDir：切換方向時重建幀列表，保持播放狀態不變
+        spr.setDir = (dir) => {
+          const t = texMap[dir] ?? texMap.down ?? base;
+          const wasPlaying = spr.playing;
+          spr.textures = [t[1], t[2], t[1], t[0]];
+          if (wasPlaying) spr.play(); else spr.gotoAndStop(3);
+        };
+
+        return { sprite: spr, entityData: entData };
+      }
+
+      // ── 舊格式：mapSprites（向下相容，逐檔載入）────────────────────────────
+      const mapSprites = vis.mapSprites;
       if (!mapSprites) return { sprite: null, entityData: entData };
 
       // 載入所有方向貼圖，直接收集 Texture / Texture[] 物件
@@ -147,11 +206,11 @@ export class EntityManager {
         spr = new PIXI.Sprite(baseSrc);
       }
 
-      const heightInTiles = entData?.visual?.heightInTiles ?? 1.7;
       const scl = refTex?.height ? (tileSize * heightInTiles) / refTex.height : 1;
       spr.scale.set(scl);
       spr.anchor.set(0.5, 1.0);
       return { sprite: spr, entityData: entData };
+
     } catch {
       return { sprite: null, entityData: null };
     }
