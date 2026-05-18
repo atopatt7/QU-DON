@@ -6,12 +6,10 @@
     "hp": 35, "maxHp": 35, "atk": 6, "def": 2, "eva": 0.25
   },
   "visuals": {
-    "mapSprites": {
-      "down":  "assets/sprites/entities/pickpocket_down.png",
-      "up":    "assets/sprites/entities/pickpocket_up.png",
-      "left":  "assets/sprites/entities/pickpocket_left.png",
-      "right": "assets/sprites/entities/pickpocket_right.png"
-    },
+    "spriteSheet":   "assets/sprites/entities/pickpocket_sheet.png",
+    "frameWidth":    128,
+    "frameHeight":   256,
+    "heightInTiles": 1.7,
     "battleMugshot": "assets/ui/portraits/monochrome_pickpocket_vfd.png"
   },
   "behavior": {

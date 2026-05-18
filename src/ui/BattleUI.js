@@ -384,18 +384,12 @@ export class BattleUI extends PIXI.Container {
    * player 有 fallback 路徑（即使 visuals 未傳入也能顯示正面圖）。
    */
   async _loadPortraits() {
-    // mapSprites.down 可為字串或字串陣列（動畫幀），陣列時取 index[1]（站立姿）
-    const pDown = this._data.player?.visuals?.mapSprites?.down;
-    const playerPath = Array.isArray(pDown)
-      ? pDown[1]
-      : (pDown ?? 'assets/sprites/entities/player_down_1.png');
-
-    const eDown = this._data.enemy?.visuals?.mapSprites?.down;
-    const enemyPath = Array.isArray(eDown) ? eDown[1] : (eDown ?? null);
+    const playerPath = this._data.player?.visuals?.battleMugshot ?? null;
+    const enemyPath  = this._data.enemy?.visuals?.battleMugshot  ?? null;
 
     await Promise.allSettled([
-      this._loadOnePortrait('player', playerPath),
-      enemyPath ? this._loadOnePortrait('enemy', enemyPath) : Promise.resolve(),
+      playerPath ? this._loadOnePortrait('player', playerPath) : Promise.resolve(),
+      enemyPath  ? this._loadOnePortrait('enemy',  enemyPath)  : Promise.resolve(),
     ]);
 
     this._build();
