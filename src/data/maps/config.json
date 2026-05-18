@@ -452,6 +452,81 @@
       "color": "0x502010",
       "desc": "燃燒的鐵桶火堆（不可通行）"
     },
+    "1050": {
+      "name": "const_wall_ext",
+      "group": "suburb",
+      "walkable": false,
+      "collides": true,
+      "draw": "brick_wall",
+      "color": "0x2a2018",
+      "desc": "鐵皮屋牆壁(外部)"
+    },
+    "1051": {
+      "name": "const_door_ext",
+      "group": "suburb",
+      "walkable": true,
+      "collides": false,
+      "draw": "warp_door",
+      "color": "0x1a1208",
+      "sfx": "door_open",
+      "desc": "工地辦公室入口(玻璃門)"
+    },
+    "1052": {
+      "name": "office_floor",
+      "group": "indoor",
+      "walkable": true,
+      "collides": false,
+      "draw": "indoor_floor",
+      "color": "0x1e1a14",
+      "sfx": "footstep_concrete",
+      "desc": "水泥汙漬地面"
+    },
+    "1053": {
+      "name": "office_wall_int",
+      "group": "indoor",
+      "walkable": false,
+      "collides": true,
+      "draw": "brick_wall",
+      "color": "0x282420",
+      "desc": "室內鐵皮牆"
+    },
+    "1054": {
+      "name": "office_door_int",
+      "group": "indoor",
+      "walkable": true,
+      "collides": false,
+      "draw": "warp_shutter",
+      "color": "0x1a1208",
+      "sfx": "door_open",
+      "desc": "辦公室出口"
+    },
+    "1055": {
+      "name": "office_desk",
+      "group": "indoor",
+      "walkable": false,
+      "collides": true,
+      "draw": "indoor_table",
+      "color": "0x2e1a0e",
+      "desc": "破舊辦公桌"
+    },
+    "1056": {
+      "name": "office_chair",
+      "group": "indoor",
+      "walkable": false,
+      "collides": true,
+      "draw": "indoor_sofa",
+      "color": "0x1c1414",
+      "desc": "生鏽鐵椅"
+    },
+    "1057": {
+      "name": "office_crates",
+      "group": "indoor",
+      "walkable": false,
+      "collides": true,
+      "draw": "crate",
+      "color": "0x1c1408",
+      "desc": "木製貨物箱"
+    },
     "2000": {
       "name": "chinatown_road_wet",
       "group": "chinatown",
