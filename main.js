@@ -118,43 +118,89 @@ function buildGameLayer(app) {
   return layer;
 }
 
-// ─── 載入玩家四向獨立貼圖（從 player.json mapSprites 讀取路徑）──────────────
-// src 可為字串（單幀）或字串陣列（多幀動畫），分別回傳 Texture 或 Texture[]
+// ─── 載入玩家貼圖 ────────────────────────────────────────────────────────────
+// 支援兩種格式：
+//   新格式：visuals.spriteSheet — 單張雪碧圖，Canvas 2D 裁切（繞過 PixiJS v8 UV 問題）
+//   舊格式：visuals.mapSprites  — 向下相容，逐檔載入
 // 同時回傳 playerJson（供戰鬥頭像使用）
 async function loadPlayerSprites() {
   try {
     const resp       = await fetch('./src/data/entities/actors/player.json');
     const playerJson = await resp.json();
-    const mapSprites = playerJson?.visuals?.mapSprites ?? {};
+    const vis        = playerJson?.visuals ?? {};
 
-    const texMap = {};
+    // ── 新格式：spriteSheet ───────────────────────────────────────────────
+    if (vis.spriteSheet) {
+      const sheet = await PIXI.Assets.load(`./${vis.spriteSheet}`);
+      const src   = sheet.source;
+      const img   = src?.resource ?? src?.htmlElement ?? src?.bitmap ?? src;
+      const fw    = vis.frameWidth  ?? 128;
+      const fh    = vis.frameHeight ?? 256;
+
+      if (!img || !(img.width > 0 || img.naturalWidth > 0)) {
+        throw new Error('spriteSheet ImageBitmap 無效');
+      }
+
+      // 標準列順序：row 0=down, 1=up, 2=left, 3=right，每方向 4 幀
+      const DIR_ROWS    = { down: 0, up: 1, left: 2, right: 3 };
+      const FRAME_COUNT = 4;
+      const texMap      = {};
+
+      for (const [dir, row] of Object.entries(DIR_ROWS)) {
+        const frames = [];
+        for (let col = 0; col < FRAME_COUNT; col++) {
+          const canvas = document.createElement('canvas');
+          canvas.width  = fw;
+          canvas.height = fh;
+          canvas.getContext('2d').drawImage(img, col * fw, row * fh, fw, fh, 0, 0, fw, fh);
+          frames.push(PIXI.Texture.from(canvas));
+        }
+        texMap[dir] = frames;
+      }
+
+      console.log(`[QU-DON] 玩家雪碧圖載入成功 (${fw}×${fh} × 4方向 × ${FRAME_COUNT}幀)`);
+      return { texMap, playerJson };
+    }
+
+    // ── 舊格式：mapSprites（向下相容）───────────────────────────────────
+    const mapSprites = vis.mapSprites ?? {};
+    const texMap     = {};
     await Promise.allSettled(
       Object.entries(mapSprites).map(async ([dir, src]) => {
         try {
-          if (Array.isArray(src)) {
-            texMap[dir] = await Promise.all(src.map(p => PIXI.Assets.load(`./${p}`)));
-          } else {
-            texMap[dir] = await PIXI.Assets.load(`./${src}`);
-          }
+          texMap[dir] = Array.isArray(src)
+            ? await Promise.all(src.map(p => PIXI.Assets.load(`./${p}`)))
+            : await PIXI.Assets.load(`./${src}`);
         } catch {
           console.warn(`[QU-DON] 玩家貼圖載入失敗 (${dir}):`, src);
         }
       })
     );
-    const loaded = Object.keys(texMap).length;
-    console.log(`[QU-DON] 玩家四向貼圖 ${loaded}/4 組載入成功`);
+    console.log(`[QU-DON] 玩家四向貼圖 ${Object.keys(texMap).length}/4 組載入成功`);
     return { texMap, playerJson };
-  } catch {
-    console.warn('[QU-DON] 無法載入玩家實體資料，使用圓形佔位精靈');
+
+  } catch (e) {
+    console.warn('[QU-DON] 無法載入玩家實體資料，使用圓形佔位精靈', e);
     return { texMap: {}, playerJson: null };
   }
 }
 
-// ─── 建立玩家精靈（四向獨立貼圖版）───────────────────────────────────────────
+// ─── 建立玩家精靈（四向 spriteSheet / 四向獨立貼圖 均支援）─────────────────
 // texMap 值為 Texture（靜態）或 Texture[]（動畫幀）；自動選擇 Sprite / AnimatedSprite
-function buildPlayerSprite(tileSize, texMap = {}) {
+function buildPlayerSprite(tileSize, texMap = {}, playerJson = null) {
+  const heightInTiles = playerJson?.visuals?.heightInTiles ?? 1.7;
   const baseSrc    = texMap.down ?? Object.values(texMap)[0] ?? null;
   const isAnimated = Array.isArray(baseSrc) && baseSrc.length >= 3;
+
+  // 幀陣列 → AnimatedSprite 播放列表（3幀: 0→1→2→1，4幀: 0→1→2→3）
+  const toFrameList = (t) => {
+    if (!Array.isArray(t)) return [t, t, t, t];
+    if (t.length >= 4)     return [t[0], t[1], t[2], t[3]];
+    if (t.length === 3)    return [t[0], t[1], t[2], t[1]];
+    return [t[0], t[0], t[0], t[0]];
+  };
+  // 站立姿 index（預設取第 2 幀，即中間靜止幀）
+  const standFrame = baseSrc && Array.isArray(baseSrc) && baseSrc.length >= 4 ? 1 : 1;
 
   if (baseSrc) {
     // 以站立幀（index 1）或單幀作為縮放基準
@@ -163,17 +209,16 @@ function buildPlayerSprite(tileSize, texMap = {}) {
 
     let spr;
     if (isAnimated) {
-      // 播放順序 0→1→2→1 模擬左右邁步回中性節奏
-      spr = new PIXI.AnimatedSprite([baseSrc[0], baseSrc[1], baseSrc[2], baseSrc[1]]);
+      spr = new PIXI.AnimatedSprite(toFrameList(baseSrc));
       spr.animationSpeed = 0.1;
       spr.loop           = true;
-      spr.gotoAndStop(1); // 預設站立姿
+      spr.gotoAndStop(standFrame); // 預設站立姿
     } else {
       spr = new PIXI.Sprite(baseSrc);
     }
 
     // 均等縮放：鎖高度，寬度隨各幀原始比例自然延伸，不壓縮
-    spr.scale.set((tileSize * 1.7) / fh);
+    spr.scale.set((tileSize * heightInTiles) / fh);
     spr.anchor.set(0.5, 1.0);
 
     let _dir = 'down';
@@ -182,12 +227,9 @@ function buildPlayerSprite(tileSize, texMap = {}) {
       _dir = dir;
       const t = texMap[dir] ?? texMap.down ?? baseSrc;
       if (isAnimated) {
-        const frames = Array.isArray(t) && t.length >= 3
-          ? [t[0], t[1], t[2], t[1]]
-          : [t, t, t, t];
         const wasPlaying = spr.playing;
-        spr.textures = frames;
-        if (wasPlaying) spr.play(); else spr.gotoAndStop(1);
+        spr.textures = toFrameList(t);
+        if (wasPlaying) spr.play(); else spr.gotoAndStop(standFrame);
       } else {
         const tex = Array.isArray(t) ? t[0] : t;
         if (spr.texture !== tex) spr.texture = tex;
@@ -195,7 +237,7 @@ function buildPlayerSprite(tileSize, texMap = {}) {
     };
 
     spr.resizeTo = (s) => {
-      spr.scale.set((s * 1.7) / fh);
+      spr.scale.set((s * heightInTiles) / fh);
     };
     return spr;
   }
@@ -332,7 +374,7 @@ async function main() {
   const player  = { gx: spawnGx, gy: spawnGy, vx: spawnGx, vy: spawnGy };
   let   facing  = spawn?.facing ?? 'down';
 
-  const playerSpr = buildPlayerSprite(mapManager.tileSize, playerTexMap);
+  const playerSpr = buildPlayerSprite(mapManager.tileSize, playerTexMap, _playerJson);
   playerSpr.setDir(facing);
   mapManager.entityLayer.addChild(playerSpr);
 

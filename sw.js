@@ -6,7 +6,7 @@
  *    才能讓舊快取失效、手機端取得最新版本。
  */
 
-const CACHE_NAME = 'qudon-v69';
+const CACHE_NAME = 'qudon-v70';
 
 // ── 本機檔案：安裝時全數預快取 ────────────────────────────────────────────────
 // 包含所有 JS 模組、資料檔與圖片資源，確保離線 / 弱網路環境也能正常啟動
@@ -70,6 +70,8 @@ const LOCAL_FILES = [
 
 // ── 實體貼圖：製作中，失敗不阻塞安裝（缺圖時遊戲以圓形佔位精靈替代）──────────
 const ENTITY_SPRITES = [
+  // 主角 HD-2D 雪碧圖（新格式，優先使用）
+  './assets/sprites/entities/player_sheet.png',
   // 主角四向（靜態單幀，動畫幀製作前的 fallback）
   './assets/sprites/entities/player_down.png',
   './assets/sprites/entities/player_up.png',
