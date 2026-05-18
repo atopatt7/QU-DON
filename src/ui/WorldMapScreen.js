@@ -53,6 +53,11 @@ export class WorldMapScreen extends PIXI.Container {
   // ─── 建置（resize 時重建）────────────────────────────────────────────────
 
   _build() {
+    // 清除前一次的閃爍 ticker
+    if (this._activeTickers) {
+      this._activeTickers.forEach(t => this._app.ticker.remove(t));
+      this._activeTickers = [];
+    }
     const { width: W, height: H } = this._app.screen;
     this.removeChildren();
 
@@ -158,23 +163,23 @@ export class WorldMapScreen extends PIXI.Container {
     this.addChild(hitArea);
   }
 
-  // ── 地圖內容區（目前為預留框架）─────────────────────────────────────────
+  // ── 地圖內容區 ───────────────────────────────────────────────────────────
 
   _buildMapArea(px, py, pw, ph) {
-    const pad = 12;
+    const pad   = 12;
     const areaX = px + pad;
     const areaY = py + pad;
     const areaW = pw - pad * 2;
     const areaH = ph - pad * 2;
 
-    // 地圖底板
+    // ── 底板 ──────────────────────────────────────────────────────────────
     const mapBg = new PIXI.Graphics();
     mapBg.roundRect(areaX, areaY, areaW, areaH, 3)
          .fill({ color: C.placeholder })
          .stroke({ color: C.borderDim, width: 1 });
     this.addChild(mapBg);
 
-    // 格線（模擬地圖網格）
+    // ── 格線 ──────────────────────────────────────────────────────────────
     const gridStep = Math.floor(Math.min(areaW, areaH) / 16);
     const grid = new PIXI.Graphics();
     for (let x = areaX; x <= areaX + areaW; x += gridStep) {
@@ -187,64 +192,132 @@ export class WorldMapScreen extends PIXI.Container {
     }
     this.addChild(grid);
 
-    // 角落掃描光圈（裝飾）
+    // ── 角落裝飾 ──────────────────────────────────────────────────────────
     const corner = new PIXI.Graphics();
     const cs = 20;
-    // 左上
-    corner.moveTo(areaX + cs, areaY + 2).lineTo(areaX + 2, areaY + 2).lineTo(areaX + 2, areaY + cs)
-          .stroke({ color: C.border, width: 1.5 });
-    // 右上
-    corner.moveTo(areaX + areaW - cs, areaY + 2).lineTo(areaX + areaW - 2, areaY + 2).lineTo(areaX + areaW - 2, areaY + cs)
-          .stroke({ color: C.border, width: 1.5 });
-    // 左下
-    corner.moveTo(areaX + cs, areaY + areaH - 2).lineTo(areaX + 2, areaY + areaH - 2).lineTo(areaX + 2, areaY + areaH - cs)
-          .stroke({ color: C.border, width: 1.5 });
-    // 右下
-    corner.moveTo(areaX + areaW - cs, areaY + areaH - 2).lineTo(areaX + areaW - 2, areaY + areaH - 2).lineTo(areaX + areaW - 2, areaY + areaH - cs)
-          .stroke({ color: C.border, width: 1.5 });
+    corner.moveTo(areaX + cs,           areaY + 2)           .lineTo(areaX + 2,           areaY + 2)           .lineTo(areaX + 2,           areaY + cs)           .stroke({ color: C.border, width: 1.5 });
+    corner.moveTo(areaX + areaW - cs,   areaY + 2)           .lineTo(areaX + areaW - 2,   areaY + 2)           .lineTo(areaX + areaW - 2,   areaY + cs)           .stroke({ color: C.border, width: 1.5 });
+    corner.moveTo(areaX + cs,           areaY + areaH - 2)   .lineTo(areaX + 2,           areaY + areaH - 2)   .lineTo(areaX + 2,           areaY + areaH - cs)   .stroke({ color: C.border, width: 1.5 });
+    corner.moveTo(areaX + areaW - cs,   areaY + areaH - 2)   .lineTo(areaX + areaW - 2,   areaY + areaH - 2)   .lineTo(areaX + areaW - 2,   areaY + areaH - cs)   .stroke({ color: C.border, width: 1.5 });
     this.addChild(corner);
 
-    // 預留文字
-    const fs = Math.max(12, Math.floor(Math.min(areaW, areaH) * 0.06));
-    const placeholder = new PIXI.Text({
-      text: '[ 地圖系統建構中... ]',
-      style: new PIXI.TextStyle({
-        fontFamily: FONT_MONO,
-        fontSize: fs, fill: C.border, alpha: 0.55,
-      }),
-    });
-    placeholder.anchor.set(0.5, 0.5);
-    placeholder.x = areaX + areaW / 2;
-    placeholder.y = areaY + areaH / 2;
-    placeholder.alpha = 0.45;
-    this.addChild(placeholder);
+    // ── 地圖節點定義（西 → 東）────────────────────────────────────────────
+    const mapNodes = [
+      { id: 'map_hakka_street',           name: '哈卡街',     zone: 'ZONE-A' },
+      { id: 'map_hakka_east_suburb',      name: '哈卡街東郊', zone: 'ZONE-B' },
+      { id: 'map_black_rock_west_suburb', name: '黑石街西郊', zone: 'ZONE-C' },
+      { id: 'map_black_rock_street',      name: '黑石街',     zone: 'ZONE-D' },
+    ];
+    const currentId = this._app.mapManager?.mapData?.id ?? null;
 
-    // 座標標示（左下角）
+    // ── 節點佈局 ──────────────────────────────────────────────────────────
+    const N      = mapNodes.length;
+    const slotW  = areaW / N;
+    const nodeW  = Math.min(120, Math.floor(slotW * 0.72));
+    const nodeH  = Math.min(60,  Math.floor(areaH * 0.22));
+    const nodeY  = areaY + Math.floor(areaH * 0.42);
+    const lineY  = nodeY + Math.floor(nodeH / 2);
+    const centers = mapNodes.map((_, i) =>
+      areaX + Math.floor(slotW * i + slotW / 2)
+    );
+
+    // ── 連線 ──────────────────────────────────────────────────────────────
+    const line = new PIXI.Graphics();
+    line.moveTo(centers[0], lineY).lineTo(centers[N - 1], lineY)
+        .stroke({ color: C.borderDim, width: 2 });
+    this.addChild(line);
+
+    // ── 節點 ──────────────────────────────────────────────────────────────
+    const fs    = Math.max(10, Math.floor(Math.min(areaW, areaH) * 0.055));
+    const fsSub = Math.max(8,  Math.floor(fs * 0.62));
+
+    if (!this._activeTickers) this._activeTickers = [];
+
+    for (let i = 0; i < N; i++) {
+      const node   = mapNodes[i];
+      const cx     = centers[i];
+      const nx     = cx - Math.floor(nodeW / 2);
+      const isHere = node.id === currentId;
+
+      // 方框
+      const box = new PIXI.Graphics();
+      if (isHere) {
+        box.roundRect(nx, nodeY, nodeW, nodeH, 3)
+           .fill({ color: C.panel })
+           .stroke({ color: C.border, width: 2 });
+        // 緩慢呼吸閃爍
+        let _t = 0;
+        const ticker = (dt) => { _t += dt * 0.05; box.alpha = 0.72 + Math.sin(_t) * 0.28; };
+        this._app.ticker.add(ticker);
+        this._activeTickers.push(ticker);
+      } else {
+        box.roundRect(nx, nodeY, nodeW, nodeH, 3)
+           .fill({ color: 0x020A02 })
+           .stroke({ color: C.borderDim, width: 1 });
+      }
+      this.addChild(box);
+
+      // ▼ 當前位置箭頭（節點上方）
+      if (isHere) {
+        const arrow = new PIXI.Text({
+          text: '▼',
+          style: new PIXI.TextStyle({ fontFamily: FONT_MONO, fontSize: fsSub, fill: C.border }),
+        });
+        arrow.anchor.set(0.5, 1);
+        arrow.x = cx;
+        arrow.y = nodeY - 4;
+        this.addChild(arrow);
+      }
+
+      // 中文地名
+      const nameTxt = new PIXI.Text({
+        text: node.name,
+        style: new PIXI.TextStyle({
+          fontFamily: FONT_JP,
+          fontSize: fs,
+          fontWeight: isHere ? 'bold' : 'normal',
+          fill: isHere ? C.title : C.borderDim,
+        }),
+      });
+      nameTxt.anchor.set(0.5, 0.5);
+      nameTxt.x = cx;
+      nameTxt.y = nodeY + nodeH * 0.36;
+      this.addChild(nameTxt);
+
+      // Zone ID
+      const zoneTxt = new PIXI.Text({
+        text: node.zone,
+        style: new PIXI.TextStyle({ fontFamily: FONT_MONO, fontSize: fsSub, fill: C.dim }),
+      });
+      zoneTxt.anchor.set(0.5, 0);
+      zoneTxt.x = cx;
+      zoneTxt.y = nodeY + nodeH * 0.62;
+      this.addChild(zoneTxt);
+    }
+
+    // ── 座標裝飾（左下）──────────────────────────────────────────────────
     const coordTxt = new PIXI.Text({
       text: 'N 25°03\'  E 121°32\'',
-      style: new PIXI.TextStyle({
-        fontFamily: FONT_MONO,
-        fontSize: Math.max(9, Math.floor(fs * 0.62)),
-        fill: C.dim,
-      }),
+      style: new PIXI.TextStyle({ fontFamily: FONT_MONO, fontSize: fsSub, fill: C.dim }),
     });
     coordTxt.x = areaX + 8;
-    coordTxt.y = areaY + areaH - coordTxt.style.fontSize - 8;
+    coordTxt.y = areaY + areaH - fsSub - 8;
     this.addChild(coordTxt);
 
-    // 掃描狀態標示（右下角）
-    const statusTxt = new PIXI.Text({
-      text: 'SCAN: PENDING',
+    // ── SCAN 狀態（右下）─────────────────────────────────────────────────
+    const activeNode = mapNodes.find(n => n.id === currentId);
+    const scanTxt = new PIXI.Text({
+      text: activeNode ? `SCAN: ${activeNode.zone} ACTIVE` : 'SCAN: OFFLINE',
       style: new PIXI.TextStyle({
         fontFamily: FONT_MONO,
-        fontSize: Math.max(9, Math.floor(fs * 0.62)),
-        fill: C.dim,
+        fontSize: fsSub,
+        fill: activeNode ? C.border : C.dim,
       }),
     });
-    statusTxt.anchor.set(1, 1);
-    statusTxt.x = areaX + areaW - 8;
-    statusTxt.y = areaY + areaH - 8;
-    this.addChild(statusTxt);
+    scanTxt.anchor.set(1, 1);
+    scanTxt.x = areaX + areaW - 8;
+    scanTxt.y = areaY + areaH - 8;
+    this.addChild(scanTxt);
   }
 
   // ─── 鍵盤 ─────────────────────────────────────────────────────────────────
@@ -268,8 +341,9 @@ export class WorldMapScreen extends PIXI.Container {
   }
 
   destroy(opts) {
-    if (this._keyHandler) window.removeEventListener('keydown', this._keyHandler);
-    if (this._rh)         this._app.stage.off('resize', this._rh);
+    if (this._activeTickers) this._activeTickers.forEach(t => this._app.ticker.remove(t));
+    if (this._keyHandler)    window.removeEventListener('keydown', this._keyHandler);
+    if (this._rh)            this._app.stage.off('resize', this._rh);
     super.destroy(opts);
   }
 }

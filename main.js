@@ -327,6 +327,7 @@ async function main() {
   const mapManager    = await MapManager.create(app, gameLayer);
   const entityManager = new EntityManager(app);
   mapManager.setEntityManager(entityManager); // loadMap 時自動呼叫 entityManager.init
+  app.mapManager = mapManager;               // 供 WorldMapScreen 讀取當前地圖 ID
 
   // ⚡ 平行載入：地圖 JSON、玩家貼圖、控制面板、角色資料 同時進行，
   //    大幅縮短黑屏等待時間（原本依序 await，現在同步發出所有請求）
