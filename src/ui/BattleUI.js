@@ -380,40 +380,99 @@ export class BattleUI extends PIXI.Container {
   // ─── 頭像系統 ─────────────────────────────────────────────────────────────────
 
   /**
-   * 並行載入主角與敵方頭像，完成後觸發 _build() 重繪。
-   * player 有 fallback 路徑（即使 visuals 未傳入也能顯示正面圖）。
+   * 並行載入雙方頭像：優先使用 spriteSheet 裁切，降級至 battleMugshot 靜態圖。
    */
   async _loadPortraits() {
-    const playerPath = this._data.player?.visuals?.battleMugshot ?? null;
-    const enemyPath  = this._data.enemy?.visuals?.battleMugshot  ?? null;
-
     await Promise.allSettled([
-      playerPath ? this._loadOnePortrait('player', playerPath) : Promise.resolve(),
-      enemyPath  ? this._loadOnePortrait('enemy',  enemyPath)  : Promise.resolve(),
+      this._loadRolePortrait('player'),
+      this._loadRolePortrait('enemy'),
     ]);
-
     this._build();
   }
 
   /**
-   * 載入單一頭像：裁切上半身 50% + 套用 VFD 螢光綠濾鏡。
+   * 依 role 的 visuals 選擇來源：spriteSheet > battleMugshot。
    * @param {'player'|'enemy'} role
-   * @param {string} path  完整資源路徑
+   */
+  async _loadRolePortrait(role) {
+    const vis = this._data[role]?.visuals;
+    if (!vis) return;
+    if (vis.spriteSheet) {
+      await this._loadSheetPortrait(role, vis.spriteSheet, vis.frameWidth ?? 128, vis.frameHeight ?? 256);
+    } else if (vis.battleMugshot) {
+      await this._loadOnePortrait(role, vis.battleMugshot);
+    }
+  }
+
+  /**
+   * 從 HD-2D 雪碧圖裁切正面站立上半身（col=0=down, row=0=idle, 取高 110px）。
+   * Canvas 2D 繞開 PixiJS v8 ImageBitmap UV 限制。
+   * @param {'player'|'enemy'} role
+   * @param {string}  sheetPath  相對路徑
+   * @param {number}  fw         幀寬（px）
+   * @param {number}  fh         幀高（px）
+   */
+  async _loadSheetPortrait(role, sheetPath, fw = 128, fh = 256) {
+    try {
+      const sheet = await PIXI.Assets.load(`./${sheetPath}`);
+      const src   = sheet.source;
+      const img   = src?.resource ?? src?.htmlElement ?? src?.bitmap ?? src;
+      if (!img || !(img.width > 0 || img.naturalWidth > 0)) return;
+
+      // 正面站立（col 0 × row 0），只取上 110px（頭 + 肩胸）
+      const cropH  = 110;
+      const canvas = document.createElement('canvas');
+      canvas.width  = fw;
+      canvas.height = cropH;
+      canvas.getContext('2d').drawImage(img, 0, 0, fw, cropH, 0, 0, fw, cropH);
+
+      const spr  = new PIXI.Sprite(PIXI.Texture.from(canvas));
+      spr.tint   = 0x00FF88; // VFD 螢光綠全息投影
+      spr.alpha  = 0.92;
+      this._portraitCache[role] = spr;
+    } catch {
+      console.warn(`[BattleUI] 雪碧圖頭像裁切失敗: ${sheetPath}`);
+      this._portraitCache[role] = false;
+    }
+  }
+
+  /**
+   * 載入靜態 battleMugshot 並裁切上半身（舊格式降級路徑）。
+   * @param {'player'|'enemy'} role
+   * @param {string} path
    */
   async _loadOnePortrait(role, path) {
     try {
-      const baseTex  = await PIXI.Assets.load(path);
+      const sheet = await PIXI.Assets.load(path);
+      const src   = sheet.source;
+      const img   = src?.resource ?? src?.htmlElement ?? src?.bitmap ?? src;
+      if (!img || !(img.width > 0 || img.naturalWidth > 0)) return;
 
-      // ── 裁切上半身（height × 0.5）──────────────────────────────────────────
-      const cropRect = new PIXI.Rectangle(0, 0, baseTex.width, Math.floor(baseTex.height * 0.5));
-      const tex      = new PIXI.Texture({ source: baseTex.source, frame: cropRect });
+      const cropH  = Math.floor((img.height || img.naturalHeight) * 0.5);
+      const cropW  = img.width  || img.naturalWidth;
+      const canvas = document.createElement('canvas');
+      canvas.width  = cropW;
+      canvas.height = cropH;
+      canvas.getContext('2d').drawImage(img, 0, 0, cropW, cropH, 0, 0, cropW, cropH);
 
-      const spr = new PIXI.Sprite(tex);
+      const spr = new PIXI.Sprite(PIXI.Texture.from(canvas));
       this._portraitCache[role] = spr;
     } catch {
       console.warn(`[BattleUI] 頭像載入失敗: ${path}`);
       this._portraitCache[role] = false;
     }
+  }
+
+  /**
+   * 受傷閃爍：將指定角色頭像短暫染紅後恢復。
+   * @param {'player'|'enemy'} role
+   */
+  flashHit(role) {
+    const spr = this._portraitCache[role];
+    if (!spr || spr === false) return;
+    const origTint = spr.tint;
+    spr.tint = 0xFF2222;
+    setTimeout(() => { if (spr.destroyed === false || spr.parent) spr.tint = origTint; }, 200);
   }
 
   // ─── 戰鬥輔助 ────────────────────────────────────────────────────────────────
@@ -447,6 +506,7 @@ export class BattleUI extends PIXI.Container {
     dmg = Math.floor(dmg * (0.9 + Math.random() * 0.2));
     e.hp = Math.max(0, e.hp - dmg);
     this._pushLog(`瞿董 攻擊了 ${e.name}，造成 ${dmg} 點傷害！`);
+    this.flashHit('enemy');
 
     // ── 勝利判定 ────────────────────────────────────────────────────────────
     if (e.hp === 0) {
@@ -465,6 +525,7 @@ export class BattleUI extends PIXI.Container {
       let eDmg = Math.floor(Math.max(1, e.atk - p.def) * (0.9 + Math.random() * 0.2));
       p.hp = Math.max(0, p.hp - eDmg);
       this._pushLog(`${e.name} 反擊，造成 ${eDmg} 點傷害！`);
+      this.flashHit('player');
       this._updateHealthUI();
 
       // ── 敗北判定 ──────────────────────────────────────────────────────────
