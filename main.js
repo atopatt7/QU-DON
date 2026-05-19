@@ -611,6 +611,8 @@ async function main() {
 
     // NPC 巡邏動畫（patrol 行為的插值移動，不受輸入鎖定影響）
     entityManager.update(app.ticker.deltaMS);
+    // 玩家精靈 zIndex 同步（與 NPC 共用 entityLayer 排序）
+    playerSpr.zIndex = playerSpr.y;
 
     const state = input.update();
 

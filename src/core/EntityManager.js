@@ -34,6 +34,8 @@ export class EntityManager {
     this._tileSize = tileSize;
 
     this.container = new PIXI.Container();
+    this.container.sortableChildren = true;  // 啟用 Y 軸深度排序
+    parentContainer.sortableChildren = true; // 讓玩家精靈也參與同層排序
     parentContainer.addChild(this.container);
 
     const npcData = await this._loadNpcData(mapId);
@@ -244,6 +246,13 @@ export class EntityManager {
         }
       }
     }
+
+    // ── 所有 NPC 按像素 Y 排序（Y 越大 = 越靠下 = 圖層越高）──────────────
+    for (const npc of this.npcs) {
+      const spr = this.sprites.get(npc.id);
+      if (spr) spr.zIndex = spr.y;
+    }
+    this.container.sortChildren();
   }
 
   // ─── 初始化巡邏狀態物件 ────────────────────────────────────────────────────
