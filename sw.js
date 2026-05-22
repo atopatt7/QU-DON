@@ -6,7 +6,7 @@
  *    才能讓舊快取失效、手機端取得最新版本。
  */
 
-const CACHE_NAME = 'qudon-v83';
+const CACHE_NAME = 'qudon-v84';
 
 // ── 本機檔案：安裝時全數預快取 ────────────────────────────────────────────────
 // 包含所有 JS 模組、資料檔與圖片資源，確保離線 / 弱網路環境也能正常啟動
@@ -27,6 +27,7 @@ const LOCAL_FILES = [
   './src/ui/StatusScreen.js',
   './src/ui/WorldMapScreen.js',
   './src/ui/BattleUI.js',
+  './src/ui/InventoryScreen.js',
   './src/ui/DialogueOverlay.js',
   './src/ui/VFDClock.js',
   // ── 遊戲模組 ───────────────────────────────────────────────────────────────
@@ -35,6 +36,7 @@ const LOCAL_FILES = [
   './src/modules/DataManager.js',
   // ── 資料 JSON ──────────────────────────────────────────────────────────────
   './src/data/actors.json',
+  './src/data/items.json',
   // ── 實體系統（registry + 獨立角色檔）──────────────────────────────────────
   './src/data/entities/registry.json',
   './src/data/entities/actors/player.json',

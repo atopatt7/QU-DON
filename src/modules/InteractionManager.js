@@ -65,10 +65,17 @@ export class InteractionManager {
    * @param {import('../ui/DialogueOverlay.js').DialogueOverlay} dialogueOverlay
    */
   constructor(mapManager, dialogueOverlay) {
-    this._map    = mapManager;
-    this._dlg    = dialogueOverlay;
-    this._em     = null;   // EntityManager（可選，啟用 NPC 互動）
-    this._active = false;
+    this._map        = mapManager;
+    this._dlg        = dialogueOverlay;
+    this._em         = null;   // EntityManager（可選，啟用 NPC 互動）
+    this._active     = false;
+    this._tileConfig = null;   // config.json tiles 字典，非同步載入後填入
+
+    // 非阻塞預載：搶在玩家第一次按確認鍵之前完成
+    fetch('./src/data/maps/config.json')
+      .then(r => r.json())
+      .then(json => { this._tileConfig = json.tiles ?? {}; })
+      .catch(() => { this._tileConfig = {}; });
   }
 
   /**
@@ -125,17 +132,10 @@ export class InteractionManager {
       }
     }
 
-    // ── 3：Tile 環境調查 ───────────────────────────────────────────────────────
+    // ── 3：Tile 環境調查（TILE_EXAMINE 優先，config.json 描述次之）──────────────
     const idx    = ty * md.width + tx;
     const tileId = md.layers.objects?.[idx] || md.layers.ground?.[idx] || 0;
-    const entry  = TILE_EXAMINE[tileId];
-    if (!entry) return false;
-
-    this._active      = true;
-    this._dlg.visible = true;
-    this._dlg.show(entry.text, entry.speaker);
-    this._dlg.once('next', () => this._close());
-    return true;
+    return this._checkObjectTrigger(tileId);
   }
 
   /**
@@ -178,6 +178,43 @@ export class InteractionManager {
 
     showNext();
     return true;
+  }
+
+  /**
+   * 方塊調查觸發器：
+   *   優先路徑 — TILE_EXAMINE 硬編碼表（富文本 lore 描述）
+   *   次要路徑 — config.json 動態查詢（collides=true 且有 desc 的方塊）
+   *
+   * 修改點：此方法抽離自 tryInteract() 原 128-138 行的內聯邏輯，
+   *         並在後段新增 config.json 回退路徑。
+   *
+   * @param {number} tileId  — 前方格子的 tile ID
+   * @returns {boolean}  true = 已觸發對話
+   */
+  _checkObjectTrigger(tileId) {
+    // ── 路徑一：TILE_EXAMINE 精確對應（lore 優先）────────────────────────────
+    const examine = TILE_EXAMINE[tileId];
+    if (examine) {
+      this._active      = true;
+      this._dlg.visible = true;
+      this._dlg.show(examine.text, examine.speaker);
+      this._dlg.once('next', () => this._close());
+      return true;
+    }
+
+    // ── 路徑二：config.json 動態描述（collides=true + desc）─────────────────
+    // _tileConfig 由建構式非同步載入；尚未就緒時靜默跳過（不阻塞玩家操作）
+    const tileDef = this._tileConfig?.[String(tileId)];
+    if (tileDef?.collides === true && tileDef.desc) {
+      const text = `* 檢查此處的環境…\n發現【${tileDef.desc}】。`;
+      this._active      = true;
+      this._dlg.visible = true;
+      this._dlg.show(text, '（環境）');
+      this._dlg.once('next', () => this._close());
+      return true;
+    }
+
+    return false;
   }
 
   _close() {

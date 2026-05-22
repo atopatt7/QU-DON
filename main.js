@@ -19,6 +19,7 @@ import { BattleUI }              from './src/ui/BattleUI.js';
 import { AudioManager }          from './src/core/AudioManager.js';
 import { StatusScreen }          from './src/ui/StatusScreen.js';
 import { WorldMapScreen }        from './src/ui/WorldMapScreen.js';
+import { InventoryScreen }       from './src/ui/InventoryScreen.js';
 
 // ─── VT323 字型 ────────────────────────────────────────────────────────────
 const fontLink = document.createElement('link');
@@ -424,6 +425,21 @@ async function main() {
   worldMap.zIndex = 1100;
   app.stage.addChild(worldMap);
 
+  // ── 背包介面 ──────────────────────────────────────────────────────────────
+  const inventoryScreen = await InventoryScreen.create(app);
+  inventoryScreen.zIndex = 1200;
+  app.stage.addChild(inventoryScreen);
+
+  // 玩家背包初始存量（之後可由存檔系統覆寫）
+  const playerInventory = [
+    { id: 'painkiller',    qty: 3 },
+    { id: 'cigarette',     qty: 5 },
+    { id: 'bento',         qty: 1 },
+    { id: 'bandage',       qty: 2 },
+    { id: 'energy_drink',  qty: 1 },
+    { id: 'id_card',       qty: 1 },
+  ];
+
   // ── 戰鬥介面（地圖世界用）────────────────────────────────────────────────
   const battleUI = new BattleUI(app);
   battleUI.visible = false;
@@ -485,7 +501,7 @@ async function main() {
   // ── 具名事件 Stubs（功能待實作）──────────────────────────────────────────
   cigarMenu.on('resume',    ()              => _hideMenu());
   cigarMenu.on('status',    ()              => { cigarMenu.hide(); statusScreen.show(); });
-  cigarMenu.on('inventory', ({ label })     => { console.log(`[Menu] ${label}`); });
+  cigarMenu.on('inventory', ()              => { _showInventory(); });
   cigarMenu.on('crew',      ({ label })     => { console.log(`[Menu] ${label}`); });
   cigarMenu.on('journal',   ({ label })     => { console.log(`[Menu] ${label}`); });
   cigarMenu.on('map',       ()              => { cigarMenu.hide(); worldMap.show(); });
@@ -494,6 +510,24 @@ async function main() {
   cigarMenu.on('quit',      ()              => { console.log('[Menu] 放棄生存'); });
 
   worldMap.on('close', () => { _showMenu(); });
+
+  const _showInventory = () => {
+    cigarMenu.hide();
+    panel.visible = false;
+    inventoryScreen.show(playerInventory);
+  };
+
+  inventoryScreen.on('close', () => { panel.visible = true; });
+
+  // 使用道具：扣減數量、刷新介面（暫不套用 HP/SP 效果，留給後期系統實作）
+  inventoryScreen.on('use', (itemId) => {
+    const entry = playerInventory.find(e => e.id === itemId);
+    if (!entry || entry.qty <= 0) return;
+    entry.qty -= 1;
+    if (entry.qty === 0) playerInventory.splice(playerInventory.indexOf(entry), 1);
+    console.log(`[Inventory] 使用：${itemId}`);
+    inventoryScreen.show(playerInventory); // 重新渲染（數量更新）
+  });
   // ────────────────────────────────────────────────────────────────────────
 
   // 控制面板實體選單按鈕
@@ -503,11 +537,19 @@ async function main() {
     }
   });
 
-  // Escape 開啟選單；選單自身的 Escape handler 負責關閉
+  // Escape 開啟選單；I 鍵開啟背包；各介面自身的 handler 負責關閉
   window.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && !cigarMenu.visible && !interaction.isActive) {
+    if (e.key === 'Escape' && !cigarMenu.visible && !interaction.isActive
+        && !inventoryScreen.visible) {
       e.preventDefault();
       _showMenu();
+    }
+    if ((e.key === 'i' || e.key === 'I')
+        && !cigarMenu.visible && !interaction.isActive
+        && !inventoryScreen.visible && !statusScreen.visible
+        && !worldMap.visible) {
+      e.preventDefault();
+      _showInventory();
     }
   });
 
@@ -609,8 +651,8 @@ async function main() {
       return; // 揭幕幀不處理輸入，避免「按新遊戲」的 pointerup 殘留觸發移動
     }
 
-    // NPC 巡邏動畫（patrol 行為的插值移動，不受輸入鎖定影響）
-    entityManager.update(app.ticker.deltaMS);
+    // NPC 巡邏動畫（背包或其他全螢幕 UI 開啟時暫停）
+    if (!inventoryScreen.visible) entityManager.update(app.ticker.deltaMS);
     // 玩家精靈 zIndex 同步（與 NPC 共用 entityLayer 排序）
     playerSpr.zIndex = playerSpr.y;
 

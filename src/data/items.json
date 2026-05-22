@@ -142,6 +142,229 @@
     },
 
     {
+      "id": "painkiller",
+      "name": "Painkiller",
+      "name_zh": "止痛藥",
+      "category": "consumable",
+      "subtype": "medical",
+      "icon": "assets/images/items/painkiller.png",
+      "description": "Cheap blister-pack pills. Chew two and the wound stops screaming.",
+      "description_zh": "廉價的成藥，擠掉泡殼包裝嚼兩顆，就能壓住傷口的跳痛。黑石街每家便利商店都有賣，但沒人拿去止痛用。",
+
+      "stackable": true,
+      "maxStack":  10,
+      "weight":    0.1,
+
+      "usable": true,
+      "consumedOnUse": true,
+
+      "useProps": {
+        "apCost":    1,
+        "targetSelf": true,
+        "targetAlly": false,
+        "range":      0,
+        "effects": [
+          { "type": "heal_hp", "value": 20, "variance": 3 }
+        ],
+        "cooldown":  0,
+        "combatOnly": false
+      },
+
+      "loottable": {
+        "baseDropChance": 0.35,
+        "dropQuantity":   { "min": 1, "max": 3 }
+      },
+
+      "value":      12,
+      "rarity":     "common",
+      "legalStatus":"legal"
+    },
+
+    {
+      "id": "bento",
+      "name": "Convenience Store Bento",
+      "name_zh": "便當",
+      "category": "consumable",
+      "subtype": "food",
+      "icon": "assets/images/items/bento.png",
+      "description": "Cold rice in a plastic bag. Counts as a meal on Black Rock Street.",
+      "description_zh": "塑膠袋裡的涼便當，米飯已經硬了。在黑石街這種地方，能有飯吃就算運氣好。",
+
+      "stackable": true,
+      "maxStack":  5,
+      "weight":    0.5,
+
+      "usable": true,
+      "consumedOnUse": true,
+
+      "useProps": {
+        "apCost":    1,
+        "targetSelf": true,
+        "targetAlly": false,
+        "range":      0,
+        "effects": [
+          { "type": "heal_hp", "value": 40, "variance": 5 }
+        ],
+        "cooldown":  0,
+        "combatOnly": false
+      },
+
+      "loottable": {
+        "baseDropChance": 0.20,
+        "dropQuantity":   { "min": 1, "max": 1 }
+      },
+
+      "value":      25,
+      "rarity":     "common",
+      "legalStatus":"legal"
+    },
+
+    {
+      "id": "energy_drink",
+      "name": "Neon Energy Drink",
+      "name_zh": "能量飲料",
+      "category": "consumable",
+      "subtype": "stimulant",
+      "icon": "assets/images/items/energy_drink.png",
+      "description": "Fluorescent green can. Drink it and your whole body goes numb—but your mind runs like radar.",
+      "description_zh": "螢光綠罐身，喝完全身發麻，意識卻清醒得像雷達螢幕。工地守衛人手一罐，理由顯而易見。",
+
+      "stackable": true,
+      "maxStack":  8,
+      "weight":    0.3,
+
+      "usable": true,
+      "consumedOnUse": true,
+
+      "useProps": {
+        "apCost":    1,
+        "targetSelf": true,
+        "targetAlly": false,
+        "range":      0,
+        "effects": [
+          { "type": "heal_sp", "value": 30, "variance": 0 }
+        ],
+        "cooldown":  0,
+        "combatOnly": false
+      },
+
+      "loottable": {
+        "baseDropChance": 0.30,
+        "dropQuantity":   { "min": 1, "max": 2 }
+      },
+
+      "value":      18,
+      "rarity":     "common",
+      "legalStatus":"legal"
+    },
+
+    {
+      "id": "cigarette",
+      "name": "Cigarette",
+      "name_zh": "香菸",
+      "category": "consumable",
+      "subtype": "stimulant",
+      "icon": "assets/images/items/cigarette.png",
+      "description": "Qu Don's old habit. Light one up and somehow the world makes a little more sense.",
+      "description_zh": "瞿董的老習慣。一根下去，焦慮少一分，壽命也少幾分。點上它的瞬間，整個人反而冷靜了。",
+
+      "stackable": true,
+      "maxStack":  20,
+      "weight":    0.05,
+
+      "usable": true,
+      "consumedOnUse": true,
+
+      "useProps": {
+        "apCost":    0,
+        "targetSelf": true,
+        "targetAlly": false,
+        "range":      0,
+        "effects": [
+          { "type": "heal_hp", "value": 5, "variance": 0 }
+        ],
+        "cooldown":  0,
+        "combatOnly": false
+      },
+
+      "loottable": {
+        "baseDropChance": 0.50,
+        "dropQuantity":   { "min": 1, "max": 5 }
+      },
+
+      "value":      3,
+      "rarity":     "common",
+      "legalStatus":"legal"
+    },
+
+    {
+      "id": "bandage",
+      "name": "First Aid Bandage",
+      "name_zh": "急救繃帶",
+      "category": "consumable",
+      "subtype": "medical",
+      "icon": "assets/images/items/bandage.png",
+      "description": "Gauze roll from a site first-aid kit. Stops the bleeding. Can't fix what's underneath.",
+      "description_zh": "工地急救箱裡的紗布繃帶，纏起傷口能暫時止血。不能治根，但能撐到下一戰。",
+
+      "stackable": true,
+      "maxStack":  8,
+      "weight":    0.2,
+
+      "usable": true,
+      "consumedOnUse": true,
+
+      "useProps": {
+        "apCost":    1,
+        "targetSelf": true,
+        "targetAlly": true,
+        "range":      1,
+        "effects": [
+          { "type": "heal_hp", "value": 35, "variance": 5 },
+          { "type": "remove_status", "statusId": "bleeding" }
+        ],
+        "cooldown":  0,
+        "combatOnly": false
+      },
+
+      "loottable": {
+        "baseDropChance": 0.25,
+        "dropQuantity":   { "min": 1, "max": 2 }
+      },
+
+      "value":      20,
+      "rarity":     "common",
+      "legalStatus":"legal"
+    },
+
+    {
+      "id": "id_card",
+      "name": "Construction Site Pass",
+      "name_zh": "工地通行證",
+      "category": "key_item",
+      "subtype": "access",
+      "icon": "assets/images/items/id_card.png",
+      "description": "Photo's blurred but the barcode still scans. Maybe it fools a gate somewhere.",
+      "description_zh": "照片已經模糊，但條碼還在。上面的姓名是「吳○○」，認識他的人大概都消失了。也許能騙過某個閘門。",
+
+      "stackable": false,
+      "maxStack":  1,
+      "weight":    0.05,
+
+      "usable": false,
+      "consumedOnUse": false,
+
+      "loottable": {
+        "baseDropChance": 0.05,
+        "dropQuantity":   { "min": 1, "max": 1 }
+      },
+
+      "value":      0,
+      "rarity":     "rare",
+      "legalStatus":"grey"
+    },
+
+    {
       "id": "9mm_handgun",
       "name": ".38 Street Special",
       "name_zh": ".38 街頭特製",

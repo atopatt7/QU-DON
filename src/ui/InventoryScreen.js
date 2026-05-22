@@ -1,438 +1,562 @@
 /**
  * QU-DON | src/ui/InventoryScreen.js
- * 背包與狀態系統 — 對應 Figma Screen 5
+ * 背包介面 — VFD 琥珀風（對應 StatusScreen 配色）
  *
- * 設計語彙：「深色皮革公事包 / 檔案夾」
- * 包含：
- *   頂部標題列（◀ 返回 + 標題）
- *   頁籤：物品 / 武器 / 烏鴉（成員）
- *   清單：道具列表（圖示 + 名稱 + 描述 + 數量）
- *   底部角色狀態列（HP / SP / 重量 / 金錢）
+ * 佈局：
+ *   標題列（含關閉按鈕）
+ *   左欄 40% — 物品清單（鍵盤 ↑↓ / 滑鼠點選）
+ *   右欄 60% — 選取物品的詳細資訊
  *
  * 事件：
- *   'close'          點擊返回
- *   'use'  (itemId)  使用道具
+ *   'close'         — Esc / I 鍵 / 關閉按鈕
+ *   'use' (itemId)  — 點擊「使用」按鈕（消耗品）
+ *
+ * API：
+ *   show(inventory)     — 傳入 [{id, qty}, ...] 顯示背包
+ *   hide()
+ *   static async create(app)  — 載入 items.json 後建立實例
  */
+
+// ── 顏色系統（沿用 StatusScreen 琥珀 VFD 調）──────────────────────────────
+const C = {
+  bg:         0x0a0a0a,
+  panel:      0x111008,
+  border:     0x5a4a1a,
+  borderHi:   0xc8a832,
+  label:      0xe0d8c0,
+  value:      0xFFB000,
+  accent:     0x00FF41,
+  sp:         0xFF5555,
+  dim:        0x555544,
+  rowEven:    0x161408,
+  rowOdd:     0x1e1c0a,
+  rowSel:     0x2a2000,
+  scanline:   0x000000,
+};
+
+const FONT_MONO = '"Courier New", "VT323", monospace';
+const FONT_JP   = '"Noto Sans TC", "Microsoft JhengHei", sans-serif';
+
+// ── 類別標籤映射 ──────────────────────────────────────────────────────────
+const CATEGORY_LABEL = {
+  consumable: '消耗品',
+  weapon:     '武器',
+  ammo:       '彈藥',
+  key_item:   '重要道具',
+  misc:       '雜物',
+};
+
+// ── 效果類型標籤映射 ──────────────────────────────────────────────────────
+const EFFECT_LABEL = {
+  heal_hp:        { label: '恢復生命值', color: C.accent  },
+  heal_sp:        { label: '恢復 SP',   color: 0x3399ff  },
+  remove_status:  { label: '解除狀態',  color: 0xFFB000  },
+};
+
 export class InventoryScreen extends PIXI.Container {
+
   /**
    * @param {PIXI.Application} app
-   * @param {object}           gameState
-   *   { player, inventory: [{itemId, name_zh, category, qty, description_zh, icon_label}] }
+   * @param {object[]}         itemDefs  — items.json 的 items 陣列
    */
-  constructor(app, gameState = {}) {
+  constructor(app, itemDefs = []) {
     super();
-    this._app       = app;
-    this._gs        = gameState;
-    this._activeTab = 0;  // 0=物品 1=武器 2=烏鴉
-    this._scrollY   = 0;
+    this._app         = app;
+    this._itemDefs    = itemDefs;
+    this._inventory   = [];   // [{id, qty}] — 由 show() 傳入
+    this._selectedIdx = 0;    // 當前選取列
+    this._scrollOff   = 0;    // 可視窗口起始列
+    this._keyHandler  = null;
+
     this._build();
     this._bindResize();
+    this._bindKeyboard();
+
+    this.visible = false;
   }
 
-  // ─── 建置 ──────────────────────────────────────────────────────────────────
+  // ─── 靜態工廠：載入 items.json 後建立實例 ────────────────────────────────
+
+  static async create(app) {
+    try {
+      const res  = await fetch('./src/data/items.json');
+      const json = await res.json();
+      const defs = Array.isArray(json) ? json : (json.items ?? []);
+      return new InventoryScreen(app, defs);
+    } catch {
+      console.warn('[InventoryScreen] 無法載入 items.json，使用空定義');
+      return new InventoryScreen(app, []);
+    }
+  }
+
+  // ─── 公開 API ──────────────────────────────────────────────────────────────
+
+  /** 傳入玩家背包陣列並顯示 */
+  show(inventory = []) {
+    this._inventory   = inventory;
+    this._selectedIdx = 0;
+    this._scrollOff   = 0;
+    this._build();
+    this.visible = true;
+  }
+
+  hide() {
+    this.visible = false;
+    this.emit('close');
+  }
+
+  // ─── 建置（resize 時重建）────────────────────────────────────────────────
 
   _build() {
     const { width: W, height: H } = this._app.screen;
     this.removeChildren();
-
-    this._buildBg(W, H);
-    const titleH = this._buildTitleBar(W, H);
-    const tabH   = this._buildTabs(W, titleH);
-    const statsH = this._buildStatsBar(W, H);
-    this._buildList(W, titleH + tabH, H - titleH - tabH - statsH);
+    this._buildDim(W, H);
+    this._buildPanel(W, H);
   }
 
-  // ── 背景（皮革紋理） ───────────────────────────────────────────────────────
+  // ── 半透明遮罩 ────────────────────────────────────────────────────────────
 
-  _buildBg(W, H) {
-    const bg = new PIXI.Graphics();
-    bg.rect(0, 0, W, H).fill({ color: 0x0D0804 });
-    this.addChild(bg);
+  _buildDim(W, H) {
+    const dim = new PIXI.Graphics();
+    dim.rect(0, 0, W, H).fill({ color: 0x000000, alpha: 0.84 });
+    dim.eventMode = 'static';
+    this.addChild(dim);
+  }
 
-    // 皮革條紋（程式繪製）
-    const lcg = (s) => (s * 1664525 + 1013904223) & 0x7fffffff;
-    let seed = 77;
-    const stripes = new PIXI.Graphics();
-    for (let i = 0; i < 30; i++) {
-      seed = lcg(seed);
-      const y = (seed / 0x7fffffff) * H;
-      seed = lcg(seed);
-      const t = 1 + (seed / 0x7fffffff) * 3;
-      seed = lcg(seed);
-      const a = 0.015 + (seed / 0x7fffffff) * 0.025;
-      stripes.rect(0, y, W, t).fill({ color: 0x4A2808, alpha: a });
+  // ── 主面板 ────────────────────────────────────────────────────────────────
+
+  _buildPanel(W, H) {
+    const panW = Math.min(W * 0.94, 800);
+    const panH = Math.min(H * 0.90, 580);
+    const panX = Math.floor((W - panW) / 2);
+    const panY = Math.floor((H - panH) / 2);
+
+    // 框體
+    const panel = new PIXI.Graphics();
+    panel.roundRect(panX, panY, panW, panH, 4)
+         .fill({ color: C.panel });
+    panel.roundRect(panX + 2, panY + 2, panW - 4, panH - 4, 3)
+         .stroke({ color: C.border, width: 1 });
+    panel.roundRect(panX, panY, panW, panH, 4)
+         .stroke({ color: C.borderHi, width: 1.5 });
+    // 掃描線
+    for (let y = panY + 4; y < panY + panH - 4; y += 3) {
+      panel.moveTo(panX + 4, y).lineTo(panX + panW - 4, y)
+           .stroke({ color: C.scanline, width: 1, alpha: 0.10 });
     }
-    stripes.eventMode = 'none';
-    this.addChild(stripes);
+    this.addChild(panel);
+
+    const titleH = Math.floor(panH * 0.10);
+    this._buildTitleBar(panX, panY, panW, titleH);
+
+    const bodyY  = panY + titleH;
+    const bodyH  = panH - titleH;
+    const leftW  = Math.floor(panW * 0.40);
+    const rightW = panW - leftW;
+
+    // 分隔線
+    const div = new PIXI.Graphics();
+    div.moveTo(panX + leftW, bodyY + 8)
+       .lineTo(panX + leftW, panY + panH - 8)
+       .stroke({ color: C.border, width: 1 });
+    this.addChild(div);
+
+    this._buildItemList(panX,          bodyY, leftW,  bodyH);
+    this._buildItemDetail(panX + leftW, bodyY, rightW, bodyH);
   }
 
-  // ── 頂部標題列 ────────────────────────────────────────────────────────────
+  // ── 標題列 ────────────────────────────────────────────────────────────────
 
-  _buildTitleBar(W) {
-    const H = 58;
-
+  _buildTitleBar(px, py, pw, th) {
     const bar = new PIXI.Graphics();
-    bar.rect(0, 0, W, H).fill({ color: 0x080502 });
-    bar.rect(0, H - 2, W, 2).fill({ color: 0x3D2808 });
+    bar.rect(px, py, pw, th).fill({ color: 0x1a1600 });
+    bar.moveTo(px, py + th).lineTo(px + pw, py + th)
+       .stroke({ color: C.borderHi, width: 1 });
     this.addChild(bar);
 
-    // 返回按鍵
-    const backBtn = new PIXI.Container();
-    backBtn.eventMode = 'static';
-    backBtn.cursor    = 'pointer';
-    backBtn.hitArea   = new PIXI.Rectangle(0, 0, 90, H);
+    const fs = Math.max(11, Math.floor(th * 0.45));
 
-    const backTxt = new PIXI.Text({
-      text: '◀  返回',
-      style: new PIXI.TextStyle({
-        fontFamily: '"Noto Sans TC","Microsoft JhengHei",sans-serif',
-        fontSize: 14, fontWeight: 'bold', fill: 0xBB8830,
-      }),
-    });
-    backTxt.x = 16;
-    backTxt.y = (H - backTxt.height) / 2;
-    backBtn.addChild(backTxt);
+    const title = this._text('◈  INVENTORY / 隨身物資  ◈', fs, C.borderHi, 'bold');
+    title.anchor.set(0.5, 0.5);
+    title.x = px + pw / 2;
+    title.y = py + th / 2;
+    this.addChild(title);
 
-    backBtn.on('pointerdown', (e) => { e.stopPropagation(); backTxt.alpha = 0.6; });
-    backBtn.on('pointerup',   () => { backTxt.alpha = 1; this.emit('close'); });
-    backBtn.on('pointerupoutside', () => { backTxt.alpha = 1; });
+    // 關閉按鈕
+    const btnW = Math.max(64, Math.floor(pw * 0.14));
+    const btnH = Math.floor(th * 0.72);
+    const btnX = px + pw - btnW - 8;
+    const btnY = py + Math.floor((th - btnH) / 2);
 
-    this.addChild(backBtn);
+    const btnBg = new PIXI.Graphics();
+    btnBg.roundRect(btnX, btnY, btnW, btnH, 3)
+         .fill({ color: 0x2a1a00 })
+         .stroke({ color: C.dim, width: 1 });
+    this.addChild(btnBg);
 
-    // 標題
-    const titleTxt = new PIXI.Text({
-      text: '背包',
-      style: new PIXI.TextStyle({
-        fontFamily: '"Noto Sans TC","Microsoft JhengHei",sans-serif',
-        fontSize: 18, fontWeight: 'bold', fill: 0xE0A030,
-      }),
-    });
-    titleTxt.anchor.set(0.5, 0.5);
-    titleTxt.x = W / 2;
-    titleTxt.y = H / 2;
-    this.addChild(titleTxt);
+    const btnTxt = this._text('✕  關閉', Math.max(9, Math.floor(btnH * 0.52)), C.dim);
+    btnTxt.anchor.set(0.5, 0.5);
+    btnTxt.x = btnX + btnW / 2;
+    btnTxt.y = btnY + btnH / 2;
+    this.addChild(btnTxt);
 
-    return H;
+    const hitArea = new PIXI.Container();
+    hitArea.eventMode = 'static';
+    hitArea.cursor    = 'pointer';
+    hitArea.hitArea   = new PIXI.Rectangle(btnX - 4, btnY - 4, btnW + 8, btnH + 8);
+    hitArea.on('pointerover',  () => { btnBg.tint = 0xddaa44; btnTxt.tint = 0xddaa44; });
+    hitArea.on('pointerout',   () => { btnBg.tint = 0xffffff; btnTxt.tint = 0xffffff; });
+    hitArea.on('pointerdown',  (e) => e.stopPropagation());
+    hitArea.on('pointerup',    () => this.hide());
+    hitArea.on('pointertap',   () => this.hide());
+    this.addChild(hitArea);
   }
 
-  // ── 頁籤列 ────────────────────────────────────────────────────────────────
+  // ── 左欄：物品清單 ────────────────────────────────────────────────────────
 
-  _buildTabs(W, y) {
-    const H    = 44;
-    const TABS = ['物品', '武器', '烏鴉'];
-    const tw   = Math.floor(W / TABS.length);
+  _buildItemList(cx, cy, cw, ch) {
+    const pad  = Math.floor(cw * 0.07);
+    let   curY = cy + pad;
 
-    TABS.forEach((label, i) => {
-      const active = i === this._activeTab;
+    const fs   = this._responsiveFs(cw, 0.065);
+    const fsSm = this._responsiveFs(cw, 0.050);
 
-      const tab = new PIXI.Container();
-      tab.eventMode = 'static';
-      tab.cursor    = 'pointer';
-      tab.hitArea   = new PIXI.Rectangle(0, 0, tw, H);
-      tab.x = i * tw;
-      tab.y = y;
+    // 小標題
+    const header = this._text('[ 物品清單 ]', fsSm, C.dim);
+    header.x = cx + pad; header.y = curY;
+    this.addChild(header);
+    curY += header.height + 4;
+    this._hLine(cx + pad, curY, cw - pad * 2);
+    curY += 8;
 
-      const bg = new PIXI.Graphics();
-      bg.rect(0, 0, tw, H).fill({ color: active ? 0x1E1408 : 0x0C0804 });
-      bg.rect(0, 0, tw, H).stroke({ color: active ? 0xE0A030 : 0x261808, width: 2 });
-      if (active) {
-        bg.rect(0, H - 2, tw, 2).fill({ color: 0xE0A030 });
+    if (this._inventory.length === 0) {
+      const empty = this._text('— 背包是空的 —', fsSm, C.dim);
+      empty.anchor.set(0.5, 0);
+      empty.x = cx + cw / 2; empty.y = curY + 20;
+      this.addChild(empty);
+      return;
+    }
+
+    // 計算可視列數
+    const itemH      = Math.floor(fs * 2.3);
+    const listBottom = cy + ch - pad - Math.floor(fsSm * 1.8);
+    const maxVisible = Math.max(1, Math.floor((listBottom - curY) / (itemH + 4)));
+
+    // 滾動窗口：確保選取列始終在可視範圍內
+    if (this._selectedIdx < this._scrollOff) {
+      this._scrollOff = this._selectedIdx;
+    } else if (this._selectedIdx >= this._scrollOff + maxVisible) {
+      this._scrollOff = this._selectedIdx - maxVisible + 1;
+    }
+
+    const visible = this._inventory.slice(this._scrollOff, this._scrollOff + maxVisible);
+
+    visible.forEach(({ id, qty }, vi) => {
+      const absIdx = vi + this._scrollOff;
+      const def    = this._getItemDef(id);
+      const isSel  = absIdx === this._selectedIdx;
+
+      // 列背景
+      const rowBg = new PIXI.Graphics();
+      if (isSel) {
+        rowBg.roundRect(cx + pad, curY, cw - pad * 2, itemH, 2)
+             .fill({ color: C.rowSel })
+             .stroke({ color: C.borderHi, width: 1 });
+      } else {
+        rowBg.roundRect(cx + pad, curY, cw - pad * 2, itemH, 2)
+             .fill({ color: absIdx % 2 === 0 ? C.rowEven : C.rowOdd });
       }
-      tab.addChild(bg);
+      this.addChild(rowBg);
 
-      const txt = new PIXI.Text({
-        text: label,
-        style: new PIXI.TextStyle({
-          fontFamily: '"Noto Sans TC","Microsoft JhengHei",sans-serif',
-          fontSize: 15,
-          fontWeight: active ? 'bold' : 'normal',
-          fill: active ? 0xE0A030 : 0x5C4020,
-        }),
-      });
-      txt.anchor.set(0.5);
-      txt.x = tw / 2;
-      txt.y = H / 2;
-      tab.addChild(txt);
+      // 選取游標
+      if (isSel) {
+        const cur = this._text('▶', fsSm, C.borderHi, 'bold');
+        cur.x = cx + pad + 3;
+        cur.y = curY + Math.floor((itemH - cur.height) / 2);
+        this.addChild(cur);
+      }
 
-      tab.on('pointerdown', (e) => { e.stopPropagation(); });
-      tab.on('pointerup',   () => {
-        this._activeTab = i;
-        this._scrollY   = 0;
+      // 物品名稱
+      const nameX   = cx + pad + (isSel ? 16 : 8);
+      const nameCol = isSel ? C.borderHi : C.label;
+      const nameTxt = this._text(def.name_zh ?? def.name ?? id, fs, nameCol,
+                                 isSel ? 'bold' : 'normal', FONT_JP);
+      nameTxt.x = nameX;
+      nameTxt.y = curY + Math.floor((itemH - nameTxt.height) / 2);
+      this.addChild(nameTxt);
+
+      // 數量徽章（右對齊）
+      const qtyTxt = this._text(`×${qty}`, fsSm,
+                                isSel ? C.value : C.dim, 'bold');
+      qtyTxt.anchor.set(1, 0.5);
+      qtyTxt.x = cx + cw - pad - 4;
+      qtyTxt.y = curY + itemH / 2;
+      this.addChild(qtyTxt);
+
+      // 點擊切換選取
+      const hit = new PIXI.Container();
+      hit.eventMode = 'static';
+      hit.cursor    = 'pointer';
+      hit.hitArea   = new PIXI.Rectangle(cx + pad, curY, cw - pad * 2, itemH);
+      const capturedIdx = absIdx;
+      hit.on('pointertap', () => {
+        this._selectedIdx = capturedIdx;
         this._build();
       });
+      this.addChild(hit);
 
-      this.addChild(tab);
+      curY += itemH + 4;
     });
 
-    return H;
+    // 捲動指示器
+    const total = this._inventory.length;
+    if (total > maxVisible) {
+      const hint = this._text(
+        `${this._selectedIdx + 1} / ${total}   ↑↓ 選取`,
+        fsSm, C.dim
+      );
+      hint.anchor.set(0.5, 1);
+      hint.x = cx + cw / 2;
+      hint.y = cy + ch - 4;
+      this.addChild(hint);
+    } else {
+      const hint = this._text('↑ ↓ 選取', fsSm, C.dim);
+      hint.anchor.set(0.5, 1);
+      hint.x = cx + cw / 2;
+      hint.y = cy + ch - 4;
+      this.addChild(hint);
+    }
   }
 
-  // ── 道具清單 ──────────────────────────────────────────────────────────────
+  // ── 右欄：物品詳情 ────────────────────────────────────────────────────────
 
-  _buildList(W, startY, listH) {
-    // 遮罩容器
-    const mask = new PIXI.Graphics();
-    mask.rect(0, startY, W, listH).fill({ color: 0xFFFFFF });
-    this.addChild(mask);
+  _buildItemDetail(cx, cy, cw, ch) {
+    const pad  = Math.floor(cw * 0.07);
+    let   curY = cy + pad;
 
-    const listContainer = new PIXI.Container();
-    listContainer.mask  = mask;
-    this.addChild(mask);
-    this.addChild(listContainer);
+    const fs   = this._responsiveFs(cw, 0.058);
+    const fsLg = this._responsiveFs(cw, 0.088);
+    const fsSm = this._responsiveFs(cw, 0.047);
 
-    const items = this._getTabItems();
-    const ROW_H = 76;
+    const entry = this._inventory[this._selectedIdx];
+    const def   = entry ? this._getItemDef(entry.id) : null;
 
-    items.forEach((item, i) => {
-      const row = this._buildRow(item, W, ROW_H, i);
-      row.x = 0;
-      row.y = startY + i * ROW_H + this._scrollY;
-      listContainer.addChild(row);
-    });
+    // 小標題
+    const header = this._text('[ 物品詳情 ]', fsSm, C.dim);
+    header.x = cx + pad; header.y = curY;
+    this.addChild(header);
+    curY += header.height + 4;
+    this._hLine(cx + pad, curY, cw - pad * 2);
+    curY += 12;
 
-    // 空狀態
-    if (items.length === 0) {
-      const empty = new PIXI.Text({
-        text: '── 無物品 ──',
-        style: new PIXI.TextStyle({
-          fontFamily: '"Noto Sans TC","Microsoft JhengHei",sans-serif',
-          fontSize: 14, fill: 0x3A2810,
-        }),
-      });
-      empty.anchor.set(0.5);
-      empty.x = W / 2;
-      empty.y = startY + listH / 2;
-      listContainer.addChild(empty);
+    if (!def) {
+      const empty = this._text('— 選取物品以查看詳情 —', fsSm, C.dim);
+      empty.anchor.set(0.5, 0.5);
+      empty.x = cx + cw / 2; empty.y = cy + ch / 2;
+      this.addChild(empty);
+      return;
     }
 
-    // 捲動（touch）
-    let touchStartY = 0;
-    const listMask = new PIXI.Graphics();
-    listMask.rect(0, startY, W, listH).fill({ color: 0xFFFFFF, alpha: 0.01 });
-    listMask.eventMode = 'static';
+    // ── 物品名稱（大標題）───────────────────────────────────────────────────
+    const nameT = this._text(def.name_zh ?? def.name ?? def.id, fsLg,
+                             C.borderHi, 'bold', FONT_JP);
+    nameT.x = cx + pad; nameT.y = curY;
+    this.addChild(nameT);
+    curY += nameT.height + 6;
 
-    listMask.on('pointerdown', (e) => { touchStartY = e.global.y; });
-    listMask.on('pointermove', (e) => {
-      if (e.buttons === 0 && !e.pressure) return;
-      const dy = e.global.y - touchStartY;
-      touchStartY = e.global.y;
-      const maxScroll = Math.max(0, items.length * ROW_H - listH);
-      this._scrollY = Math.max(-maxScroll, Math.min(0, this._scrollY + dy));
-      listContainer.children.forEach((child, idx) => {
-        if (child !== mask) {
-          child.y = startY + idx * ROW_H + this._scrollY;
-        }
+    // ── 類別徽章 ─────────────────────────────────────────────────────────────
+    const catLabel = CATEGORY_LABEL[def.category] ?? def.category ?? '—';
+    const catTxt   = this._text(catLabel, fsSm, C.dim);
+    const badgeW   = catTxt.width + 16;
+    const badgeH   = catTxt.height + 6;
+
+    const catBg = new PIXI.Graphics();
+    catBg.roundRect(cx + pad, curY, badgeW, badgeH, 2)
+         .fill({ color: 0x1a1408 })
+         .stroke({ color: C.border, width: 1 });
+    catTxt.x = cx + pad + 8; catTxt.y = curY + 3;
+    this.addChild(catBg, catTxt);
+    curY += badgeH + 12;
+
+    this._hLine(cx + pad, curY, cw - pad * 2);
+    curY += 10;
+
+    // ── 描述（多行自動換行）─────────────────────────────────────────────────
+    const descStyle = new PIXI.TextStyle({
+      fontFamily:    FONT_JP,
+      fontSize:      Math.max(10, fs - 1),
+      fill:          C.label,
+      wordWrap:      true,
+      wordWrapWidth: cw - pad * 2 - 8,
+      lineHeight:    Math.floor(fs * 1.6),
+    });
+    const descTxt = new PIXI.Text({
+      text:  def.description_zh ?? def.description ?? '—',
+      style: descStyle,
+    });
+    descTxt.x = cx + pad; descTxt.y = curY;
+    this.addChild(descTxt);
+    curY += descTxt.height + 14;
+
+    // ── 使用效果區塊（僅限消耗品）────────────────────────────────────────────
+    const effects = def.useProps?.effects ?? [];
+    if (effects.length > 0) {
+      this._hLine(cx + pad, curY, cw - pad * 2);
+      curY += 8;
+
+      const effHdr = this._text('使用效果', fsSm, C.dim);
+      effHdr.x = cx + pad; effHdr.y = curY;
+      this.addChild(effHdr);
+      curY += effHdr.height + 4;
+
+      effects.forEach(eff => {
+        const meta  = EFFECT_LABEL[eff.type];
+        if (!meta) return;
+        const label = meta.label;
+        const val   = eff.value  ? `+${eff.value}` :
+                      eff.statusId ? eff.statusId    : '';
+        curY = this._statRow(cx + pad, curY, cw - pad * 2,
+                             fs, fsSm, label, val, meta.color);
       });
-    });
 
-    this.addChild(listMask);
-    this._listMask = listMask;
+      curY += 4;
+    }
+
+    // ── 持有數量（底部）─────────────────────────────────────────────────────
+    this._hLine(cx + pad, curY + 4, cw - pad * 2);
+    curY += 12;
+    this._statRow(cx + pad, curY, cw - pad * 2,
+                  fs, fsSm, '持有數量', String(entry.qty), C.value);
+    curY += Math.floor(fs * 1.6);
+
+    // ── 「使用」按鈕（消耗品且 visible 狀態才顯示）───────────────────────────
+    if (def.usable && entry.qty > 0) {
+      curY += 8;
+      const btnW = Math.min(cw - pad * 2, 140);
+      const btnH = Math.max(28, Math.floor(fs * 1.9));
+      const btnX = cx + pad;
+      const btnY = curY;
+
+      const btnBg = new PIXI.Graphics();
+      btnBg.roundRect(btnX, btnY, btnW, btnH, 3)
+           .fill({ color: 0x1a2a10 })
+           .stroke({ color: C.accent, width: 1.5 });
+      this.addChild(btnBg);
+
+      const btnTxt = this._text('▶ 使用', Math.max(10, Math.floor(btnH * 0.48)),
+                                C.accent, 'bold', FONT_JP);
+      btnTxt.anchor.set(0.5, 0.5);
+      btnTxt.x = btnX + btnW / 2; btnTxt.y = btnY + btnH / 2;
+      this.addChild(btnTxt);
+
+      const hit = new PIXI.Container();
+      hit.eventMode = 'static';
+      hit.cursor    = 'pointer';
+      hit.hitArea   = new PIXI.Rectangle(btnX, btnY, btnW, btnH);
+      hit.on('pointerover',  () => { btnBg.tint = 0xbbddbb; btnTxt.tint = 0xbbddbb; });
+      hit.on('pointerout',   () => { btnBg.tint = 0xffffff; btnTxt.tint = 0xffffff; });
+      hit.on('pointerdown',  (e) => e.stopPropagation());
+      hit.on('pointerup',    () => this.emit('use', def.id));
+      hit.on('pointertap',   () => this.emit('use', def.id));
+      this.addChild(hit);
+    }
   }
 
-  _buildRow(item, W, H, idx) {
-    const row = new PIXI.Container();
+  // ─── 工具方法（與 StatusScreen 相同介面）──────────────────────────────────
 
-    const bg = new PIXI.Graphics();
-    bg.rect(0, 0, W, H).fill({ color: idx % 2 === 0 ? 0x120D06 : 0x0D0904 });
-    bg.rect(0, H - 1, W, 1).fill({ color: 0x2A1C0A });
-    row.addChild(bg);
-
-    // 圖示框
-    const iconSize = Math.floor(H * 0.62);
-    const iconX    = 16;
-    const iconY    = (H - iconSize) / 2;
-
-    const iconBg = new PIXI.Graphics();
-    iconBg.roundRect(iconX, iconY, iconSize, iconSize, 3)
-           .fill({ color: 0x1C1408 });
-    iconBg.roundRect(iconX, iconY, iconSize, iconSize, 3)
-           .stroke({ color: 0x3D2808, width: 1 });
-    row.addChild(iconBg);
-
-    const iconTxt = new PIXI.Text({
-      text: item.icon_label ?? '■',
-      style: new PIXI.TextStyle({ fontSize: Math.floor(iconSize * 0.55), fill: item.icon_color ?? 0xE0A030 }),
-    });
-    iconTxt.anchor.set(0.5);
-    iconTxt.x = iconX + iconSize / 2;
-    iconTxt.y = iconY + iconSize / 2;
-    row.addChild(iconTxt);
-
-    // 名稱
-    const nameX = iconX + iconSize + 12;
-    const name  = new PIXI.Text({
-      text: item.name_zh ?? item.name ?? '???',
+  _text(str, size, color, weight = 'normal', family = FONT_MONO) {
+    return new PIXI.Text({
+      text: str,
       style: new PIXI.TextStyle({
-        fontFamily: '"Noto Sans TC","Microsoft JhengHei",sans-serif',
-        fontSize: 15, fontWeight: 'bold', fill: 0xEEEEEE,
+        fontFamily: family,
+        fontSize:   Math.max(9, Math.round(size)),
+        fontWeight: weight,
+        fill:       color,
       }),
     });
-    name.x = nameX;
-    name.y = Math.floor(H * 0.2);
-    row.addChild(name);
-
-    // 描述
-    const desc = new PIXI.Text({
-      text: item.description_zh ?? item.description ?? '',
-      style: new PIXI.TextStyle({
-        fontFamily: '"Noto Sans TC","Microsoft JhengHei",sans-serif',
-        fontSize: 10, fill: 0x666666,
-        wordWrap: true, wordWrapWidth: W - nameX - 70,
-      }),
-    });
-    desc.x = nameX;
-    desc.y = Math.floor(H * 0.52);
-    row.addChild(desc);
-
-    // 數量
-    const qtyColor = item.qty === 1 ? 0xFF5555 : 0x00FF41;
-    const qty = new PIXI.Text({
-      text: `× ${item.qty ?? 1}`,
-      style: new PIXI.TextStyle({
-        fontFamily: '"VT323","Courier New",monospace',
-        fontSize: 14, fontWeight: 'bold', fill: qtyColor,
-      }),
-    });
-    qty.anchor.set(1, 0.5);
-    qty.x = W - 16;
-    qty.y = H / 2;
-    row.addChild(qty);
-
-    // 點擊（使用道具）
-    row.eventMode = 'static';
-    row.hitArea   = new PIXI.Rectangle(0, 0, W, H);
-    row.on('pointerdown', (e) => { e.stopPropagation(); bg.alpha = 0.7; });
-    row.on('pointerup',   () => { bg.alpha = 1; if (item.usable) this.emit('use', item.id); });
-    row.on('pointerupoutside', () => { bg.alpha = 1; });
-
-    return row;
   }
 
-  // ── 底部角色狀態列 ────────────────────────────────────────────────────────
+  _hLine(x, y, w) {
+    const g = new PIXI.Graphics();
+    g.moveTo(x, y).lineTo(x + w, y)
+     .stroke({ color: C.border, width: 1, alpha: 0.7 });
+    this.addChild(g);
+  }
 
-  _buildStatsBar(W, H) {
-    const barH = 116;
-    const y    = H - barH;
+  _responsiveFs(colW, ratio) {
+    return Math.min(Math.max(10, Math.floor(colW * ratio)), 22);
+  }
 
-    const bg = new PIXI.Graphics();
-    bg.rect(0, y, W, barH).fill({ color: 0x070402 });
-    bg.rect(0, y, W, 2).fill({ color: 0x3D2808 });
-    this.addChild(bg);
+  _statRow(x, y, rowW, fsLabel, _fsVal, label, value, valueColor) {
+    const lbl = this._text(label, fsLabel, C.label);
+    const val = this._text(value, fsLabel, valueColor, 'bold');
+    lbl.x = x; lbl.y = y;
+    val.anchor.set(1, 0);
+    val.x = x + rowW; val.y = y;
+    this.addChild(lbl, val);
 
-    const p = this._gs.player ?? {
-      name: '瞿董', level: 8, hp: 204, maxHp: 240, sp: 144, maxSp: 240,
+    const dotLine = new PIXI.Graphics();
+    const dotY    = y + lbl.height / 2;
+    dotLine.moveTo(x + lbl.width + 4, dotY)
+           .lineTo(x + rowW - val.width - 4, dotY)
+           .stroke({ color: C.dim, width: 1, alpha: 0.5 });
+    this.addChild(dotLine);
+
+    const rowH = Math.max(lbl.height, val.height);
+    return y + rowH + Math.floor(rowH * 0.35);
+  }
+
+  /** 從 _itemDefs 取得物品定義；找不到時回傳最小佔位物件 */
+  _getItemDef(id) {
+    return this._itemDefs.find(d => d.id === id) ?? {
+      id, name: id, name_zh: id, category: 'misc', description_zh: '—',
+      usable: false, useProps: null,
     };
-
-    // 角色名稱 + 等級
-    const nameLabel = new PIXI.Text({
-      text: `${p.name}  /  LV. ${String(p.level ?? 8).padStart(2, '0')}`,
-      style: new PIXI.TextStyle({
-        fontFamily: '"Noto Sans TC","Microsoft JhengHei",sans-serif',
-        fontSize: 13, fontWeight: 'bold', fill: 0xE0A030,
-      }),
-    });
-    nameLabel.x = 16;
-    nameLabel.y = y + 12;
-    this.addChild(nameLabel);
-
-    // HP 條
-    this._buildStatBar(16, y + 36, W - 120, 10, p.hp, p.maxHp, 0x00FF41, 'HP');
-    // SP 條
-    this._buildStatBar(16, y + 56, W - 120, 8,  p.sp ?? 144, p.maxSp ?? 240, 0x3366FF, 'SP');
-
-    // 攜帶重量
-    const weight = new PIXI.Text({
-      text: `攜帶重量  ${p.weight ?? 12} / ${p.maxWeight ?? 20} kg`,
-      style: new PIXI.TextStyle({
-        fontFamily: '"Noto Sans TC","Microsoft JhengHei",sans-serif',
-        fontSize: 11, fill: 0x5C4020,
-      }),
-    });
-    weight.x = 16;
-    weight.y = y + 74;
-    this.addChild(weight);
-
-    // 持有金錢
-    const money = new PIXI.Text({
-      text: `$  ${(p.money ?? 2480).toLocaleString()}`,
-      style: new PIXI.TextStyle({
-        fontFamily: '"VT323","Courier New",monospace',
-        fontSize: 15, fontWeight: 'bold', fill: 0xE0A030,
-      }),
-    });
-    money.anchor.set(1, 0);
-    money.x = W - 16;
-    money.y = y + 72;
-    this.addChild(money);
-
-    return barH;
   }
 
-  _buildStatBar(x, y, barW, barH, cur, max, color, label) {
-    const pct = Math.max(0, Math.min(1, cur / max));
+  // ─── 鍵盤 ─────────────────────────────────────────────────────────────────
 
-    const bg = new PIXI.Graphics();
-    bg.roundRect(x, y, barW, barH, 2)
-      .fill({ color: color === 0x00FF41 ? 0x051005 : 0x050514 });
-    bg.roundRect(x, y, barW, barH, 2).stroke({ color: 0x222222, width: 1 });
-    this.addChild(bg);
-
-    if (pct > 0) {
-      const fill = new PIXI.Graphics();
-      fill.roundRect(x, y, Math.floor(barW * pct), barH, 2).fill({ color });
-      this.addChild(fill);
-    }
-
-    const txt = new PIXI.Text({
-      text: `${label}  ${cur} / ${max}`,
-      style: new PIXI.TextStyle({
-        fontFamily: '"VT323","Courier New",monospace',
-        fontSize: Math.max(10, barH + 1), fill: color,
-      }),
-    });
-    txt.x = x + barW + 8;
-    txt.y = y - 1;
-    this.addChild(txt);
-  }
-
-  // ─── 資料篩選 ─────────────────────────────────────────────────────────────
-
-  _getTabItems() {
-    const inv = this._gs.inventory ?? DEFAULT_INVENTORY;
-    const tabCategories = ['consumable', 'weapon', 'ally'];
-    const cat = tabCategories[this._activeTab];
-
-    if (this._activeTab === 2) {
-      // 烏鴉（成員）頁
-      return (this._gs.members ?? DEFAULT_MEMBERS);
-    }
-    return inv.filter(i => i.category === cat || (!i.category && this._activeTab === 0));
+  _bindKeyboard() {
+    this._keyHandler = (e) => {
+      if (!this.visible) return;
+      switch (e.key) {
+        case 'Escape':
+        case 'i':
+        case 'I':
+          e.preventDefault();
+          this.hide();
+          break;
+        case 'ArrowUp': {
+          e.preventDefault();
+          const len = this._inventory.length;
+          if (len === 0) break;
+          this._selectedIdx = (this._selectedIdx - 1 + len) % len;
+          this._build();
+          break;
+        }
+        case 'ArrowDown': {
+          e.preventDefault();
+          const len = this._inventory.length;
+          if (len === 0) break;
+          this._selectedIdx = (this._selectedIdx + 1) % len;
+          this._build();
+          break;
+        }
+      }
+    };
+    window.addEventListener('keydown', this._keyHandler);
   }
 
   // ─── Resize ───────────────────────────────────────────────────────────────
 
   _bindResize() {
-    this._rh = () => this._build();
+    this._rh = () => { if (this.visible) this._build(); };
     this._app.stage.on('resize', this._rh);
   }
 
   destroy(opts) {
-    if (this._rh) this._app.stage.off('resize', this._rh);
+    if (this._keyHandler) window.removeEventListener('keydown', this._keyHandler);
+    if (this._rh)         this._app.stage.off('resize', this._rh);
     super.destroy(opts);
   }
 }
-
-// ─── 預設資料（無真實存檔時使用）────────────────────────────────────────────
-
-const DEFAULT_INVENTORY = [
-  { id:'stolen_meds', name_zh:'偷來的藥',   category:'consumable', qty:2,  usable:true,  icon_label:'✚', icon_color:0x00FF41, description_zh:'回復 HP 25 點，移除流血狀態' },
-  { id:'lead_pipe',   name_zh:'鉛管',       category:'weapon',     qty:1,  usable:false, icon_label:'⚒', icon_color:0xAAAAAA, description_zh:'8–14 鈍器傷害，25% 擊退機率' },
-  { id:'9mm_rounds',  name_zh:'九釐米彈匣', category:'consumable', qty:12, usable:false, icon_label:'⊙', icon_color:0xBBBB44, description_zh:'標準 9mm 空尖彈，每發計算清楚' },
-  { id:'9mm_handgun', name_zh:'.38 街頭特製', category:'weapon',   qty:1,  usable:false, icon_label:'🔫', icon_color:0x888888, description_zh:'12–18 穿刺傷害，射程 5 格' },
-];
-
-const DEFAULT_MEMBERS = [
-  { id:'qu_don',  name_zh:'瞿董',    category:'ally', qty:1, icon_label:'◆', icon_color:0xE0A030, description_zh:'前黑道協調人，以資訊和談判見長' },
-  { id:'raymond', name_zh:'Raymond', category:'ally', qty:1, icon_label:'◆', icon_color:0xFF5555, description_zh:'前拳擊手，擅長近戰壓制' },
-  { id:'lina',    name_zh:'Lina',    category:'ally', qty:1, icon_label:'◆', icon_color:0x44AAFF, description_zh:'前警察線人，狙擊手身手' },
-];
