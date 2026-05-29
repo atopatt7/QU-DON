@@ -20,6 +20,7 @@ import { AudioManager }          from './src/core/AudioManager.js';
 import { StatusScreen }          from './src/ui/StatusScreen.js';
 import { WorldMapScreen }        from './src/ui/WorldMapScreen.js';
 import { InventoryScreen }       from './src/ui/InventoryScreen.js';
+import { GameStateManager }      from './src/core/GameStateManager.js';
 
 // ─── VT323 字型 ────────────────────────────────────────────────────────────
 const fontLink = document.createElement('link');
@@ -558,8 +559,23 @@ async function main() {
   dialogueOverlay.visible = false;
   app.stage.addChild(dialogueOverlay);
 
+  // ── GameStateManager（隊伍 / 旗標 / 狀態機）────────────────────────────────
+  const gsm = new GameStateManager();
+
+  // 訂閱戰鬥觸發（InteractionManager BATTLE 選項 → 這裡接手）
+  gsm.on('battle:trigger', ({ npc }) => {
+    if (npc?.entityData) _startBattle(npc);
+  });
+
+  // 訂閱招募成功（未來可在此更新隊伍 UI / EntityManager 跟隨行為）
+  gsm.on('party:join', ({ id }) => {
+    entityManager.hideNpc(id); // 暫時：招募後從地圖移除（後期改為跟隨 AI）
+    console.log(`[main] 隊伍成員已加入：${id}`);
+  });
+
   const interaction = new InteractionManager(mapManager, dialogueOverlay);
   interaction.setEntityManager(entityManager);
+  interaction.setGameStateManager(gsm);
 
   // ── VFD 時鐘（左下角，遊戲區底部）────────────────────────────────────────
   const clock = new VFDClock({ color: 'green', fontSize: 18, showSeconds: false });

@@ -68,6 +68,7 @@ export class InteractionManager {
     this._map        = mapManager;
     this._dlg        = dialogueOverlay;
     this._em         = null;   // EntityManager（可選，啟用 NPC 互動）
+    this._gsm        = null;   // GameStateManager（可選，啟用招募 / 旗標）
     this._active     = false;
     this._tileConfig = null;   // config.json tiles 字典，非同步載入後填入
 
@@ -85,6 +86,14 @@ export class InteractionManager {
    */
   setEntityManager(entityManager) {
     this._em = entityManager;
+  }
+
+  /**
+   * 注入 GameStateManager，啟用招募 / 旗標 / 戰鬥選擇肢處理。
+   * 在 main.js 的 startGame 階段呼叫一次即可。
+   */
+  setGameStateManager(gsm) {
+    this._gsm = gsm;
   }
 
   // ─── 公開 API ──────────────────────────────────────────────────────────────
@@ -157,8 +166,9 @@ export class InteractionManager {
    * 預留 TODO：最後一行結束後可插入選項選單（商店 / 搶劫）。
    */
   _startNpcDialogue(npc) {
-    const lines  = npc.entityData.dialogue;
-    const name   = npc.entityData.name ?? npc.id;
+    const lines   = npc.entityData.dialogue;
+    const name    = npc.entityData.name ?? npc.id;
+    const choices = npc.entityData.choices ?? [];  // [{text, action, flagId?}]
     let   lineIdx = 0;
 
     this._active      = true;
@@ -166,9 +176,18 @@ export class InteractionManager {
 
     const showNext = () => {
       if (lineIdx >= lines.length) {
-        // TODO: Show Shop/Robbery menu here after dialogue
-        //   e.g. this._dlg.show('', name, [{ label: '購物' }, { label: '搶劫' }, { label: '離開' }]);
-        this._close();
+        // ── 對話結束：若有選擇肢則顯示，否則直接關閉 ───────────────────────
+        if (choices.length > 0) {
+          // 最後一行文字 + 選擇肢同時顯示（重用最後一行 speaker/text）
+          const lastText = lines[lines.length - 1] ?? '';
+          this._dlg.show(lastText, name, choices);
+          // 監聽選擇結果（once：選完自動移除）
+          this._dlg.once('choice', ({ action, index }) => {
+            this._handleChoice(action, choices[index], npc);
+          });
+        } else {
+          this._close();
+        }
         return;
       }
       this._dlg.show(lines[lineIdx], name);
@@ -178,6 +197,53 @@ export class InteractionManager {
 
     showNext();
     return true;
+  }
+
+  /**
+   * 選擇肢結果分派器。
+   * NPC entityData.choices 格式：
+   *   { text: "加入我們", action: "RECRUIT" }
+   *   { text: "展開戰鬥", action: "BATTLE"  }
+   *   { text: "記下情報", action: "SET_FLAG", flagId: "met_informant" }
+   *   { text: "算了",     action: "CLOSE"   }
+   *
+   * @param {string} action  — 動作代碼
+   * @param {object} choice  — 原始 choice 物件（含額外參數）
+   * @param {object} npc     — NPC 實例（含 id、entityData）
+   */
+  _handleChoice(action, choice, npc) {
+    switch (action) {
+
+      case 'RECRUIT':
+        if (this._gsm) {
+          this._gsm.recruitNpc(npc.id);
+          // 招募成功後顯示確認訊息再關閉
+          this._dlg.show(`${npc.entityData.name ?? npc.id} 加入了你的隊伍。`, '（系統）');
+          this._dlg.once('next', () => this._close());
+        } else {
+          this._close();
+        }
+        break;
+
+      case 'BATTLE':
+        // 關閉對話框後由 GSM 狀態切換觸發戰鬥（main.js 訂閱 'party:join' 等事件處理）
+        this._close();
+        // emit 至 GSM 讓 main.js 的監聽器接手（避免 InteractionManager 直接持有 BattleUI）
+        this._gsm?.emit('battle:trigger', { npc });
+        break;
+
+      case 'SET_FLAG':
+        if (this._gsm && choice.flagId) {
+          this._gsm.setFlag(choice.flagId, choice.flagValue ?? true);
+        }
+        this._close();
+        break;
+
+      case 'CLOSE':
+      default:
+        this._close();
+        break;
+    }
   }
 
   /**

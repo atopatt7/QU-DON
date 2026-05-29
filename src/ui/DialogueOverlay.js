@@ -171,10 +171,13 @@ export class DialogueOverlay extends PIXI.Container {
       const choiceBtnH   = Math.floor((boxH - txH - 38) / choices.length);
 
       choices.forEach((ch, i) => {
-        const cb = this._makeChoice(ch.label, inner - 14, Math.max(choiceBtnH, 30), i === 0);
+        // 支援 ch.text（新格式）與 ch.label（舊格式）
+        const displayText = ch.text ?? ch.label ?? `選項 ${i + 1}`;
+        const cb = this._makeChoice(displayText, ch.action, inner - 14, Math.max(choiceBtnH, 30), i === 0);
         cb.x = pad + 7;
         cb.y = choiceStartY + i * (Math.max(choiceBtnH, 30) + 4);
-        cb.on('_tap', () => this.emit('choice', i));
+        // emit 包含 index 與 action，供 InteractionManager 分派
+        cb.on('_tap', () => this.emit('choice', { index: i, action: ch.action ?? null }));
         this.addChild(cb);
       });
     }
@@ -257,8 +260,24 @@ export class DialogueOverlay extends PIXI.Container {
   }
 
   // ─── 選項按鍵 ─────────────────────────────────────────────────────────────
+  //
+  // 配色規則（VFD 復古風）：
+  //   RECRUIT  → 螢光綠 0x00FF41（招募 / 加入）
+  //   BATTLE   → 危險紅 0xFF0040（戰鬥）
+  //   其他     → 琥珀黃 0xE6B200（對話 / 預設）
 
-  _makeChoice(label, W, H, active) {
+  _makeChoice(label, action, W, H, active) {
+    // 依 action 決定主色
+    const accent = action === 'RECRUIT' ? 0x00FF41
+                 : action === 'BATTLE'  ? 0xFF0040
+                 :                        0xE6B200;
+    const bgActive   = action === 'RECRUIT' ? 0x0D1A0A
+                     : action === 'BATTLE'  ? 0x1A0505
+                     :                        0x1E1608;
+    const pressColor = action === 'RECRUIT' ? 0x008B22
+                     : action === 'BATTLE'  ? 0x8B0020
+                     :                        0x8B6800;
+
     const c = new PIXI.Container();
     c.eventMode = 'static';
     c.cursor    = 'pointer';
@@ -266,13 +285,13 @@ export class DialogueOverlay extends PIXI.Container {
 
     const bg = new PIXI.Graphics();
     bg.roundRect(0, 0, W, H, 2)
-      .fill({ color: active ? 0x1E1608 : 0x0D0D0D });
+      .fill({ color: active ? bgActive : 0x0D0D0D });
     bg.roundRect(0, 0, W, H, 2)
-      .stroke({ color: active ? 0xE6B200 : 0x2C2C2C, width: 1 });
+      .stroke({ color: active ? accent : 0x2C2C2C, width: 1 });
 
     const dn = new PIXI.Graphics();
-    dn.roundRect(0, 0, W, H, 2).fill({ color: 0x0A0A06 });
-    dn.roundRect(0, 0, W, H, 2).stroke({ color: 0x8B6800, width: 1 });
+    dn.roundRect(0, 0, W, H, 2).fill({ color: 0x060606 });
+    dn.roundRect(0, 0, W, H, 2).stroke({ color: pressColor, width: 1 });
     dn.visible = false;
 
     const txt = new PIXI.Text({
@@ -280,7 +299,7 @@ export class DialogueOverlay extends PIXI.Container {
       style: new PIXI.TextStyle({
         fontFamily: '"Noto Sans TC","Microsoft JhengHei",sans-serif',
         fontSize: 12, fontWeight: active ? 'bold' : 'normal',
-        fill: active ? 0xE6B200 : 0x555555,
+        fill: active ? accent : 0x555555,
       }),
     });
     txt.x = 12;
