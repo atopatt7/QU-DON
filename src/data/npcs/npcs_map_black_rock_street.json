@@ -1,32 +1,153 @@
 [
   {
+    "_comment": "蕾娜（Lina Castillo）：前警方線人，對瞿董保持距離。🔒 名單是她送去警局的（docs/WORLD.md 6.1）",
     "id":        "npc_lena",
-    "name":      "蕾娜",
+    "entityRef": "npc_lena",
     "category":  "recruitable",
     "position":  { "x": 17, "y": 10 },
     "direction": "down",
     "behavior":  "idle",
-    "dialogue":  ["...", "你來幹嘛？"],
-    "_dialogueRecruitable": ["聽說你在找人手？", "我可以考慮跟你走。"],
-    "_dialogueRecruited":   ["交給我吧，瞿董。"],
-    "recruitCondition": { "type": "flagSet", "flagId": "met_lena" }
+    "dialogue":  ["……瞿先生。", "茶桌散了以後，我們最好別在街上講話。"],
+    "variants": [
+      {
+        "if": "ws_end_camp",
+        "dialogue": [
+          "報社明天要登西郊的事。",
+          "你又把自己放到桌子中間了，瞿先生。跟以前一樣。",
+          "……上一次你這麼做，後來發生什麼事，你還記得吧。"
+        ]
+      },
+      {
+        "if": "ws_got_permit",
+        "dialogue": [
+          "聽說你去翻了鴻圖的辦公室。",
+          "小心點。范振宇最近常在西郊附近出現。他不是去散步的。"
+        ]
+      },
+      {
+        "if": "ws_met_elder",
+        "dialogue": [
+          "西郊的事，你插手了？",
+          "那裡現在是紅犬幫的地盤。紅犬那個人，不跟你上茶桌的。"
+        ]
+      }
+    ]
   },
+
   {
+    "_comment": "陳醫生：無牌診所。兩根菸換一次完整治療（香菸＝道上的通用貨幣）",
     "id":        "npc_doctor_chen",
-    "name":      "陳醫生",
+    "entityRef": "npc_doctor_chen",
     "category":  "system",
-    "position":  { "x": 10, "y": 17 },
+    "position":  { "x": 7, "y": 16 },
     "direction": "right",
     "behavior":  "idle",
-    "dialogue":  ["有傷嗎？我來看看。", "這條街不安全，小心點。"]
+    "dialogue":  ["有傷嗎？我這裡不問傷是怎麼來的。", "只問你付現，還是欠著。"],
+    "choices": [
+      {
+        "text": "請他處理傷口（兩根菸）",
+        "requiresItem": { "id": "cigarette", "qty": 2 },
+        "takeItem":     { "id": "cigarette", "qty": 2 },
+        "heal": "full",
+        "reply": ["……坐好，別亂動。", "好了。下次別等傷口發臭才來。"]
+      },
+      {
+        "text": "打聽消息",
+        "reply": [
+          "上個月有個工人被抬進來，頭破了。送他來的人戴紅帽子。",
+          "我縫完，他們就把人帶走了。之後我再也沒看過他。"
+        ]
+      },
+      { "text": "不用了" }
+    ]
   },
+
   {
+    "_comment": "老王：以物易物 + 情報（山手的宴席）",
     "id":        "npc_merchant_wang",
-    "name":      "老王",
+    "entityRef": "npc_merchant_wang",
     "category":  "system",
     "position":  { "x": 28, "y": 21 },
     "direction": "left",
     "behavior":  "idle",
-    "dialogue":  ["要買東西嗎？", "便宜賣你。"]
+    "dialogue":  ["要買東西嗎？錢不收，菸收。", "這年頭，菸比錢實在。"],
+    "choices": [
+      {
+        "text": "三根菸換一盒止痛藥",
+        "requiresItem": { "id": "cigarette", "qty": 3 },
+        "takeItem":     { "id": "cigarette", "qty": 3 },
+        "giveItem":     { "id": "painkiller", "qty": 1 },
+        "reply": ["成交。"]
+      },
+      {
+        "text": "打聽消息",
+        "reply": [
+          "西郊那塊地？鴻圖的沈董事長上個月在山手請了三桌，市議員都到了。",
+          "我賣東西給他們的司機。司機什麼都講。"
+        ]
+      },
+      { "text": "走了" }
+    ]
+  },
+
+  {
+    "_comment": "阿財伯：新玩家的路標（西郊在西邊）",
+    "id":        "street_homeless_vet",
+    "entityRef": "npc_homeless_vet",
+    "category":  "system",
+    "position":  { "x": 8, "y": 18 },
+    "direction": "right",
+    "behavior":  "idle",
+    "dialogue": [
+      "瞿家的……你也睡不著啊。",
+      "西郊？從這條路一直往西走到底就是了。以前那裡是煤場，我們都在那邊搬貨。",
+      "現在聽說要蓋豪宅。蓋給誰住啊，我們又住不起。"
+    ],
+    "variants": [
+      {
+        "if": "ws_end_camp",
+        "dialogue": ["聽說西郊的人不用搬了？", "……那就好。那就好。"]
+      }
+    ]
+  },
+
+  {
+    "_comment": "組頭阿彬：天公簽（世界觀：以港務局吞吐量末三碼開獎）",
+    "id":        "street_bookie",
+    "entityRef": "npc_bookie",
+    "category":  "system",
+    "position":  { "x": 19, "y": 26 },
+    "direction": "up",
+    "behavior":  "idle",
+    "dialogue": [
+      "天公簽要不要？港務局昨天的吞吐量，末三碼是四、一、七。",
+      "今天的明牌我只跟熟客講。包你中——不中的話，是你命不好。"
+    ],
+    "choices": [
+      {
+        "text": "用一根菸換明牌",
+        "requiresItem": "cigarette",
+        "takeItem": "cigarette",
+        "setFlag": "street_bookie_tip",
+        "reply": [
+          "爽快。今天的明牌是……八、八、六。",
+          "我跟你說，這是從港務局裡面傳出來的。紅犬幫的人也在簽這一組。"
+        ]
+      },
+      { "text": "不用了" }
+    ]
+  },
+
+  {
+    "_comment": "紅犬幫在南側收保護費的打手（敵對巡邏）",
+    "id":        "street_redhound",
+    "entityRef": "enemy_redhound_thug",
+    "name":      "紅犬幫收帳的",
+    "category":  "hostile",
+    "position":  { "x": 24, "y": 25 },
+    "direction": "right",
+    "behavior":  "patrol",
+    "path":      [[24, 25], [36, 25]],
+    "moveSpeed": 0.6
   }
 ]

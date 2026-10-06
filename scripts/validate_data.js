@@ -228,6 +228,15 @@ for (const f of fs.readdirSync(NPCS_DIR)) {
   for (const mod of seen) {
     if (!precache.has(mod)) warn(`sw.js PRECACHE 缺少模組 ${mod}（離線第一次啟動會失敗）`);
   }
+  // 遊戲會讀到的資料檔（可到達地圖、其 NPC 檔、registry 內的角色）
+  const dataFiles = [
+    ...[...reachable].map(id => `src/data/maps/${id}.json`),
+    ...fs.readdirSync(NPCS_DIR).filter(f => f.endsWith('.json')).map(f => `src/data/npcs/${f}`),
+    ...Object.entries(registry).filter(([k]) => !k.startsWith('_')).map(([, rel]) => `src/data/entities/${rel}`),
+  ];
+  for (const f of dataFiles) {
+    if (!precache.has(f)) warn(`sw.js PRECACHE 缺少資料檔 ${f}（離線時讀不到）`);
+  }
 }
 
 // ─── 輸出 ───────────────────────────────────────────────────────────────────

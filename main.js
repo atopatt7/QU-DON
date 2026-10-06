@@ -732,6 +732,12 @@ async function main() {
   gsm.on('inventory:change', _autosave);
   gsm.on('party:join',       _autosave);
 
+  // 對話選項的回復效果（例如無牌診所）
+  gsm.on('player:heal', (amount) => {
+    _setPlayerHp(amount === 'full' ? playerBase.stats.maxHp : playerHp + amount);
+    _autosave();
+  });
+
   // ── 備忘錄 / 隊伍人脈內容 ─────────────────────────────────────────────────
   function _buildJournalPanel() {
     const sections = [];

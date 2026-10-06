@@ -1,0 +1,15 @@
+{
+  "id": "npc_homeless_vet",
+  "name": "阿財伯",
+  "level": 1,
+  "stats": { "hp": 30, "maxHp": 30, "atk": 4, "def": 1, "eva": 0.0 },
+  "visuals": {
+    "spriteSheet":   "assets/sprites/entities/const_guard_sheet.png",
+    "frameWidth":    128,
+    "frameHeight":   256,
+    "heightInTiles": 1.7,
+    "tint":          "0x6a6656",
+    "_art": "暫用剪影：尚無專屬美術"
+  },
+  "description": "在黑石街睡了十年騎樓的老人。以前在義和堂的碼頭搬貨。"
+}

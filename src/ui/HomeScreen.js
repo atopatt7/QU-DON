@@ -202,7 +202,7 @@ export class HomeScreen extends PIXI.Container {
 
     // 時代標語
     const era = new PIXI.Text({
-      text: '── 1986  洛杉磯  雨季 ──',
+      text: '── 1986  洛城  雨季 ──',
       style: new PIXI.TextStyle({
         fontFamily: '"Noto Sans TC", "Microsoft JhengHei", sans-serif',
         fontSize: Math.min(Math.floor(W * 0.026), 10), fill: 0x484848,

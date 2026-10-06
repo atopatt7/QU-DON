@@ -186,7 +186,7 @@ export class DialogueOverlay extends PIXI.Container {
       choices.forEach((ch, i) => {
         // 支援 ch.text（新格式）與 ch.label（舊格式）
         const displayText = ch.text ?? ch.label ?? `選項 ${i + 1}`;
-        const cb = this._makeChoice(displayText, ch.action, btnW, btnH);
+        const cb = this._makeChoice(displayText, ch.action, btnW, btnH, ch.disabled);
         cb.x = areaX + (i % cols) * (btnW + gap);
         cb.y = areaY + Math.floor(i / cols) * (btnH + gap);
         cb.setActive(i === this._choiceIdx);
@@ -283,7 +283,7 @@ export class DialogueOverlay extends PIXI.Container {
   //   BATTLE   → 危險紅 0xFF0040（戰鬥）
   //   其他     → 琥珀黃 0xE6B200（對話 / 預設）
 
-  _makeChoice(label, action, W, H) {
+  _makeChoice(label, action, W, H, disabled = false) {
     // 依 action 決定主色
     const accent = action === 'RECRUIT' ? 0x00FF41
                  : action === 'BATTLE'  ? 0xFF0040
@@ -322,9 +322,10 @@ export class DialogueOverlay extends PIXI.Container {
       bg.clear();
       bg.roundRect(0, 0, W, H, 2).fill({ color: active ? bgActive : 0x0D0D0D });
       bg.roundRect(0, 0, W, H, 2).stroke({ color: active ? accent : 0x2C2C2C, width: 1 });
-      txt.text             = (active ? '▶  ' : '　') + label;
+      txt.text             = (active ? '▶  ' : '　') + label + (disabled ? '　（不足）' : '');
       txt.style.fontWeight = active ? 'bold' : 'normal';
-      txt.style.fill       = active ? accent : 0x555555;
+      // 道具不足：灰掉（游標仍可移上去看，但不能選）
+      txt.style.fill       = disabled ? (active ? 0x777777 : 0x3A3A3A) : (active ? accent : 0x555555);
     };
 
     c.addChild(bg, dn, txt);
@@ -376,8 +377,9 @@ export class DialogueOverlay extends PIXI.Container {
 
   _pickChoice(i) {
     if (this._choicePicked) return; // 同一組選項只回應一次（防連按）
-    this._choicePicked = true;
     const ch = this._opts.choices?.[i];
+    if (ch?.disabled) return;       // 道具不足的選項不能選
+    this._choicePicked = true;
     this.emit('choice', { index: i, action: ch?.action ?? null });
   }
 

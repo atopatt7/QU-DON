@@ -31,7 +31,7 @@
       "archetype": "Fixer",
       "portrait": "assets/images/actors/qu_don.png",
       "sprite": "assets/images/sprites/qu_don.png",
-      "description": "前黑道協調人，以資訊和談判見長。在洛城地下社會以「公正仲裁者」聞名。",
+      "description": "前茶桌仲裁人，繼承了父親「瞿董」的稱號。以資訊和談判見長，在洛城地下社會以「公正仲裁者」聞名。",
 
       "stats": {
         "hp":          85,
@@ -225,7 +225,7 @@
       "archetype": "Intel",
       "portrait": "assets/images/actors/eddie.png",
       "sprite": "assets/images/sprites/eddie.png",
-      "description": "唐人街情報掮客。一身是膽全靠消息。上了戰場就是累贅——除非他先知道敵人在哪。",
+      "description": "哈卡街情報掮客。一身是膽全靠消息。上了戰場就是累贅——除非他先知道敵人在哪。",
 
       "stats": {
         "hp":          55,

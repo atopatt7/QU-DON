@@ -8,5 +8,11 @@
   "enemy_redhound_thug": "actors/enemy_redhound_thug.json",
   "npc_camp_elder": "actors/npc_camp_elder.json",
   "npc_camp_youth": "actors/npc_camp_youth.json",
-  "npc_camp_kid": "actors/npc_camp_kid.json"
+  "npc_camp_kid": "actors/npc_camp_kid.json",
+  "npc_lena": "actors/npc_lena.json",
+  "npc_doctor_chen": "actors/npc_doctor_chen.json",
+  "npc_merchant_wang": "actors/npc_merchant_wang.json",
+  "npc_bartender": "actors/npc_bartender.json",
+  "npc_homeless_vet": "actors/npc_homeless_vet.json",
+  "npc_bookie": "actors/npc_bookie.json"
 }

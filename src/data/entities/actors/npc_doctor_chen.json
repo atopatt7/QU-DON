@@ -1,0 +1,15 @@
+{
+  "id": "npc_doctor_chen",
+  "name": "陳醫生",
+  "level": 2,
+  "stats": { "hp": 40, "maxHp": 40, "atk": 5, "def": 2, "eva": 0.0 },
+  "visuals": {
+    "spriteSheet":   "assets/sprites/entities/const_guard_sheet.png",
+    "frameWidth":    128,
+    "frameHeight":   256,
+    "heightInTiles": 1.7,
+    "tint":          "0x30364a",
+    "_art": "暫用剪影：尚無專屬美術"
+  },
+  "description": "黑石街無牌診所的醫生。前公立醫院外科醫生，因為一起醫療糾紛被吊照。"
+}

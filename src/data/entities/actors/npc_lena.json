@@ -1,0 +1,15 @@
+{
+  "id": "npc_lena",
+  "name": "蕾娜",
+  "level": 3,
+  "stats": { "hp": 55, "maxHp": 55, "atk": 14, "def": 4, "eva": 0.15 },
+  "visuals": {
+    "spriteSheet":   "assets/sprites/entities/player_sheet.png",
+    "frameWidth":    128,
+    "frameHeight":   256,
+    "heightInTiles": 1.7,
+    "tint":          "0x342c42",
+    "_art": "暫用剪影：尚無專屬美術"
+  },
+  "description": "蕾娜（Lina Castillo）。南灣長大的前警方線人，槍法極準，子彈永遠不夠。"
+}

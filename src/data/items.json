@@ -47,7 +47,7 @@
       "subtype": "melee_blunt",
       "icon": "assets/images/items/lead_pipe.png",
       "description": "A length of pipe ripped from a Chinatown alley wall. Crude. Effective.",
-      "description_zh": "從唐人街後巷扯下來的一截水管。粗糙，管用。",
+      "description_zh": "從黑石街後巷扯下來的一截水管。粗糙，管用。",
 
       "stackable": false,
       "maxStack":  1,
@@ -367,12 +367,12 @@
     {
       "id": "9mm_handgun",
       "name": ".38 Street Special",
-      "name_zh": ".38 街頭特製",
+      "name_zh": "九釐米街頭手槍",
       "category": "weapon",
       "subtype": "ranged_handgun",
       "icon": "assets/images/items/9mm_handgun.png",
       "description": "A battered revolver, serial number filed off. Standard LA street hardware.",
-      "description_zh": "一把磨掉序號的舊左輪。洛城街頭標配。",
+      "description_zh": "一把磨掉序號的九釐米手槍。洛城街頭標配，子彈比槍還難找。",
 
       "stackable": false,
       "maxStack":  1,

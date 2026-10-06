@@ -1,0 +1,15 @@
+{
+  "id": "npc_bartender",
+  "name": "酒保 阿貴",
+  "level": 1,
+  "stats": { "hp": 40, "maxHp": 40, "atk": 6, "def": 3, "eva": 0.05 },
+  "visuals": {
+    "spriteSheet":   "assets/sprites/entities/clerk_sheet.png",
+    "frameWidth":    128,
+    "frameHeight":   256,
+    "heightInTiles": 1.7,
+    "tint":          "0x5c4a6a",
+    "_art": "暫用剪影：尚無專屬美術"
+  },
+  "description": "霓虹酒吧的酒保。看過茶桌最風光的年代，現在只想把店撐下去。"
+}
