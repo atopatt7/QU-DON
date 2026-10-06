@@ -1,0 +1,15 @@
+{
+  "id": "npc_recycler_yang",
+  "name": "回收場 老楊",
+  "level": 1,
+  "stats": { "hp": 35, "maxHp": 35, "atk": 5, "def": 2, "eva": 0.0 },
+  "visuals": {
+    "spriteSheet":   "assets/sprites/entities/const_guard_sheet.png",
+    "frameWidth":    128,
+    "frameHeight":   256,
+    "heightInTiles": 1.7,
+    "tint":          "0x7a6e5a",
+    "_art": "暫用剪影：尚無專屬美術"
+  },
+  "description": "哈卡街東郊資源回收場的老闆。拆掉的房子最後都會送到他這裡。"
+}

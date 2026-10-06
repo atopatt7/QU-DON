@@ -10,7 +10,7 @@
  *    只改 JS / JSON 的話，線上玩家下次開啟就會拿到新版。
  */
 
-const CACHE_NAME = 'qudon-v92';
+const CACHE_NAME = 'qudon-v93';
 const NETWORK_TIMEOUT_MS = 3000;
 
 // ── 安裝時預快取：讓第一次開啟後就能離線遊玩 ──────────────────────────────────
@@ -62,6 +62,8 @@ const PRECACHE = [
   './src/data/entities/actors/npc_bartender.json',
   './src/data/entities/actors/npc_homeless_vet.json',
   './src/data/entities/actors/npc_bookie.json',
+  './src/data/entities/actors/npc_recycler_yang.json',
+  './src/data/entities/actors/npc_eddie.json',
   './src/data/maps/config.json',
   './src/data/maps/map_black_rock_street.json',
   './src/data/maps/map_neon_bar.json',
@@ -78,6 +80,8 @@ const PRECACHE = [
   './src/data/npcs/npcs_map_convenience_store.json',
   './src/data/npcs/npcs_map_black_rock_west_suburb.json',
   './src/data/npcs/npcs_map_neon_bar.json',
+  './src/data/npcs/npcs_map_hakka_east_suburb.json',
+  './src/data/npcs/npcs_map_hakka_street.json',
   // ── 圖片 / 音訊 ────────────────────────────────────────────────────────────
   './assets/sounds/bgm/neon_bar_theme.webm',
   './assets/images/home_bg.jpg',

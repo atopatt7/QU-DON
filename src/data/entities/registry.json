@@ -14,5 +14,7 @@
   "npc_merchant_wang": "actors/npc_merchant_wang.json",
   "npc_bartender": "actors/npc_bartender.json",
   "npc_homeless_vet": "actors/npc_homeless_vet.json",
-  "npc_bookie": "actors/npc_bookie.json"
+  "npc_bookie": "actors/npc_bookie.json",
+  "npc_recycler_yang": "actors/npc_recycler_yang.json",
+  "npc_eddie": "actors/npc_eddie.json"
 }
