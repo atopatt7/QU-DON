@@ -12,7 +12,13 @@
  *     "direction": "right",                    // 初始朝向
  *     "behavior":  "patrol",                   // idle | patrol
  *     "path":      [[10,16],[14,16],[14,15],[10,15]],  // 巡邏路徑點（循環，點與點之間逐格行走）
- *     "moveSpeed": 0.5                         // 格/秒（0.5 = 每 2 秒一格）
+ *     "moveSpeed": 0.5,                        // 格/秒（0.5 = 每 2 秒一格）
+ *     "tint":      "0xbfb8a8",                 // 可選：精靈色調（同一張雪碧圖扮演不同角色）
+ *     "dialogue":  ["..."], "choices": [...],  // 可選：覆寫實體的對話 / 選項（見 InteractionManager._runScript）
+ *     "variants":  [                           // 可選：條件成立時覆寫上述欄位（第一個成立者生效）
+ *       { "if": "flag", "position": { "x": 12, "y": 14 }, "dialogue": ["..."] },
+ *       { "ifNot": "flag", "hidden": true }
+ *     ]
  *   }
  * ]
  *
@@ -105,8 +111,12 @@ export class EntityManager {
     this.container = parentContainer;
     parentContainer.sortableChildren = true;
 
-    const npcData = (await this._loadNpcData(mapId)).filter(n => !this._removed.has(n.id));
+    const npcData = (await this._loadNpcData(mapId))
+      .filter(n => !this._removed.has(n.id))
+      .map(n => ({ id: n.id, _base: n })); // _base 保留原始 JSON，variant 每次都從它解析
     if (seq !== this._initSeq) return;
+    // 先同步套用一次（位置 / 碰撞立即生效），貼圖載入後再補上實體資料
+    for (const npc of npcData) this._applyVariant(npc, true);
     this.npcs = npcData;
 
     for (const npc of npcData) {
@@ -146,27 +156,79 @@ export class EntityManager {
     }
   }
 
-  // ─── 建立單一 NPC 精靈（回傳精靈，由 init 掛載）──────────────────────────────
-  async _createSprite(npc) {
-    this._applyCategory(npc);
+  /**
+   * 注入條件解析器（通常是 base => gsm.resolveVariant(base)）。
+   * NPC JSON 可帶 variants: [{ if, ifNot, requiresItem, ...覆寫欄位 }]，
+   * 第一個成立的 variant 覆寫 dialogue / choices / position / hidden 等欄位。
+   */
+  setConditionResolver(fn) {
+    this._resolve = fn;
+    this.refreshVariants();
+  }
 
-    let spr = null;
+  /** 旗標或背包變動後呼叫：重新套用每個 NPC 目前成立的 variant。 */
+  refreshVariants() {
+    for (const npc of this.npcs) this._applyVariant(npc);
+  }
 
-    if (npc.entityRef) {
-      const entData = await _loadEntity(npc.entityRef);
-      npc.entityData = entData; // 供戰鬥系統使用
-      spr = await this._buildEntitySprite(entData, npc.direction ?? 'down');
-    }
+  /**
+   * 依目前條件套用 NPC 資料。
+   * 對話 / 數值 / 顯示狀態每次都更新；位置 / 行為只在切換到不同 variant 時重設
+   * （避免巡邏中的 NPC 每次旗標變動都被拉回原位）。
+   */
+  _applyVariant(npc, initial = false) {
+    const v = this._resolve ? this._resolve(npc._base) : { ...npc._base, _variant: -1 };
+    const changed = initial || v._variant !== npc._variant;
+    npc._variant = v._variant;
 
     // 實例欄位覆寫 / 補足實體資料（例如同一實體在不同地圖說不同台詞；
     // 無 entityRef 的 NPC 也能靠實例上的 name / dialogue 進行對話）
     const overrides = {};
-    for (const key of ['name', 'dialogue', 'choices', 'stats']) {
-      if (npc[key] !== undefined) overrides[key] = npc[key];
+    for (const key of ['name', 'dialogue', 'choices', 'stats', 'onEnd']) {
+      if (v[key] !== undefined) overrides[key] = v[key];
     }
-    if (npc.entityData || Object.keys(overrides).length) {
-      npc.entityData = { ...(npc.entityData ?? {}), ...overrides };
+    npc.entityData = (npc._entity || Object.keys(overrides).length)
+      ? { ...(npc._entity ?? {}), ...overrides }
+      : null;
+
+    npc.category = v.category;
+    this._applyCategory(npc);
+    npc.hidden = !!v.hidden;
+
+    const spr = this.sprites.get(npc.id);
+    if (spr) spr.visible = !npc.hidden;
+
+    if (changed) {
+      npc.position  = { ...v.position };
+      npc.direction = v.direction;
+      npc.behavior  = v.behavior;
+      npc.path      = v.path;
+      npc.moveSpeed = v.moveSpeed;
+      npc._patrol   = null;
+      npc._target   = null;
+      if (spr) {
+        spr.stopWalk?.();
+        spr.setDir?.(npc.direction ?? 'down');
+        this._placeSprite(npc, spr);
+      }
     }
+  }
+
+  // ─── 建立單一 NPC 精靈（回傳精靈，由 init 掛載）──────────────────────────────
+  async _createSprite(npc) {
+    let spr = null;
+
+    const ref = npc._base.entityRef;
+    npc._entity = ref ? await _loadEntity(ref) : null;
+    this._applyVariant(npc, true);
+
+    if (npc._entity) {
+      spr = await this._buildEntitySprite(npc._entity, npc.direction ?? 'down');
+    }
+
+    // 色調：讓同一張雪碧圖扮演不同角色（實例 / variant 的 tint 優先於實體設定）
+    const tint = npc._base.tint ?? npc._entity?.visuals?.tint;
+    if (spr && tint != null) spr.tint = typeof tint === 'string' ? parseInt(tint) : tint;
 
     // Fallback：色塊佔位（entityRef 缺失或貼圖載入失敗時使用）
     // 高度與玩家精靈一致（1.7 格），寬度 0.5 格；以 1 格 = 1px 繪製再縮放，resize 只需改 scale
@@ -178,6 +240,7 @@ export class EntityManager {
     }
 
     spr.resizeTo(this._tileSize);
+    spr.visible = !npc.hidden;
     this._placeSprite(npc, spr);
     return spr;
   }
@@ -259,7 +322,7 @@ export class EntityManager {
     let contact = null;
 
     for (const npc of this.npcs) {
-      if (npc.behavior !== 'patrol' || !npc.path?.length) continue;
+      if (npc.hidden || npc.behavior !== 'patrol' || !npc.path?.length) continue;
 
       npc._patrol ??= this._initPatrol(npc);
       const p   = npc._patrol;
@@ -361,7 +424,7 @@ export class EntityManager {
 
   // ─── 查詢指定格子的 NPC（含移動中正在進入該格的 NPC）──────────────────────
   getNpcAt(gx, gy, exclude = null) {
-    return this.npcs.find(n => n !== exclude && (
+    return this.npcs.find(n => n !== exclude && !n.hidden && (
       (n.position.x === gx && n.position.y === gy) ||
       (n._target && n._target.x === gx && n._target.y === gy)
     )) ?? null;

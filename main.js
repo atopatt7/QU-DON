@@ -514,6 +514,7 @@ async function main() {
     const onWin = () => {
       _setPlayerHp(battleUI.playerHp);
       entityManager.hideNpc(npc.id);
+      gsm.setFlag(`defeated_${npc.id}`); // 供對話 variants 判斷（例如「你把守衛打了？」）
       cleanup();
     };
     const onLose = () => {
@@ -554,13 +555,17 @@ async function main() {
 
   inventoryScreen.on('close', () => { panel.visible = true; });
 
-  // 使用道具：扣減數量、刷新介面（暫不套用 HP/SP 效果，留給後期系統實作）
+  // 使用道具：目前支援 heal_hp（items.json 的 useProps.effects）。
+  // 沒有可套用效果、或 HP 已滿時不消耗（能量飲料等留給之後的 SP 系統，也可拿來當交涉道具）
   inventoryScreen.on('use', (itemId) => {
-    const entry = playerInventory.find(e => e.id === itemId);
-    if (!entry || entry.qty <= 0) return;
-    entry.qty -= 1;
-    if (entry.qty === 0) playerInventory.splice(playerInventory.indexOf(entry), 1);
-    console.log(`[Inventory] 使用：${itemId}`);
+    const def  = gsm.itemDef(itemId);
+    const heal = (def?.useProps?.effects ?? [])
+      .filter(e => e.type === 'heal_hp')
+      .reduce((sum, e) => sum + e.value + Math.round((Math.random() * 2 - 1) * (e.variance ?? 0)), 0);
+    if (!def?.usable || heal <= 0 || playerHp >= playerBase.stats.maxHp) return;
+    if (!gsm.removeItem(itemId, 1)) return;
+    _setPlayerHp(playerHp + heal);
+    console.log(`[Inventory] 使用：${itemId}  HP +${heal} → ${playerHp}`);
     inventoryScreen.show(playerInventory); // 重新渲染（數量更新）
   });
   // ────────────────────────────────────────────────────────────────────────
@@ -601,6 +606,13 @@ async function main() {
 
   // ── GameStateManager（隊伍 / 旗標 / 狀態機）────────────────────────────────
   const gsm = new GameStateManager();
+  gsm.inventory = playerInventory;          // 與 InventoryScreen 共用同一個陣列
+  gsm.itemDefs  = inventoryScreen.itemDefs;
+
+  // NPC 的條件式 variants（位置 / 對話 / 是否出現）隨旗標與背包即時更新
+  entityManager.setConditionResolver(base => gsm.resolveVariant(base));
+  gsm.on('flag:set',         () => entityManager.refreshVariants());
+  gsm.on('inventory:change', () => entityManager.refreshVariants());
 
   // 訂閱戰鬥觸發（InteractionManager BATTLE 選項 → 這裡接手）
   gsm.on('battle:trigger', ({ npc }) => {
@@ -746,7 +758,9 @@ async function main() {
 
     // ── 0) 環境調查：確認鍵邏輯 ────────────────────────────────────────────
     if (interaction.isActive) {
-      // 對話框開啟中：確認鍵跳過打字機或關閉對話；其餘輸入全部丟棄
+      // 對話框開啟中：方向鍵移動選項游標；確認鍵跳過打字機 / 選定選項 / 推進對話
+      if (state.justDir === 'up'   || state.justDir === 'left')  interaction.moveChoice(-1);
+      if (state.justDir === 'down' || state.justDir === 'right') interaction.moveChoice(1);
       if (state.confirmJust) interaction.advance();
       return;
     }

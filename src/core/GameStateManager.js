@@ -21,6 +21,8 @@ export class GameStateManager extends PIXI.EventEmitter {
     // ── 隊伍與劇情旗標（主要欄位）────────────────────────────────────────────
     this.party  = [];   // 已招募 NPC id 陣列（新標準欄位）
     this.flags  = {};   // 劇情布林旗標，例如 { "met_lena": true, "office_unlocked": false }
+    this.inventory = []; // [{ id, qty }]
+    this.itemDefs  = []; // items.json 的 items 陣列
 
     // 向後相容別名（舊代碼可繼續用）
     this.recruitedNpcs = this.party;
@@ -81,4 +83,61 @@ export class GameStateManager extends PIXI.EventEmitter {
   // 向後相容方法名
   setNpcFlag(flagId, value = true) { this.setFlag(flagId, value); }
   getNpcFlag(flagId)               { return this.getFlag(flagId); }
+
+  // ── 背包 ────────────────────────────────────────────────────────────────────
+  // inventory 由 main.js 指定（與 InventoryScreen 共用同一個陣列，必須原地修改）
+
+  itemDef(id)  { return this.itemDefs.find(d => d.id === id) ?? null; }
+  itemName(id) { const d = this.itemDef(id); return d?.name_zh ?? d?.name ?? id; }
+
+  itemCount(id) { return this.inventory.find(e => e.id === id)?.qty ?? 0; }
+  hasItem(id, qty = 1) { return this.itemCount(id) >= qty; }
+
+  addItem(id, qty = 1) {
+    const entry = this.inventory.find(e => e.id === id);
+    if (entry) entry.qty += qty;
+    else this.inventory.push({ id, qty });
+    this.emit('inventory:change', { id, qty });
+  }
+
+  removeItem(id, qty = 1) {
+    const entry = this.inventory.find(e => e.id === id);
+    if (!entry || entry.qty < qty) return false;
+    entry.qty -= qty;
+    if (entry.qty === 0) this.inventory.splice(this.inventory.indexOf(entry), 1);
+    this.emit('inventory:change', { id, qty: -qty });
+    return true;
+  }
+
+  // ── 資料驅動條件 ────────────────────────────────────────────────────────────
+  /**
+   * 判斷物件上的條件欄位是否成立（缺少的欄位視為成立）：
+   *   if:           "flag" | ["flag", ...]   全部旗標為真
+   *   ifNot:        "flag" | ["flag", ...]   全部旗標為假
+   *   requiresItem: "itemId" | { id, qty }   背包持有足夠數量
+   */
+  meets(cond) {
+    if (!cond) return true;
+    const list = v => (v == null ? [] : Array.isArray(v) ? v : [v]);
+    if (!list(cond.if).every(f => this.getFlag(f)))     return false;
+    if (list(cond.ifNot).some(f => this.getFlag(f)))     return false;
+    for (const req of list(cond.requiresItem)) {
+      const { id, qty = 1 } = typeof req === 'string' ? { id: req } : req;
+      if (!this.hasItem(id, qty)) return false;
+    }
+    return true;
+  }
+
+  /**
+   * 依 variants 解析目前生效的資料：第一個條件成立的 variant 覆寫 base 欄位。
+   * 回傳 { ...base, ...variant, _variant: index（-1 = 未套用 variant）}
+   */
+  resolveVariant(base) {
+    const variants = base?.variants ?? [];
+    const idx = variants.findIndex(v => this.meets(v));
+    const { variants: _omit, ...rest } = base;
+    if (idx < 0) return { ...rest, _variant: -1 };
+    const { if: _if, ifNot: _ifNot, requiresItem: _req, ...overrides } = variants[idx];
+    return { ...rest, ...overrides, _variant: idx };
+  }
 }

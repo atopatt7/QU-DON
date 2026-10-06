@@ -1,8 +1,12 @@
 {
   "_comment": "QU-DON | entities/registry.json — NPC 索引表，ID → 檔案路徑",
-  "player":            "actors/player.json",
-  "enemy_thug":        "actors/enemy_thug.json",
-  "enemy_pickpocket":  "actors/enemy_pickpocket.json",
-  "npc_clerk":         "actors/npc_clerk.json",
-  "npc_const_guard":   "actors/npc_const_guard.json"
+  "player": "actors/player.json",
+  "enemy_thug": "actors/enemy_thug.json",
+  "enemy_pickpocket": "actors/enemy_pickpocket.json",
+  "npc_clerk": "actors/npc_clerk.json",
+  "npc_const_guard": "actors/npc_const_guard.json",
+  "enemy_redhound_thug": "actors/enemy_redhound_thug.json",
+  "npc_camp_elder": "actors/npc_camp_elder.json",
+  "npc_camp_youth": "actors/npc_camp_youth.json",
+  "npc_camp_kid": "actors/npc_camp_kid.json"
 }

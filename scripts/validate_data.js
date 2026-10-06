@@ -101,6 +101,38 @@ for (const id of reachable) {
   }
 }
 
+// ─── 物品參照（choices / onEnd / variants 中的 requiresItem、takeItem、giveItem）──
+const itemIds = new Set(readJson(path.join(ROOT, 'src/data/items.json')).items.map(i => i.id));
+const asList  = v => (v == null ? [] : Array.isArray(v) ? v : [v]);
+function checkItemRefs(obj, tag) {
+  if (!obj || typeof obj !== 'object') return;
+  for (const key of ['requiresItem', 'takeItem', 'giveItem']) {
+    for (const ref of asList(obj[key])) {
+      const id = typeof ref === 'string' ? ref : ref?.id;
+      if (!itemIds.has(id)) err(`${tag}：${key} 參照不存在的物品 "${id}"`);
+    }
+  }
+  checkItemRefs(obj.onEnd, tag);
+  for (const c of obj.choices ?? [])  checkItemRefs(c, `${tag} 選項「${c.text}」`);
+  for (const v of obj.variants ?? []) checkItemRefs(v, `${tag} variant`);
+}
+
+// ─── 地圖調查點 ─────────────────────────────────────────────────────────────
+for (const id of reachable) {
+  const m = maps[id];
+  for (const t of m.triggers ?? []) {
+    if (t.type !== 'examine') continue;
+    const tag = `${id} trigger "${t.id}"`;
+    if (!inBounds(m, t.gx, t.gy)) err(`${tag}：位置 (${t.gx},${t.gy}) 超出地圖`);
+    if (!Array.isArray(t.dialogue) || !t.dialogue.length) err(`${tag}：缺少 dialogue`);
+    // 調查點必須能從相鄰的可行走格子面向它
+    const reachableFrom = [[0, 1], [0, -1], [1, 0], [-1, 0]]
+      .some(([dx, dy]) => walkable(id, t.gx + dx, t.gy + dy));
+    if (!reachableFrom) err(`${tag}：四周沒有可站立的格子，玩家無法調查`);
+    checkItemRefs(t, tag);
+  }
+}
+
 // ─── 實體 registry ──────────────────────────────────────────────────────────
 const registry = readJson(path.join(ENT_DIR, 'registry.json'));
 const entities = {};
@@ -132,9 +164,14 @@ for (const f of fs.readdirSync(NPCS_DIR)) {
     if (!['hostile', 'recruitable', 'system', undefined].includes(npc.category)) {
       err(`${tag}：未知 category "${npc.category}"`);
     }
-    const { x, y } = npc.position ?? {};
-    if (!walkable(mapId, x, y)) err(`${tag}：位置 (${x},${y}) 不可行走`);
-    else if (warpAt(m, x, y))   err(`${tag}：站在傳送點 (${x},${y}) 上`);
+    // 預設位置與每個 variant 的位置都要合法
+    for (const [label, pos] of [['位置', npc.position], ...(npc.variants ?? [])
+      .filter(v => v.position).map((v, i) => [`variant[${i}] 位置`, v.position])]) {
+      const { x, y } = pos ?? {};
+      if (!walkable(mapId, x, y)) err(`${tag}：${label} (${x},${y}) 不可行走`);
+      else if (warpAt(m, x, y))   err(`${tag}：${label} (${x},${y}) 在傳送點上`);
+    }
+    checkItemRefs(npc, tag);
 
     const ent = npc.entityRef ? entities[npc.entityRef] : null;
     if (npc.entityRef && !ent) err(`${tag}：entityRef "${npc.entityRef}" 不在 registry`);

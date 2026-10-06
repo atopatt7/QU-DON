@@ -1,17 +1,242 @@
 [
   {
+    "_comment": "工地正門守衛。四種進工地的方法：出示通行證 / 遞能量飲料 / 硬闖 / 從西側圍籬缺口潛入",
     "id":        "suburb_guard_01",
     "entityRef": "npc_const_guard",
+    "name":      "守衛 老鄭",
     "category":  "system",
-    "position":  { "x": 10, "y": 16 },
+    "position":  { "x": 12, "y": 15 },
+    "direction": "down",
+    "behavior":  "idle",
+    "dialogue":  ["這裡現在是管制區，沒事快滾。"],
+    "choices": [
+      {
+        "text": "出示工地通行證",
+        "requiresItem": "id_card",
+        "setFlag": ["ws_gate_open", "ws_showed_card"],
+        "reply": [
+          "通行證？我看看……吳○○？",
+          "……這是阿吳的證件。你從哪裡拿到的？",
+          "算了，我不想知道。進去吧，我什麼都沒看到。"
+        ]
+      },
+      {
+        "text": "遞一罐能量飲料",
+        "requiresItem": "energy_drink",
+        "takeItem": "energy_drink",
+        "setFlag": "ws_gate_open",
+        "reply": [
+          "……你怎麼知道我值大夜班就靠這個？",
+          "我去那邊巡一下。你自己看著辦。"
+        ]
+      },
+      { "text": "硬闖過去", "action": "BATTLE" },
+      { "text": "轉身離開" }
+    ],
+    "variants": [
+      {
+        "if": "ws_end_camp",
+        "position": { "x": 13, "y": 14 }, "direction": "left",
+        "dialogue": ["聽說工程要暫停了。", "我這把老骨頭，總算可以回家睡一覺。"],
+        "choices": []
+      },
+      {
+        "if": "ws_gate_open",
+        "position": { "x": 13, "y": 14 }, "direction": "left",
+        "dialogue": ["進去吧，動作快。", "辦公室門口那個紅犬幫的小鬼，可沒我這麼好說話。"],
+        "choices": []
+      }
+    ]
+  },
+
+  {
+    "_comment": "辦公室門口的紅犬幫小弟：遞菸 / 動手 / 離開",
+    "id":        "site_door_thug",
+    "entityRef": "enemy_redhound_thug",
+    "name":      "紅犬幫小弟",
+    "category":  "system",
+    "position":  { "x": 35, "y": 5 },
+    "direction": "down",
+    "behavior":  "idle",
+    "dialogue":  ["站住。這裡是鴻圖的地方，紅犬幫罩的。", "……你誰啊？"],
+    "choices": [
+      {
+        "text": "遞根菸給他",
+        "requiresItem": "cigarette",
+        "takeItem": "cigarette",
+        "setFlag": "ws_door_ok",
+        "reply": [
+          "……等等，你是瞿董？黑石街那個瞿董？",
+          "我什麼都沒看見。你也沒見過我。"
+        ]
+      },
+      { "text": "動手", "action": "BATTLE" },
+      { "text": "離開" }
+    ],
+    "variants": [
+      {
+        "if": "ws_door_ok",
+        "position": { "x": 37, "y": 6 }, "direction": "left",
+        "dialogue": ["快點。主任半夜會回來查帳。"],
+        "choices": []
+      }
+    ]
+  },
+
+  {
+    "_comment": "工地內巡邏的打手（敵對）：繞地基東側一圈，撞上就開戰",
+    "id":        "site_yard_thug",
+    "entityRef": "enemy_redhound_thug",
+    "category":  "hostile",
+    "position":  { "x": 22, "y": 10 },
     "direction": "right",
     "behavior":  "patrol",
-    "path":      [[10, 16], [14, 16], [14, 15], [10, 15]],
-    "moveSpeed": 0.5,
-    "dialogue":  ["這裡現在是管制區，沒事快滾。"],
-    "choices":   [
-      { "text": "硬闖過去", "action": "BATTLE" },
-      { "text": "轉身離開", "action": "CLOSE"  }
+    "path":      [[22, 10], [32, 10], [32, 14], [22, 14]],
+    "moveSpeed": 0.8,
+    "variants": [
+      { "if": "ws_end_camp", "hidden": true }
+    ]
+  },
+
+  {
+    "_comment": "在營地門口人行道來回騷擾的打手（敵對）；營地事件解決後撤走",
+    "id":        "road_thug",
+    "entityRef": "enemy_redhound_thug",
+    "category":  "hostile",
+    "position":  { "x": 16, "y": 21 },
+    "direction": "right",
+    "behavior":  "patrol",
+    "path":      [[16, 21], [31, 21]],
+    "moveSpeed": 0.7,
+    "variants": [
+      { "if": "ws_end_camp", "hidden": true }
+    ]
+  },
+
+  {
+    "_comment": "任務主線：老許。variants 由上往下第一個成立者生效",
+    "id":        "camp_elder",
+    "entityRef": "npc_camp_elder",
+    "category":  "system",
+    "position":  { "x": 27, "y": 27 },
+    "direction": "up",
+    "behavior":  "idle",
+    "dialogue": [
+      "……你就是瞿董？黑石街那個「公正的仲裁人」？",
+      "我叫老許。這片工地，我扛了二十年鋼筋。",
+      "工程蓋好了，他們說這塊地要蓋景觀豪宅。我們這些住在這裡的人，得在禮拜五之前滾。",
+      "建商拿著一張「拆除許可」到處給人看。可是里長說，區公所根本沒發過這種東西。",
+      "那張許可就鎖在工地東北角的辦公室裡。要是能拿到它……我們至少有東西可以跟人講理。"
+    ],
+    "onEnd": { "setFlag": "ws_met_elder" },
+    "variants": [
+      {
+        "if": "ws_end_camp",
+        "dialogue": [
+          "記者明天一早就來。",
+          "這是我們第一次，有機會自己說話。",
+          "……還有阿吳。如果你在工地裡看到什麼，記得告訴我。"
+        ],
+        "onEnd": null
+      },
+      {
+        "if": "ws_end_keep",
+        "dialogue": ["你走吧。", "我們不需要再被另一個老闆買賣一次。"],
+        "onEnd": null
+      },
+      {
+        "if": ["ws_met_elder", "ws_found_glove"],
+        "ifNot": "ws_told_glove",
+        "dialogue": [
+          "……這是阿吳的手套。",
+          "阿吳是我以前的工班。三個月前，他跟建商吵著要欠了半年的薪水，之後就再也沒來上工。",
+          "大家都說他回南部了。可是他的帳篷，到現在還在營地西邊，沒人動過。"
+        ],
+        "onEnd": { "setFlag": "ws_told_glove" }
+      },
+      {
+        "if": "ws_got_permit",
+        "dialogue": [
+          "這是……區公所的章？日期是下禮拜一，章還是歪的。",
+          "這就是他們口中的「合法」。",
+          "瞿董，東西在你手上。你打算怎麼用？"
+        ],
+        "choices": [
+          {
+            "text": "交給老許",
+            "takeItem": "forged_permit",
+            "giveItem": [{ "id": "bento", "qty": 1 }, { "id": "painkiller", "qty": 2 }],
+            "setFlag": "ws_end_camp",
+            "reply": [
+              "我有個老朋友在報社跑社會線。這一次，換他們上新聞。",
+              "這些你拿著。營地沒什麼好東西，就是一點心意。"
+            ]
+          },
+          {
+            "text": "這東西我先留著",
+            "setFlag": "ws_end_keep",
+            "reply": ["……我懂了。", "你也是做生意的人。"]
+          },
+          { "text": "讓我再想想" }
+        ],
+        "onEnd": null
+      },
+      {
+        "if": "ws_met_elder",
+        "dialogue": [
+          "工地辦公室在東北角那間鐵皮屋。",
+          "正門有老鄭在顧——他以前跟我同一個工班，人不壞，就是怕丟工作。",
+          "阿德說西邊圍籬有個缺口。不過工地裡現在都是紅犬幫的人，小心點。"
+        ],
+        "onEnd": null
+      }
+    ]
+  },
+
+  {
+    "_comment": "營地青年：提示圍籬缺口",
+    "id":        "camp_youth",
+    "entityRef": "npc_camp_youth",
+    "category":  "system",
+    "position":  { "x": 34, "y": 28 },
+    "direction": "left",
+    "behavior":  "idle",
+    "dialogue": [
+      "我以前在黑石街那間超商上大夜班。偷吃過期便當被抓到，就被開除了。",
+      "晚上睡不著，我會從工地西邊圍籬的缺口鑽進去撿廢鐵。",
+      "守衛老鄭從來不往那邊看。他眼睛不好。"
+    ],
+    "variants": [
+      { "if": "ws_end_camp", "dialogue": ["老許說明天記者要來？", "……我要不要去借一件乾淨的衣服。"] },
+      { "if": "ws_end_keep", "dialogue": ["老許今天一句話都沒說。", "你到底跟他講了什麼？"] }
+    ]
+  },
+
+  {
+    "_comment": "營地少年：營地事件以「交給老許」結束後可招募",
+    "id":        "camp_kid",
+    "entityRef": "npc_camp_kid",
+    "category":  "recruitable",
+    "position":  { "x": 9, "y": 31 },
+    "direction": "right",
+    "behavior":  "idle",
+    "dialogue": [
+      "幹嘛？我又沒偷你東西。",
+      "……好啦，前幾天是有摸過一個皮夾。但那是紅犬幫的人掉的，不算。"
+    ],
+    "variants": [
+      {
+        "if": "ws_end_camp",
+        "dialogue": [
+          "你真的把那張紙拿回來了？",
+          "……喂，你在黑石街做事，需要人跑腿吧？每一條巷子我都熟。"
+        ],
+        "choices": [
+          { "text": "跟我走吧", "action": "RECRUIT", "reply": ["早說嘛。"] },
+          { "text": "留下來照顧大家" }
+        ]
+      },
+      { "if": "ws_end_keep", "dialogue": ["老許說你把那張紙留著自己用。", "滾啦，騙子。"] }
     ]
   }
 ]

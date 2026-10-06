@@ -26,6 +26,9 @@ export class DialogueOverlay extends PIXI.Container {
     this._ticker    = null;       // 保留欄位，destroy() 時清除舊訂閱
     this._typeTimer  = null;       // setTimeout handle（取代 ticker 打字機）
     this._isFrozen   = false;      // ⚡ 防護：cacheAsBitmap = true 只執行一次
+    this._choiceBtns    = [];      // 目前顯示的選項按鈕
+    this._choiceIdx     = 0;       // 游標所在選項
+    this._choicePicked  = false;
     this._build();
     this._bindResize();
   }
@@ -166,20 +169,31 @@ export class DialogueOverlay extends PIXI.Container {
     this._prompt.alpha = 0;
     this.addChild(this._prompt);
 
-    // ── 選項列 ─────────────────────────────────────────────────────────────
+    // ── 選項列（超過 2 個時排成兩欄，確保全部落在對話框內）─────────────────
+    this._choiceBtns = [];
     if (hasChoice) {
-      const choiceStartY = boxY + txH + 28;
-      const choiceBtnH   = Math.floor((boxH - txH - 38) / choices.length);
+      const gap   = 4;
+      const cols  = choices.length > 2 ? 2 : 1;
+      const rows  = Math.ceil(choices.length / cols);
+      const areaX = pad + 7;
+      const areaW = inner - 14;
+      const areaY = txY + txH + 8;
+      const areaH = boxY + boxH - 10 - areaY;
+      const btnW  = Math.floor((areaW - gap * (cols - 1)) / cols);
+      const btnH  = Math.max(24, Math.floor((areaH - gap * (rows - 1)) / rows));
+      if (this._choiceIdx >= choices.length) this._choiceIdx = 0;
 
       choices.forEach((ch, i) => {
         // 支援 ch.text（新格式）與 ch.label（舊格式）
         const displayText = ch.text ?? ch.label ?? `選項 ${i + 1}`;
-        const cb = this._makeChoice(displayText, ch.action, inner - 14, Math.max(choiceBtnH, 30), i === 0);
-        cb.x = pad + 7;
-        cb.y = choiceStartY + i * (Math.max(choiceBtnH, 30) + 4);
-        // emit 包含 index 與 action，供 InteractionManager 分派
-        cb.on('_tap', () => this.emit('choice', { index: i, action: ch.action ?? null }));
+        const cb = this._makeChoice(displayText, ch.action, btnW, btnH);
+        cb.x = areaX + (i % cols) * (btnW + gap);
+        cb.y = areaY + Math.floor(i / cols) * (btnH + gap);
+        cb.setActive(i === this._choiceIdx);
+        cb.on('_tap', () => this._pickChoice(i));
+        cb.on('pointerover', () => this._setChoice(i));
         this.addChild(cb);
+        this._choiceBtns.push(cb);
       });
     }
 
@@ -257,6 +271,8 @@ export class DialogueOverlay extends PIXI.Container {
   /** 顯示新一行對話 */
   show(text, speaker, choices = []) {
     this._opts = { text, speaker, choices };
+    this._choiceIdx    = 0;
+    this._choicePicked = false;
     this._build();
   }
 
@@ -267,7 +283,7 @@ export class DialogueOverlay extends PIXI.Container {
   //   BATTLE   → 危險紅 0xFF0040（戰鬥）
   //   其他     → 琥珀黃 0xE6B200（對話 / 預設）
 
-  _makeChoice(label, action, W, H, active) {
+  _makeChoice(label, action, W, H) {
     // 依 action 決定主色
     const accent = action === 'RECRUIT' ? 0x00FF41
                  : action === 'BATTLE'  ? 0xFF0040
@@ -285,10 +301,6 @@ export class DialogueOverlay extends PIXI.Container {
     c.hitArea   = new PIXI.Rectangle(0, 0, W, H);
 
     const bg = new PIXI.Graphics();
-    bg.roundRect(0, 0, W, H, 2)
-      .fill({ color: active ? bgActive : 0x0D0D0D });
-    bg.roundRect(0, 0, W, H, 2)
-      .stroke({ color: active ? accent : 0x2C2C2C, width: 1 });
 
     const dn = new PIXI.Graphics();
     dn.roundRect(0, 0, W, H, 2).fill({ color: 0x060606 });
@@ -296,15 +308,24 @@ export class DialogueOverlay extends PIXI.Container {
     dn.visible = false;
 
     const txt = new PIXI.Text({
-      text: (active ? '▶  ' : '　') + label,
+      text: label,
       style: new PIXI.TextStyle({
         fontFamily: '"Noto Sans TC","Microsoft JhengHei",sans-serif',
-        fontSize: 12, fontWeight: active ? 'bold' : 'normal',
-        fill: active ? accent : 0x555555,
+        fontSize: 12,
       }),
     });
     txt.x = 12;
     txt.y = Math.max(0, (H - txt.style.fontSize - 4) / 2);
+
+    // 游標所在的選項高亮（鍵盤 / D-Pad 上下移動、滑鼠移入時切換）
+    c.setActive = (active) => {
+      bg.clear();
+      bg.roundRect(0, 0, W, H, 2).fill({ color: active ? bgActive : 0x0D0D0D });
+      bg.roundRect(0, 0, W, H, 2).stroke({ color: active ? accent : 0x2C2C2C, width: 1 });
+      txt.text             = (active ? '▶  ' : '　') + label;
+      txt.style.fontWeight = active ? 'bold' : 'normal';
+      txt.style.fill       = active ? accent : 0x555555;
+    };
 
     c.addChild(bg, dn, txt);
 
@@ -329,8 +350,36 @@ export class DialogueOverlay extends PIXI.Container {
     this._app.stage.on('resize', this._rh);
   }
 
-  /** 鍵盤確認鍵觸發：打字中則跳到尾，否則推進到下一行。 */
-  advance() { this._skipOrNext(); }
+  /** 鍵盤確認鍵觸發：打字中則跳到尾；有選項時選定游標所在項；否則推進到下一行。 */
+  advance() {
+    if (!this._typing && this._choiceBtns.length) {
+      this._pickChoice(this._choiceIdx);
+      return;
+    }
+    this._skipOrNext();
+  }
+
+  /** 移動選項游標（delta = ±1，循環）。沒有選項時回傳 false。 */
+  moveChoice(delta) {
+    const n = this._choiceBtns.length;
+    if (!n) return false;
+    this._setChoice((this._choiceIdx + delta + n) % n);
+    return true;
+  }
+
+  _setChoice(i) {
+    if (i === this._choiceIdx) return;
+    this._choiceBtns[this._choiceIdx]?.setActive(false);
+    this._choiceIdx = i;
+    this._choiceBtns[i]?.setActive(true);
+  }
+
+  _pickChoice(i) {
+    if (this._choicePicked) return; // 同一組選項只回應一次（防連按）
+    this._choicePicked = true;
+    const ch = this._opts.choices?.[i];
+    this.emit('choice', { index: i, action: ch?.action ?? null });
+  }
 
   destroy(opts) {
     if (this._typeTimer) { clearTimeout(this._typeTimer); this._typeTimer = null; }

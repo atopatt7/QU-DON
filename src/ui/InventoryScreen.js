@@ -100,6 +100,9 @@ export class InventoryScreen extends PIXI.Container {
     this.visible = true;
   }
 
+  /** items.json 的 items 陣列（供 GameStateManager 查詢物品名稱 / 效果） */
+  get itemDefs() { return this._itemDefs; }
+
   hide() {
     this.visible = false;
     this.emit('close');

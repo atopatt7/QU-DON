@@ -1,0 +1,16 @@
+{
+  "id": "npc_camp_youth",
+  "name": "阿德",
+  "level": 1,
+  "stats": {
+    "hp": 35, "maxHp": 35, "atk": 6, "def": 2, "eva": 0.05
+  },
+  "visuals": {
+    "spriteSheet":   "assets/sprites/entities/clerk_sheet.png",
+    "frameWidth":    128,
+    "frameHeight":   256,
+    "heightInTiles": 1.7,
+    "tint":          "0xb3ab98"
+  },
+  "description": "被超商開除的前大夜班店員，還穿著那件洗不乾淨的制服背心。"
+}
