@@ -51,14 +51,47 @@
       "gx": 5,
       "gy": 9,
       "targetMap": "map_black_rock_west_suburb",
-      "targetGx": 38,
-      "targetGy": 1,
+      "targetGx": 35,
+      "targetGy": 5,
       "direction": "down",
       "label": "Black Rock 西郊",
       "active": true
     }
   ],
-  "triggers": [],
+  "triggers": [
+    {
+      "id": "office_desk",
+      "gx": 2,
+      "gy": 2,
+      "type": "examine",
+      "dialogue": [
+        "桌上堆滿工程報表和吃剩的便當盒。抽屜上的鎖是便宜貨，一扳就開了。",
+        "裡面有一份「拆除許可」——蓋著區公所的大印，日期卻是下週一。",
+        "印章的字是歪的。這東西是假的。"
+      ],
+      "onEnd": { "giveItem": { "id": "forged_permit", "qty": 1 }, "setFlag": "ws_got_permit" },
+      "variants": [
+        { "if": "ws_got_permit", "dialogue": ["抽屜已經被你翻過了。只剩一疊外送菜單。"], "onEnd": null }
+      ]
+    },
+    {
+      "id": "office_crates",
+      "gx": 8,
+      "gy": 1,
+      "type": "examine",
+      "dialogue": [
+        "木箱上印著「鴻圖建設」。",
+        "撬開一角——裡面裝的不是建材，是一整箱的鋁製球棒。"
+      ]
+    },
+    {
+      "id": "office_crates_2",
+      "gx": 8,
+      "gy": 2,
+      "type": "examine",
+      "dialogue": ["另一個木箱。封條上的出貨單寫著：「紅犬　收」。"]
+    }
+  ],
   "spawnPoints": [
     { "id": "spawn_from_suburb", "gx": 5, "gy": 8, "facing": "down" }
   ],

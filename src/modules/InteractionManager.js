@@ -45,6 +45,31 @@ const TILE_EXAMINE = {
     speaker: '（環境）',
     text: '冰櫃透出冷冷的藍光。架上有幾瓶不知名能量飲料，標籤已經褪色。',
   },
+  // ── 西郊（工地 / 營地）環境調查 ──────────────────────────────────────────
+  1015: {
+    speaker: '（環境）',
+    text: '灌到一半的水泥地基，鋼筋像肋骨一樣從裡面戳出來。',
+  },
+  1039: {
+    speaker: '（環境）',
+    text: '疊成小山的水泥管。管子裡有人睡過的痕跡——紙箱、空酒瓶、一隻破襪子。',
+  },
+  1040: {
+    speaker: '（環境）',
+    text: '生鏽的鐵皮圍籬，上面噴著「鴻圖建設」四個字，又被人用黑漆塗掉一半。',
+  },
+  1041: {
+    speaker: '（環境）',
+    text: '防水布搭成的帳篷，用磚頭壓著四角。裡面傳出收音機的雜訊。',
+  },
+  1042: {
+    speaker: '（環境）',
+    text: '鐵桶裡燒著木板和舊報紙。這是整片西郊唯一暖和的地方。',
+  },
+  1050: {
+    speaker: '（環境）',
+    text: '工地辦公室的鐵皮牆。窗戶被報紙糊住，裡面的燈還亮著。',
+  },
 };
 
 // ─── 面向 → 前方格子偏移量 ─────────────────────────────────────────────────────
@@ -137,11 +162,26 @@ export class InteractionManager {
       }
 
       if (npc?.interactable && npc.entityData?.dialogue?.length) {
-        return this._startNpcDialogue(npc);
+        const d = npc.entityData;
+        return this._runScript({
+          speaker:  d.name ?? npc.id,
+          dialogue: d.dialogue,
+          choices:  d.choices,
+          onEnd:    d.onEnd,
+        }, npc);
       }
     }
 
-    // ── 3：Tile 環境調查（TILE_EXAMINE 優先，config.json 描述次之）──────────────
+    // ── 3：地圖觸發點（map.triggers 中 type="examine"，依座標，可帶條件 variants）───
+    const trigger = (md.triggers ?? []).find(t => t.type === 'examine' && t.gx === tx && t.gy === ty);
+    if (trigger) {
+      const t = this._gsm ? this._gsm.resolveVariant(trigger) : trigger;
+      if (!t.hidden && t.dialogue?.length) {
+        return this._runScript({ speaker: '（環境）', ...t });
+      }
+    }
+
+    // ── 4：Tile 環境調查（TILE_EXAMINE 優先，config.json 描述次之）──────────────
     const idx    = ty * md.width + tx;
     const tileId = md.layers.objects?.[idx] || md.layers.ground?.[idx] || 0;
     return this._checkObjectTrigger(tileId);
@@ -149,11 +189,30 @@ export class InteractionManager {
 
   /**
    * 對話框開啟期間，鍵盤確認鍵呼叫此方法。
-   * 打字中 → 立即顯示全文；打字完成 → 推進下一行或關閉。
+   * 打字中 → 立即顯示全文；有選項 → 選定游標所在項；否則推進下一行或關閉。
    */
   advance() {
     if (!this._active) return;
     this._dlg.advance();
+  }
+
+  /** 對話框顯示選項時移動游標（delta = ±1）。 */
+  moveChoice(delta) {
+    if (!this._active) return false;
+    return this._dlg.moveChoice(delta);
+  }
+
+  /**
+   * 顯示一則單行訊息（系統提示 / 劇情旁白），確認鍵關閉。
+   * 對話中呼叫時忽略（不打斷進行中的對話）。
+   */
+  showMessage(text, speaker = '（系統）') {
+    if (this._active) return false;
+    this._active      = true;
+    this._dlg.visible = true;
+    this._dlg.show(text, speaker);
+    this._dlg.once('next', () => this._close());
+    return true;
   }
 
   /** 對話框是否正在顯示中（用於 main.js 封鎖移動輸入） */
@@ -162,37 +221,50 @@ export class InteractionManager {
   // ─── 內部 ──────────────────────────────────────────────────────────────────
 
   /**
-   * 逐行顯示 NPC 的 dialogue 陣列，全部播完後關閉。
-   * 預留 TODO：最後一行結束後可插入選項選單（商店 / 搶劫）。
+   * 執行一段對話腳本（NPC 與地圖觸發點共用）。
+   *
+   * script 格式：
+   *   speaker:  說話者名稱
+   *   dialogue: ["第一行", "第二行", ...]       逐行顯示；最後一行與選項同時出現
+   *   choices:  [choice, ...]                  可選；不符合條件的選項自動隱藏
+   *   onEnd:    { setFlag, giveItem, takeItem } 沒有選項時，對話結束後套用
+   *
+   * choice 格式：
+   *   text:         選項文字
+   *   action:       "CLOSE"（預設）| "BATTLE" | "RECRUIT" | "SET_FLAG"（舊格式，搭配 flagId）
+   *   if / ifNot / requiresItem   顯示條件（見 GameStateManager.meets）
+   *   takeItem / giveItem         "itemId" | { id, qty } | [ ... ]
+   *   setFlag:      "flag" | ["flag", ...]   對話結束時設定
+   *   reply:        ["...", ...]             選完後說話者的回應
    */
-  _startNpcDialogue(npc) {
-    const lines   = npc.entityData.dialogue;
-    const name    = npc.entityData.name ?? npc.id;
-    const choices = npc.entityData.choices ?? [];  // [{text, action, flagId?}]
-    let   lineIdx = 0;
+  _runScript(script, npc = null) {
+    const speaker = script.speaker ?? '（環境）';
+    const lines   = script.dialogue?.length ? script.dialogue : ['……'];
+    const choices = (script.choices ?? []).filter(c => this._meets(c));
+    let   i = 0;
 
     this._active      = true;
     this._dlg.visible = true;
 
     const showNext = () => {
-      if (lineIdx >= lines.length) {
-        // ── 對話結束：若有選擇肢則顯示，否則直接關閉 ───────────────────────
-        if (choices.length > 0) {
-          // 最後一行文字 + 選擇肢同時顯示（重用最後一行 speaker/text）
-          const lastText = lines[lines.length - 1] ?? '';
-          this._dlg.show(lastText, name, choices);
-          // 監聽選擇結果（once：選完自動移除）
-          this._dlg.once('choice', ({ action, index }) => {
-            this._handleChoice(action, choices[index], npc);
-          });
-        } else {
+      if (i >= lines.length) {
+        // 沒有選項的腳本：套用 onEnd 效果，播完獲得物品等系統訊息後關閉
+        const sys = this._applyItems(script.onEnd);
+        this._playQueue(sys, () => {
+          this._applyFlags(script.onEnd);
           this._close();
-        }
+        });
         return;
       }
-      this._dlg.show(lines[lineIdx], name);
-      lineIdx++;
-      this._dlg.once('next', showNext);
+      const text   = lines[i++];
+      const isLast = i === lines.length;
+      if (isLast && choices.length) {
+        this._dlg.show(text, speaker, choices);
+        this._dlg.once('choice', ({ index }) => this._handleChoice(choices[index], npc, speaker));
+      } else {
+        this._dlg.show(text, speaker);
+        this._dlg.once('next', showNext);
+      }
     };
 
     showNext();
@@ -200,50 +272,76 @@ export class InteractionManager {
   }
 
   /**
-   * 選擇肢結果分派器。
-   * NPC entityData.choices 格式：
-   *   { text: "加入我們", action: "RECRUIT" }
-   *   { text: "展開戰鬥", action: "BATTLE"  }
-   *   { text: "記下情報", action: "SET_FLAG", flagId: "met_informant" }
-   *   { text: "算了",     action: "CLOSE"   }
-   *
-   * @param {string} action  — 動作代碼
-   * @param {object} choice  — 原始 choice 物件（含額外參數）
-   * @param {object} npc     — NPC 實例（含 id、entityData）
+   * 選擇肢結果：物品交換 → 說話者回應 → 系統訊息 → 設定旗標 → 執行動作。
+   * 旗標放在最後設定，讓 NPC 位置 / 外觀變化發生在對話關閉之後。
    */
-  _handleChoice(action, choice, npc) {
-    switch (action) {
+  _handleChoice(choice, npc, speaker) {
+    const sys   = this._applyItems(choice);
+    const queue = [
+      ...(choice.reply ?? []).map(text => ({ text, speaker })),
+      ...sys,
+    ];
 
-      case 'RECRUIT':
-        if (this._gsm) {
-          this._gsm.recruitNpc(npc.id);
-          // 招募成功後顯示確認訊息再關閉
-          this._dlg.show(`${npc.entityData.name ?? npc.id} 加入了你的隊伍。`, '（系統）');
-          this._dlg.once('next', () => this._close());
-        } else {
+    this._playQueue(queue, () => {
+      this._applyFlags(choice);
+
+      switch (choice.action) {
+        case 'RECRUIT':
+          if (this._gsm && npc) {
+            this._gsm.recruitNpc(npc.id);
+            this._playQueue(
+              [{ text: `${npc.entityData?.name ?? npc.id} 加入了你的隊伍。`, speaker: '（系統）' }],
+              () => this._close(),
+            );
+            return;
+          }
+          break;
+
+        case 'BATTLE':
+          // 關閉對話框後交給 main.js 的 'battle:trigger' 監聽器（InteractionManager 不直接持有 BattleUI）
           this._close();
-        }
-        break;
+          if (npc) this._gsm?.emit('battle:trigger', { npc });
+          return;
 
-      case 'BATTLE':
-        // 關閉對話框後由 GSM 狀態切換觸發戰鬥（main.js 訂閱 'party:join' 等事件處理）
-        this._close();
-        // emit 至 GSM 讓 main.js 的監聽器接手（避免 InteractionManager 直接持有 BattleUI）
-        this._gsm?.emit('battle:trigger', { npc });
-        break;
+        case 'SET_FLAG': // 舊格式：{ action: "SET_FLAG", flagId, flagValue }
+          if (choice.flagId) this._gsm?.setFlag(choice.flagId, choice.flagValue ?? true);
+          break;
+      }
+      this._close();
+    });
+  }
 
-      case 'SET_FLAG':
-        if (this._gsm && choice.flagId) {
-          this._gsm.setFlag(choice.flagId, choice.flagValue ?? true);
-        }
-        this._close();
-        break;
+  /** 依序顯示 [{ text, speaker }]，全部播完後呼叫 done。 */
+  _playQueue(queue, done) {
+    if (!queue.length) { done(); return; }
+    const [head, ...rest] = queue;
+    this._dlg.show(head.text, head.speaker);
+    this._dlg.once('next', () => this._playQueue(rest, done));
+  }
 
-      case 'CLOSE':
-      default:
-        this._close();
-        break;
+  _meets(cond) { return this._gsm ? this._gsm.meets(cond) : true; }
+
+  /** 套用 takeItem / giveItem，回傳要顯示的系統訊息。 */
+  _applyItems(fx) {
+    if (!fx || !this._gsm) return [];
+    const list = v => (v == null ? [] : Array.isArray(v) ? v : [v])
+      .map(e => (typeof e === 'string' ? { id: e, qty: 1 } : { qty: 1, ...e }));
+    const msgs = [];
+    for (const { id, qty } of list(fx.takeItem)) {
+      if (this._gsm.removeItem(id, qty)) {
+        msgs.push({ text: `交出【${this._gsm.itemName(id)}】×${qty}`, speaker: '（系統）' });
+      }
     }
+    for (const { id, qty } of list(fx.giveItem)) {
+      this._gsm.addItem(id, qty);
+      msgs.push({ text: `獲得【${this._gsm.itemName(id)}】×${qty}`, speaker: '（系統）' });
+    }
+    return msgs;
+  }
+
+  _applyFlags(fx) {
+    if (!fx?.setFlag || !this._gsm) return;
+    for (const f of [].concat(fx.setFlag)) this._gsm.setFlag(f);
   }
 
   /**
@@ -260,24 +358,13 @@ export class InteractionManager {
   _checkObjectTrigger(tileId) {
     // ── 路徑一：TILE_EXAMINE 精確對應（lore 優先）────────────────────────────
     const examine = TILE_EXAMINE[tileId];
-    if (examine) {
-      this._active      = true;
-      this._dlg.visible = true;
-      this._dlg.show(examine.text, examine.speaker);
-      this._dlg.once('next', () => this._close());
-      return true;
-    }
+    if (examine) return this.showMessage(examine.text, examine.speaker);
 
     // ── 路徑二：config.json 動態描述（collides=true + desc）─────────────────
     // _tileConfig 由建構式非同步載入；尚未就緒時靜默跳過（不阻塞玩家操作）
     const tileDef = this._tileConfig?.[String(tileId)];
     if (tileDef?.collides === true && tileDef.desc) {
-      const text = `* 檢查此處的環境…\n發現【${tileDef.desc}】。`;
-      this._active      = true;
-      this._dlg.visible = true;
-      this._dlg.show(text, '（環境）');
-      this._dlg.once('next', () => this._close());
-      return true;
+      return this.showMessage(`* 檢查此處的環境…\n發現【${tileDef.desc}】。`, '（環境）');
     }
 
     return false;

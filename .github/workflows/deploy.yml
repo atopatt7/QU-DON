@@ -27,6 +27,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Validate game data
+        # 地圖 / 傳送點 / NPC / 實體資料不一致時中止部署
+        run: node scripts/validate_data.js
+
       - name: Setup Pages
         uses: actions/configure-pages@v5
 

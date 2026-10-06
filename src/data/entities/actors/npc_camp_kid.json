@@ -1,0 +1,16 @@
+{
+  "id": "npc_camp_kid",
+  "name": "小蟑",
+  "level": 1,
+  "stats": {
+    "hp": 30, "maxHp": 30, "atk": 7, "def": 2, "eva": 0.25
+  },
+  "visuals": {
+    "spriteSheet":   "assets/sprites/entities/pickpocket_sheet.png",
+    "frameWidth":    128,
+    "frameHeight":   256,
+    "heightInTiles": 1.7,
+    "tint":          "0x9fb4ff"
+  },
+  "description": "在營地長大的少年，手腳很快，嘴巴更快。黑石街每一條巷子他都鑽過。"
+}

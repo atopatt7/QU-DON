@@ -416,6 +416,28 @@
       "value":      120,
       "rarity":     "rare",
       "legalStatus":"illegal"
+    },
+
+    {
+      "id": "forged_permit",
+      "name": "Forged Demolition Permit",
+      "name_zh": "偽造的拆除許可",
+      "category": "key_item",
+      "subtype": "evidence",
+      "icon": "assets/images/items/forged_permit.png",
+      "description": "Stamped by the district office, dated next Monday. The seal is crooked.",
+      "description_zh": "蓋著區公所大印的拆除許可，日期卻是下週一。印章的字是歪的——這是鴻圖建設清除西郊營地的「法律依據」。",
+
+      "stackable": false,
+      "maxStack":  1,
+      "weight":    0.05,
+
+      "usable": false,
+      "consumedOnUse": false,
+
+      "value":      0,
+      "rarity":     "unique",
+      "legalStatus":"grey"
     }
 
   ]

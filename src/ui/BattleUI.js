@@ -34,7 +34,12 @@ export class BattleUI extends PIXI.Container {
 
   _build() {
     const { width: W, height: H } = this._app.screen;
-    this.removeChildren();
+    // 每次重繪都整批重建：舊節點必須 destroy，否則每推一行 log 就洩漏一批 Text / Graphics。
+    // 頭像精靈由 _portraitCache 跨重繪重用，不能在這裡銷毀
+    const keep = new Set(Object.values(this._portraitCache).filter(Boolean));
+    for (const child of this.removeChildren()) {
+      if (!keep.has(child)) child.destroy({ children: true });
+    }
 
     const eH  = Math.floor(H * 0.25);   // 敵方上半
     const pH  = Math.floor(H * 0.25);   // 我方下半
@@ -346,16 +351,17 @@ export class BattleUI extends PIXI.Container {
         maxHp: pStats.maxHp ?? 100,
         sp:    pStats.sp    ?? 80,
         maxSp: pStats.maxSp ?? 80,
-        atk:   pStats.atk   ?? 10,
-        def:   pStats.def   ?? 5,
+        // actors.json 用 attack/defense，entities/*.json 用 atk/def，兩者皆接受
+        atk:   pStats.atk   ?? pStats.attack  ?? 10,
+        def:   pStats.def   ?? pStats.defense ?? 5,
       },
       enemy: {
         name:  enemyData.name,
         level: enemyData.level ?? 1,
         hp:    eStats.hp    ?? 50,
         maxHp: eStats.maxHp ?? 50,
-        atk:   eStats.atk   ?? 6,
-        def:   eStats.def   ?? 2,
+        atk:   eStats.atk   ?? eStats.attack  ?? 6,
+        def:   eStats.def   ?? eStats.defense ?? 2,
       },
     };
     // 保存 visuals 供頭像系統使用
@@ -364,7 +370,11 @@ export class BattleUI extends PIXI.Container {
 
     this._log             = [`${enemyData.name} 擋住了去路！`];
     this._isLocked        = false;
-    this._portraitCache   = { player: null, enemy: null }; // 重置快取
+    // 重置頭像快取：上一場的頭像是 canvas 裁切出的專屬貼圖，連同貼圖一起釋放
+    for (const spr of Object.values(this._portraitCache)) {
+      if (spr) spr.destroy({ texture: true, textureSource: true });
+    }
+    this._portraitCache   = { player: null, enemy: null };
 
     // 重新綁定內部戰鬥邏輯（移除舊監聽器後再掛）
     if (this._actHandler) this.off('action', this._actHandler);
@@ -502,8 +512,7 @@ export class BattleUI extends PIXI.Container {
     const e = this._data.enemy;
 
     // ── 玩家攻擊 ────────────────────────────────────────────────────────────
-    let dmg = Math.max(1, p.atk - e.def);
-    dmg = Math.floor(dmg * (0.9 + Math.random() * 0.2));
+    const dmg = BattleUI.rollDamage(p.atk, e.def);
     e.hp = Math.max(0, e.hp - dmg);
     this._pushLog(`瞿董 攻擊了 ${e.name}，造成 ${dmg} 點傷害！`);
     this.flashHit('enemy');
@@ -522,7 +531,7 @@ export class BattleUI extends PIXI.Container {
 
     // ── 敵人反擊（延遲 1 秒） ─────────────────────────────────────────────
     setTimeout(() => {
-      let eDmg = Math.floor(Math.max(1, e.atk - p.def) * (0.9 + Math.random() * 0.2));
+      const eDmg = BattleUI.rollDamage(e.atk, p.def);
       p.hp = Math.max(0, p.hp - eDmg);
       this._pushLog(`${e.name} 反擊，造成 ${eDmg} 點傷害！`);
       this.flashHit('player');
@@ -543,6 +552,17 @@ export class BattleUI extends PIXI.Container {
       this._isLocked = false; // 解鎖，等待玩家下一回合
     }, 1000);
   }
+
+  /**
+   * 傷害公式：(攻 − 防) × 0.9～1.1 浮動，取整後最少 1 點。
+   * 下限必須在浮動與取整「之後」套用，否則攻防接近時 1 × 0.9 會被 floor 成 0。
+   */
+  static rollDamage(atk, def) {
+    return Math.max(1, Math.floor((atk - def) * (0.9 + Math.random() * 0.2)));
+  }
+
+  /** 戰鬥結束時玩家剩餘 HP（供呼叫端保存，下一場延續） */
+  get playerHp() { return this._data?.player?.hp ?? 0; }
 
   /** 推入 Log 並刷新（公開版，供外部呼叫） */
   pushLog(msg) {

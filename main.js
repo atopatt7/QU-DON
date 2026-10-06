@@ -262,6 +262,12 @@ function fadeOut(app, duration = 600) {
   });
 }
 
+// ─── 無輸入快照（全螢幕介面開啟時取代 input.update() 結果）────────────────
+const IDLE_INPUT = Object.freeze({
+  direction: null, justMoved: false, justDir: null, tileTarget: null,
+  confirmJust: false, cancelJust: false, action: {}, raw: {},
+});
+
 // ─── 開發輔助旗標 ──────────────────────────────────────────────────────────
 window.SHOW_COORDS = false;
 
@@ -395,6 +401,7 @@ async function main() {
   app.stage.on('resize', () => {
     mapManager.onResize(player.gx, player.gy);
     playerSpr.resizeTo?.(mapManager.tileSize);
+    entityManager.resize(mapManager.tileSize);
     // setCameraVisual 沒有 centerOn 的 early-return guard，確保 tileSize 改變後鏡頭重算
     mapManager.setCameraVisual(player.vx, player.vy);
     mapManager.render();
@@ -472,31 +479,59 @@ async function main() {
     _showMenu(); // 關閉狀態介面後回到雪茄選單
   });
 
+  // ── 玩家當前 HP（跨戰鬥保留；之後由存檔系統接手）────────────────────────
+  const playerBase = _quDonData ?? { name: '瞿董', stats: { hp: 85, maxHp: 85, atk: 10, def: 5 } };
+  let   playerHp   = playerBase.stats.hp;
+
+  const _setPlayerHp = (hp) => {
+    playerHp = Math.max(0, Math.min(hp, playerBase.stats.maxHp));
+    statusScreen.updateData({ hp: playerHp });
+  };
+
   // ── 觸發戰鬥：鎖定輸入、顯示 BattleUI、戰後處理 NPC ─────────────────────
   function _startBattle(npc) {
-    if (!npc.entityData) return;
+    if (!npc.entityData || battleUI.visible) return;
     AudioManager.stopBGM();
     input.lock();
     panel.visible = false;
     MapManager.onActorMoveEnd(playerSpr);
 
-    const playerBase = _quDonData ?? { name: '瞿董', stats: { hp: 85, maxHp: 85, atk: 10, def: 5 } };
-    const playerData = { ...playerBase, visuals: _playerJson?.visuals ?? null };
+    const playerData = {
+      ...playerBase,
+      stats:   { ...playerBase.stats, hp: playerHp },
+      visuals: _playerJson?.visuals ?? null,
+    };
     battleUI.visible = true;
     battleUI.startBattle(playerData, npc.entityData);
 
-    const cleanup = (isWin) => {
+    const cleanup = () => {
       battleUI.off('win',  onWin);
       battleUI.off('lose', onLose);
       battleUI.visible = false;
       panel.visible = true;
-      if (isWin) entityManager.hideNpc(npc.id);
       input.unlock();
     };
-    const onWin  = () => cleanup(true);
-    const onLose = () => cleanup(false);
+    const onWin = () => {
+      _setPlayerHp(battleUI.playerHp);
+      entityManager.hideNpc(npc.id);
+      gsm.setFlag(`defeated_${npc.id}`); // 供對話 variants 判斷（例如「你把守衛打了？」）
+      cleanup();
+    };
+    const onLose = () => {
+      cleanup();
+      _wakeUpAtHome();
+    };
     battleUI.on('win',  onWin);
     battleUI.on('lose', onLose);
+  }
+
+  // ── 戰敗：昏倒後在自己房間醒來，HP 回滿；擊敗你的敵人仍留在原地 ───────────
+  const HOME_MAP = 'map_qu_don_room';
+  function _wakeUpAtHome() {
+    _setPlayerHp(playerBase.stats.maxHp);
+    _warpTo(HOME_MAP, null, null).then(() => {
+      interaction.showMessage('……你在自己房間的床上醒來。渾身痠痛，但還活著。', '（系統）');
+    });
   }
 
   // ── 具名事件 Stubs（功能待實作）──────────────────────────────────────────
@@ -520,35 +555,45 @@ async function main() {
 
   inventoryScreen.on('close', () => { panel.visible = true; });
 
-  // 使用道具：扣減數量、刷新介面（暫不套用 HP/SP 效果，留給後期系統實作）
+  // 使用道具：目前支援 heal_hp（items.json 的 useProps.effects）。
+  // 沒有可套用效果、或 HP 已滿時不消耗（能量飲料等留給之後的 SP 系統，也可拿來當交涉道具）
   inventoryScreen.on('use', (itemId) => {
-    const entry = playerInventory.find(e => e.id === itemId);
-    if (!entry || entry.qty <= 0) return;
-    entry.qty -= 1;
-    if (entry.qty === 0) playerInventory.splice(playerInventory.indexOf(entry), 1);
-    console.log(`[Inventory] 使用：${itemId}`);
+    const def  = gsm.itemDef(itemId);
+    const heal = (def?.useProps?.effects ?? [])
+      .filter(e => e.type === 'heal_hp')
+      .reduce((sum, e) => sum + e.value + Math.round((Math.random() * 2 - 1) * (e.variance ?? 0)), 0);
+    if (!def?.usable || heal <= 0 || playerHp >= playerBase.stats.maxHp) return;
+    if (!gsm.removeItem(itemId, 1)) return;
+    _setPlayerHp(playerHp + heal);
+    console.log(`[Inventory] 使用：${itemId}  HP +${heal} → ${playerHp}`);
     inventoryScreen.show(playerInventory); // 重新渲染（數量更新）
   });
   // ────────────────────────────────────────────────────────────────────────
 
+  // 任一全螢幕介面（選單 / 狀態 / 地圖 / 背包 / 戰鬥）開啟中
+  const _isUiOpen = () =>
+    cigarMenu.visible || statusScreen.visible || worldMap.visible
+    || inventoryScreen.visible || battleUI.visible;
+
+  // 可開啟選單 / 背包：無介面、無對話、非轉場或戰鬥鎖定
+  const _canOpenOverlay = () =>
+    !_isUiOpen() && !interaction.isActive && !input.isLocked;
+
   // 控制面板實體選單按鈕
   panel.on('menu', () => {
-    if (!cigarMenu.visible && !interaction.isActive) {
-      _showMenu();
-    }
+    if (_canOpenOverlay()) _showMenu();
   });
 
   // Escape 開啟選單；I 鍵開啟背包；各介面自身的 handler 負責關閉
   window.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && !cigarMenu.visible && !interaction.isActive
-        && !inventoryScreen.visible) {
+    // 介面自身的 handler 先註冊、先執行；已處理（preventDefault）的按鍵不再重開選單，
+    // 否則 Esc 關閉選單後會在同一個事件內被這裡立刻重新打開
+    if (e.defaultPrevented) return;
+    if (e.key === 'Escape' && _canOpenOverlay()) {
       e.preventDefault();
       _showMenu();
     }
-    if ((e.key === 'i' || e.key === 'I')
-        && !cigarMenu.visible && !interaction.isActive
-        && !inventoryScreen.visible && !statusScreen.visible
-        && !worldMap.visible) {
+    if ((e.key === 'i' || e.key === 'I') && _canOpenOverlay()) {
       e.preventDefault();
       _showInventory();
     }
@@ -561,6 +606,13 @@ async function main() {
 
   // ── GameStateManager（隊伍 / 旗標 / 狀態機）────────────────────────────────
   const gsm = new GameStateManager();
+  gsm.inventory = playerInventory;          // 與 InventoryScreen 共用同一個陣列
+  gsm.itemDefs  = inventoryScreen.itemDefs;
+
+  // NPC 的條件式 variants（位置 / 對話 / 是否出現）隨旗標與背包即時更新
+  entityManager.setConditionResolver(base => gsm.resolveVariant(base));
+  gsm.on('flag:set',         () => entityManager.refreshVariants());
+  gsm.on('inventory:change', () => entityManager.refreshVariants());
 
   // 訂閱戰鬥觸發（InteractionManager BATTLE 選項 → 這裡接手）
   gsm.on('battle:trigger', ({ npc }) => {
@@ -602,8 +654,33 @@ async function main() {
     mapManager.render();
   }
 
+  // ── _warpTo：轉場到指定地圖座標（gx/gy 為 null 時使用該地圖的 player_start）──
+  function _warpTo(targetMap, gx, gy) {
+    input.lock();
+    _isAnimating = false;
+    _stepPhase   = 0;
+    MapManager.onActorMoveEnd(playerSpr);
+    return mapManager.transitionTo(targetMap, () => {
+      const spawn = mapManager.mapData.spawnPoints?.find(s => s.id === 'player_start')
+                 ?? mapManager.mapData.spawnPoints?.[0];
+      player.gx = gx ?? spawn?.gx ?? 0;
+      player.gy = gy ?? spawn?.gy ?? 0;
+      if (!mapManager.entityLayer.children.includes(playerSpr)) {
+        mapManager.entityLayer.addChild(playerSpr);
+      }
+      clock.updateLocation(getMapLabel(mapManager.mapData));
+      syncPlayer();
+      requestUpdate();
+    })
+      .then(() => input.unlock())
+      .catch(() => {
+        console.warn(`[Warp] 目標地圖 "${targetMap}" 尚未建立，略過轉場`);
+        input.unlock();
+      });
+  }
+
   // ── tryMovePlayer：嘗試向 dir 方向移動一格 ────────────────────────────────
-  // 回傳 'moved' | 'blocked' | 'warping'
+  // 回傳 'moved' | 'blocked' | 'warping' | 'battle'
   // 連鎖移動（連續按住）與初次移動共用同一段邏輯，避免重複。
   function tryMovePlayer(dir) {
     facing = dir;
@@ -612,6 +689,16 @@ async function main() {
     const nx = player.gx + dx;
     const ny = player.gy + dy;
     if (!mapManager.isWalkable(nx, ny)) return 'blocked';
+
+    // NPC 佔據的格子不可進入；撞上敵對 NPC 直接開戰（玩家留在原格）
+    const npc = entityManager.getNpcAt(nx, ny);
+    if (npc) {
+      if (npc.combatCollidable) {
+        _startBattle(npc);
+        return 'battle';
+      }
+      return 'blocked';
+    }
 
     player.gx = nx;
     player.gy = ny;
@@ -623,25 +710,8 @@ async function main() {
 
     const warp = mapManager.checkWarp(player.gx, player.gy);
     if (warp) {
-      input.lock();
-      _isAnimating = false;
-      _stepPhase   = 0;
       console.log(`[Warp] "${warp.label ?? warp.id}" → ${warp.targetMap}`);
-      mapManager.transitionTo(warp.targetMap, () => {
-        player.gx = warp.targetGx;
-        player.gy = warp.targetGy;
-        if (!mapManager.entityLayer.children.includes(playerSpr)) {
-          mapManager.entityLayer.addChild(playerSpr);
-        }
-        clock.updateLocation(getMapLabel(mapManager.mapData));
-        syncPlayer();
-        requestUpdate();
-      })
-        .then(() => input.unlock())
-        .catch(() => {
-          console.warn(`[Warp] 目標地圖 "${warp.targetMap}" 尚未建立，略過轉場`);
-          input.unlock();
-        });
+      _warpTo(warp.targetMap, warp.targetGx, warp.targetGy);
       return 'warping';
     }
     return 'moved';
@@ -667,19 +737,30 @@ async function main() {
       return; // 揭幕幀不處理輸入，避免「按新遊戲」的 pointerup 殘留觸發移動
     }
 
-    // NPC 巡邏動畫（背包或其他全螢幕 UI 開啟時暫停）
-    if (!inventoryScreen.visible) entityManager.update(app.ticker.deltaMS);
+    // NPC 巡邏（任何介面 / 對話 / 轉場 / 戰鬥期間暫停）
+    // 玩家佔據邏輯格與目前視覺所在格（移動途中兩格都算），避免 NPC 穿過玩家
+    if (!_isUiOpen() && !interaction.isActive && !input.isLocked) {
+      const contact = entityManager.update(app.ticker.deltaMS, (x, y) =>
+        (x === player.gx && y === player.gy) ||
+        (x === Math.round(player.vx) && y === Math.round(player.vy)));
+      if (contact) _startBattle(contact);
+    }
     // 玩家精靈 zIndex 同步（與 NPC 共用 entityLayer 排序）
     playerSpr.zIndex = playerSpr.y;
 
-    const state = input.update();
+    // 介面開啟時仍需消費輸入佇列，但丟棄結果：
+    // 選單用方向鍵 / Enter 操作時，不得同時移動玩家或觸發調查
+    const rawState = input.update();
+    const state    = _isUiOpen() ? IDLE_INPUT : rawState;
 
     // ── 座標顯示更新 ──────────────────────────────────────────────────────────
     panel.updateCoordinates(player.gx, player.gy);
 
     // ── 0) 環境調查：確認鍵邏輯 ────────────────────────────────────────────
     if (interaction.isActive) {
-      // 對話框開啟中：確認鍵跳過打字機或關閉對話；其餘輸入全部丟棄
+      // 對話框開啟中：方向鍵移動選項游標；確認鍵跳過打字機 / 選定選項 / 推進對話
+      if (state.justDir === 'up'   || state.justDir === 'left')  interaction.moveChoice(-1);
+      if (state.justDir === 'down' || state.justDir === 'right') interaction.moveChoice(1);
       if (state.confirmJust) interaction.advance();
       return;
     }
@@ -712,20 +793,16 @@ async function main() {
         _isAnimating = false;
         _stepPhase   = 0;
 
-        // ── NPC 碰撞檢定：踏入格子時若有敵對 NPC → 觸發戰鬥 ─────────────────
-        const landedNpc = entityManager.getNpcAt(player.gx, player.gy);
-        if (landedNpc?.combatCollidable) {
-          updateSpritePos(player.vx, player.vy);
-          mapManager.setCameraVisual(player.vx, player.vy);
-          mapManager.render();
-          _startBattle(landedNpc);
-          return;
-        }
-
         if (held && !interaction.isActive) {
           const result = tryMovePlayer(held);
           if (result === 'warping') return;
           if (result === 'blocked') MapManager.onActorMoveEnd(playerSpr);
+          if (result === 'battle') {
+            updateSpritePos(player.vx, player.vy);
+            mapManager.setCameraVisual(player.vx, player.vy);
+            mapManager.render();
+            return;
+          }
           // 'moved'：_isAnimating 已重置為 true，AnimatedSprite 持續播放不重啟
         } else {
           MapManager.onActorMoveEnd(playerSpr);

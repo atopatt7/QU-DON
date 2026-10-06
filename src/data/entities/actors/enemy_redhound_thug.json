@@ -1,0 +1,15 @@
+{
+  "id": "enemy_redhound_thug",
+  "name": "紅犬幫打手",
+  "level": 2,
+  "stats": {
+    "hp": 45, "maxHp": 45, "atk": 13, "def": 3, "eva": 0.05
+  },
+  "visuals": {
+    "spriteSheet":   "assets/sprites/entities/pickpocket_sheet.png",
+    "frameWidth":    128,
+    "frameHeight":   256,
+    "heightInTiles": 1.7
+  },
+  "description": "紅犬幫的年輕打手，戴著紅色棒球帽當識別。拿建商的錢，做建商不方便做的事。"
+}
