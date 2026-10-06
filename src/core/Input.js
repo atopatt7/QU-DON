@@ -47,7 +47,6 @@ export class InputManager {
     this._tapMaxDist = 10;  // px，超過視為滑動，不算 tap
 
     this._bindKeyboard();
-    this._bindDPad();
     this._bindCanvasInput();
   }
 
@@ -93,51 +92,6 @@ export class InputManager {
     if (this._keys['ArrowLeft']  || this._keys['KeyA']) return 'left';
     if (this._keys['ArrowRight'] || this._keys['KeyD']) return 'right';
     return null;
-  }
-
-  // ─── D-Pad Buttons（Mobile）──────────────────────────────────────────────
-
-  _bindDPad() {
-    const dpad = document.getElementById('dpad');
-    if (!dpad) return;
-
-    dpad.querySelectorAll('.dpad-btn').forEach(btn => {
-      const dir = btn.dataset.dir;
-
-      btn.addEventListener('pointerdown', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        this._dpadDir = dir;
-        this._justPressed['__dpad__'] = true;
-        btn.style.background = 'rgba(255,255,255,0.35)';
-      });
-
-      const release = () => {
-        if (this._dpadDir === dir) this._dpadDir = null;
-        btn.style.background = 'rgba(255,255,255,0.15)';
-      };
-      btn.addEventListener('pointerup',     release);
-      btn.addEventListener('pointercancel', release);
-      btn.addEventListener('pointerleave',  release);
-    });
-
-    // Action buttons
-    document.querySelectorAll('.action-btn').forEach(btn => {
-      const action = btn.dataset.action;
-      btn.addEventListener('pointerdown', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        this._actions[action] = true;
-        this._justPressed[`__action_${action}__`] = true;
-        btn.style.background = 'rgba(255,255,255,0.35)';
-      });
-      const release = () => {
-        this._actions[action] = false;
-        btn.style.background = 'rgba(255,255,255,0.15)';
-      };
-      btn.addEventListener('pointerup',     release);
-      btn.addEventListener('pointercancel', release);
-    });
   }
 
   // ─── Canvas 點擊 / Touch（Tile Click 移動）────────────────────────────────
@@ -218,7 +172,7 @@ export class InputManager {
       this._justPressed['ArrowDown']  || this._justPressed['KeyS']    ? 'down'  :
       this._justPressed['ArrowLeft']  || this._justPressed['KeyA']    ? 'left'  :
       this._justPressed['ArrowRight'] || this._justPressed['KeyD']    ? 'right' :
-      this._justPressed['__dpad__'] || this._justPressed['__inject__'] ? dpadDir :
+      this._justPressed['__inject__'] ||
       swipeDir
     ) || null;
 
@@ -260,11 +214,13 @@ export class InputManager {
    * @param {string|null} dir  'up'|'down'|'left'|'right'|null
    */
   injectDir(dir) {
-    const wasNone = !this._dpadDir;
+    const prev = this._dpadDir;
     this._dpadDir = dir;
-    // 有方向且是從無到有 → 視為 justPressed（格子移動用）
-    if (dir && wasNone) {
-      this._justPressed['__inject__'] = true;
+    // 按下新方向 → 記下「按下的是哪個方向」（不是 true）。
+    // 快速點按時按下與放開可能落在同一幀之間（低幀率手機尤其常見），
+    // 若只記 true、到下一幀才讀 _dpadDir，方向早已被放開清成 null，這一下點按就會被吃掉
+    if (dir && dir !== prev) {
+      this._justPressed['__inject__'] = dir;
     }
   }
 

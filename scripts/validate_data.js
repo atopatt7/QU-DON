@@ -101,6 +101,54 @@ for (const id of reachable) {
   }
 }
 
+// ─── 可走到性：從進入地圖的位置出發，每個出口 / NPC / 調查點都要走得到 ─────────
+// NPC 視為可通過（守衛會讓開、敵人可以打倒），只看地形。避免玩家被地形卡死。
+{
+  const entries = {};
+  for (const id of reachable) {
+    for (const w of maps[id].warps ?? []) {
+      if (reachable.has(w.targetMap)) (entries[w.targetMap] ??= []).push([w.targetGx, w.targetGy]);
+    }
+  }
+  for (const id of ENTRY_MAPS) {
+    const sp = maps[id]?.spawnPoints?.find(s => s.id === 'player_start') ?? maps[id]?.spawnPoints?.[0];
+    if (sp) (entries[id] ??= []).push([sp.gx, sp.gy]);
+  }
+
+  for (const id of reachable) {
+    const m = maps[id];
+    const seen = new Uint8Array(m.width * m.height);
+    const queue = (entries[id] ?? []).filter(([x, y]) => walkable(id, x, y));
+    for (const [x, y] of queue) seen[y * m.width + x] = 1;
+    while (queue.length) {
+      const [x, y] = queue.shift();
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const nx = x + dx, ny = y + dy;
+        if (!walkable(id, nx, ny) || seen[ny * m.width + nx]) continue;
+        // 傳送點本身走得到，但會被傳走，不從它往外擴散
+        seen[ny * m.width + nx] = 1;
+        if (!warpAt(m, nx, ny)) queue.push([nx, ny]);
+      }
+    }
+    const at   = (x, y) => inBounds(m, x, y) && seen[y * m.width + x];
+    const near = (x, y) => [[0, 1], [0, -1], [1, 0], [-1, 0]].some(([dx, dy]) => at(x + dx, y + dy));
+
+    for (const w of m.warps ?? []) {
+      if (!at(w.gx, w.gy)) err(`${id} warp "${w.id}"：從進入點走不到 (${w.gx},${w.gy})`);
+    }
+    for (const t of m.triggers ?? []) {
+      if (t.type === 'examine' && !near(t.gx, t.gy)) err(`${id} trigger "${t.id}"：從進入點走不到旁邊 (${t.gx},${t.gy})`);
+    }
+    let npcs = [];
+    try { npcs = readJson(path.join(NPCS_DIR, `npcs_${id}.json`)); } catch { /* 沒有 NPC 檔 */ }
+    for (const n of npcs) {
+      for (const pos of [n.position, ...(n.variants ?? []).map(v => v.position).filter(Boolean)]) {
+        if (!at(pos.x, pos.y) && !near(pos.x, pos.y)) err(`${id} NPC "${n.id}"：從進入點走不到 (${pos.x},${pos.y})`);
+      }
+    }
+  }
+}
+
 // ─── 物品參照（choices / onEnd / variants 中的 requiresItem、takeItem、giveItem）──
 const itemIds = new Set(readJson(path.join(ROOT, 'src/data/items.json')).items.map(i => i.id));
 const asList  = v => (v == null ? [] : Array.isArray(v) ? v : [v]);
@@ -204,6 +252,38 @@ for (const f of fs.readdirSync(NPCS_DIR)) {
         }
       }
     }
+  }
+}
+
+// ─── Service Worker 預快取：main.js 匯入的每個模組都要在清單上（否則離線時無法啟動）──
+{
+  const swSrc    = fs.readFileSync(path.join(ROOT, 'sw.js'), 'utf8');
+  const listSrc  = swSrc.slice(swSrc.indexOf('const PRECACHE'), swSrc.indexOf('];', swSrc.indexOf('const PRECACHE')));
+  const precache = new Set([...listSrc.matchAll(/'\.\/([^']+)'/g)].map(m => m[1]));
+  for (const p of precache) if (p && !exists(p)) err(`sw.js PRECACHE：檔案不存在 ${p}`);
+
+  const seen  = new Set();
+  const stack = ['main.js'];
+  while (stack.length) {
+    const rel = stack.pop();
+    if (seen.has(rel)) continue;
+    seen.add(rel);
+    const src = fs.readFileSync(path.join(ROOT, rel), 'utf8');
+    for (const m of src.matchAll(/^\s*import\s[^'"]*['"](\.{1,2}\/[^'"]+)['"]/gm)) {
+      stack.push(path.posix.normalize(path.posix.join(path.posix.dirname(rel), m[1])));
+    }
+  }
+  for (const mod of seen) {
+    if (!precache.has(mod)) warn(`sw.js PRECACHE 缺少模組 ${mod}（離線第一次啟動會失敗）`);
+  }
+  // 遊戲會讀到的資料檔（可到達地圖、其 NPC 檔、registry 內的角色）
+  const dataFiles = [
+    ...[...reachable].map(id => `src/data/maps/${id}.json`),
+    ...fs.readdirSync(NPCS_DIR).filter(f => f.endsWith('.json')).map(f => `src/data/npcs/${f}`),
+    ...Object.entries(registry).filter(([k]) => !k.startsWith('_')).map(([, rel]) => `src/data/entities/${rel}`),
+  ];
+  for (const f of dataFiles) {
+    if (!precache.has(f)) warn(`sw.js PRECACHE 缺少資料檔 ${f}（離線時讀不到）`);
   }
 }
 

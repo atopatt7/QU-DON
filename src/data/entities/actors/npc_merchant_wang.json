@@ -1,0 +1,15 @@
+{
+  "id": "npc_merchant_wang",
+  "name": "老王",
+  "level": 1,
+  "stats": { "hp": 35, "maxHp": 35, "atk": 5, "def": 2, "eva": 0.05 },
+  "visuals": {
+    "spriteSheet":   "assets/sprites/entities/clerk_sheet.png",
+    "frameWidth":    128,
+    "frameHeight":   256,
+    "heightInTiles": 1.7,
+    "tint":          "0x8a7a5a",
+    "_art": "暫用剪影：尚無專屬美術"
+  },
+  "description": "賣什麼都有的雜貨小販。消息靈通程度僅次於 Eddie。"
+}

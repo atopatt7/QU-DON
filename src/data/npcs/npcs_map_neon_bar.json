@@ -1,0 +1,64 @@
+[
+  {
+    "_comment": "酒保阿貴：瞿董每晚都來的地方",
+    "id":        "bar_bartender",
+    "entityRef": "npc_bartender",
+    "category":  "system",
+    "position":  { "x": 3, "y": 3 },
+    "direction": "down",
+    "behavior":  "idle",
+    "dialogue": [
+      "老位子還留著。",
+      "最近紅犬幫的小鬼常來，喝了酒不付錢。我不敢說什麼。"
+    ],
+    "choices": [
+      {
+        "text": "來一杯",
+        "ifNot": "bar_had_drink",
+        "setFlag": "bar_had_drink",
+        "heal": 15,
+        "reply": ["老樣子。不加冰。"]
+      },
+      {
+        "text": "問紅犬幫的事",
+        "reply": [
+          "紅犬那個人，以前是同興堂鬥狗場的打手。茶桌散了以後，他把空出來的地盤一口一口吃下來。",
+          "他最討厭的就是你們這些老人。他說，規矩早就死了。"
+        ]
+      },
+      { "text": "沒事" }
+    ],
+    "variants": [
+      {
+        "if": "ws_end_camp",
+        "dialogue": [
+          "聽說西郊那邊，是你出的面？",
+          "……很久沒有人在這條街上講公道了。這杯算我的。"
+        ],
+        "choices": [
+          { "text": "謝了", "ifNot": "bar_had_drink", "setFlag": "bar_had_drink", "heal": 15, "reply": ["敬茶桌。"] },
+          { "text": "沒事" }
+        ]
+      }
+    ]
+  },
+  {
+    "_comment": "酒客：紅犬幫的小弟在東北角那桌喝酒（不主動開戰）",
+    "id":        "bar_redhound_drinker",
+    "entityRef": "enemy_redhound_thug",
+    "name":      "喝醉的紅犬幫小弟",
+    "category":  "system",
+    "position":  { "x": 7, "y": 5 },
+    "direction": "left",
+    "behavior":  "idle",
+    "dialogue": [
+      "看什麼看？……喔，你就是那個瞿董？",
+      "我們老大說了，茶桌那套早就過時了。現在是誰拳頭硬、誰錢多，誰說了算。"
+    ],
+    "choices": [
+      { "text": "讓他說完", "reply": ["……你不生氣？", "老大說你們這些老人最愛面子。看來也沒有嘛。"] },
+      { "text": "教訓他", "action": "BATTLE" },
+      { "text": "不理他" }
+    ]
+  }
+]

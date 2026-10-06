@@ -545,7 +545,7 @@
       "draw": "sidewalk",
       "color": "0x2a2218",
       "sfx": "footstep_stone",
-      "desc": "唐人街人行道（六角形青石磚）"
+      "desc": "哈卡街人行道（六角形青石磚）"
     },
     "2002": {
       "name": "chinatown_alley",
@@ -615,7 +615,7 @@
       "draw": "sidewalk",
       "color": "0x2a2218",
       "sfx": "footstep_stone",
-      "desc": "唐人街人行道（六角形青石磚）"
+      "desc": "哈卡街人行道（六角形青石磚）"
     },
     "20002": {
       "name": "chinatown_alley",

@@ -11,12 +11,30 @@ export class AudioManager {
   static _audio  = null;   // 當前 HTMLAudioElement
   static _url    = '';     // 當前播放的 URL
   static _volume = 0.55;   // 全域音量 0~1
+  static _muted  = false;  // 設定中的「音樂」關閉
+  static _wanted = '';     // 目前場景應該播放的 BGM（靜音時記住，取消靜音後接著播）
+
+  /** 開關音樂。關閉時停止播放；重新開啟時播放目前場景的 BGM。 */
+  static setMuted(muted) {
+    AudioManager._muted = !!muted;
+    if (AudioManager._muted) {
+      const wanted = AudioManager._wanted;
+      AudioManager.stopBGM();
+      AudioManager._wanted = wanted;
+    } else if (AudioManager._wanted) {
+      AudioManager.playBGM(AudioManager._wanted);
+    }
+  }
+
+  static get muted() { return AudioManager._muted; }
 
   /**
    * 播放 BGM。若已在播放同一檔案則不重新啟動。
    * @param {string} url 音訊路徑
    */
   static playBGM(url) {
+    AudioManager._wanted = url;
+    if (AudioManager._muted) return;
     if (AudioManager._url === url && AudioManager._audio && !AudioManager._audio.paused) return;
 
     AudioManager.stopBGM();
@@ -36,6 +54,7 @@ export class AudioManager {
 
   /** 停止目前 BGM 並釋放資源。 */
   static stopBGM() {
+    AudioManager._wanted = '';
     if (!AudioManager._audio) return;
     AudioManager._audio.pause();
     AudioManager._audio.currentTime = 0;

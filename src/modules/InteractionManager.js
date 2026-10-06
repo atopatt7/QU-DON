@@ -215,6 +215,12 @@ export class InteractionManager {
     return true;
   }
 
+  /** 播放一段對話腳本（序章、劇情事件用；格式同 _runScript）。對話中呼叫時忽略。 */
+  play(script) {
+    if (this._active) return false;
+    return this._runScript(script);
+  }
+
   /** 對話框是否正在顯示中（用於 main.js 封鎖移動輸入） */
   get isActive() { return this._active; }
 
@@ -235,12 +241,17 @@ export class InteractionManager {
    *   if / ifNot / requiresItem   顯示條件（見 GameStateManager.meets）
    *   takeItem / giveItem         "itemId" | { id, qty } | [ ... ]
    *   setFlag:      "flag" | ["flag", ...]   對話結束時設定
+   *   heal:         數字 | "full"            回復 HP（診所等服務）
    *   reply:        ["...", ...]             選完後說話者的回應
    */
   _runScript(script, npc = null) {
     const speaker = script.speaker ?? '（環境）';
     const lines   = script.dialogue?.length ? script.dialogue : ['……'];
-    const choices = (script.choices ?? []).filter(c => this._meets(c));
+    // 劇情條件（if / ifNot）不成立 → 隱藏；只差道具（requiresItem）→ 顯示但灰掉，
+    // 讓玩家知道有這個選項、要付出什麼（例如「請他處理傷口（兩根菸）」）
+    const choices = (script.choices ?? [])
+      .filter(c => this._meets({ if: c.if, ifNot: c.ifNot }))
+      .map(c => (this._meets({ requiresItem: c.requiresItem }) ? c : { ...c, disabled: true }));
     let   i = 0;
 
     this._active      = true;
@@ -288,7 +299,7 @@ export class InteractionManager {
       switch (choice.action) {
         case 'RECRUIT':
           if (this._gsm && npc) {
-            this._gsm.recruitNpc(npc.id);
+            this._gsm.recruitNpc(npc.id, npc.entityData?.name ?? npc.id);
             this._playQueue(
               [{ text: `${npc.entityData?.name ?? npc.id} 加入了你的隊伍。`, speaker: '（系統）' }],
               () => this._close(),
@@ -335,6 +346,11 @@ export class InteractionManager {
     for (const { id, qty } of list(fx.giveItem)) {
       this._gsm.addItem(id, qty);
       msgs.push({ text: `獲得【${this._gsm.itemName(id)}】×${qty}`, speaker: '（系統）' });
+    }
+    // heal: 數字 = 回復量；"full" = 回滿（由 main.js 的 'player:heal' 監聽器套用到 HP）
+    if (fx.heal) {
+      this._gsm.emit('player:heal', fx.heal);
+      msgs.push({ text: fx.heal === 'full' ? '傷勢處理好了。（HP 全滿）' : `回復了 ${fx.heal} HP。`, speaker: '（系統）' });
     }
     return msgs;
   }

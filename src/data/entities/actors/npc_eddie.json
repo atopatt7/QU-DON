@@ -1,0 +1,15 @@
+{
+  "id": "npc_eddie",
+  "name": "Eddie「耳朵」黃",
+  "level": 2,
+  "stats": { "hp": 30, "maxHp": 30, "atk": 4, "def": 2, "eva": 0.3 },
+  "visuals": {
+    "spriteSheet":   "assets/sprites/entities/pickpocket_sheet.png",
+    "frameWidth":    128,
+    "frameHeight":   256,
+    "heightInTiles": 1.7,
+    "tint":          "0x7f9cc4",
+    "_art": "暫用剪影：尚無專屬美術"
+  },
+  "description": "哈卡街錄影帶出租店老闆。店後面的房間擺滿電話和錄音機，全城的消息都會流到他這裡。"
+}

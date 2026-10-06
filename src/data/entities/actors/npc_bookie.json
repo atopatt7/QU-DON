@@ -1,0 +1,15 @@
+{
+  "id": "npc_bookie",
+  "name": "組頭 阿彬",
+  "level": 1,
+  "stats": { "hp": 35, "maxHp": 35, "atk": 7, "def": 2, "eva": 0.1 },
+  "visuals": {
+    "spriteSheet":   "assets/sprites/entities/pickpocket_sheet.png",
+    "frameWidth":    128,
+    "frameHeight":   256,
+    "heightInTiles": 1.7,
+    "tint":          "0x7fa07f",
+    "_art": "暫用剪影：尚無專屬美術"
+  },
+  "description": "天公簽的組頭。每天晚上在黑石街收單，嘴上說包中，從來沒人中過。"
+}

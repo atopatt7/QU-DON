@@ -20,7 +20,13 @@ import { AudioManager }          from './src/core/AudioManager.js';
 import { StatusScreen }          from './src/ui/StatusScreen.js';
 import { WorldMapScreen }        from './src/ui/WorldMapScreen.js';
 import { InventoryScreen }       from './src/ui/InventoryScreen.js';
+import { TextPanelScreen }       from './src/ui/TextPanelScreen.js';
 import { GameStateManager }      from './src/core/GameStateManager.js';
+import { gameAreaHeight, isLandscape } from './src/core/Layout.js';
+import { SaveSystem, Settings }  from './src/core/SaveSystem.js';
+
+// 新遊戲的起點：瞿董的房間（序章）
+const START_MAP = 'map_qu_don_room';
 
 // ─── VT323 字型 ────────────────────────────────────────────────────────────
 const fontLink = document.createElement('link');
@@ -77,19 +83,18 @@ async function initPixi() {
     width:           W,
     height:          H,
     backgroundColor: 0x080610,
-    resolution:      window.devicePixelRatio || 1,
+    // 解析度上限 2：像素風畫面在 3x 螢幕上看不出差別，但要填的像素多 2.25 倍（手機 GPU 的主要負擔）
+    resolution:      Math.min(window.devicePixelRatio || 1, 2),
     autoDensity:     true,
     antialias:       false,
     eventMode:       'static',
   });
 
-  // ⚡ Stage 3/4 效能：30fps 上限，減半 ticker 喚醒次數
-  app.ticker.maxFPS = 30;
+  // 60fps 上限：移動已改為以時間計算（見 BASE_FRAME_MS），高刷新率螢幕不會多燒電
+  app.ticker.maxFPS = 60;
 
   _appInstance = app;
   document.getElementById('game-container').appendChild(app.canvas);
-  const htmlCtrl = document.getElementById('touch-controls');
-  if (htmlCtrl) htmlCtrl.style.display = 'none';
   return app;
 }
 
@@ -102,14 +107,14 @@ function bindResize(app) {
   });
 }
 
-// ─── 遊戲圖層（上方 66%，帶遮罩）──────────────────────────────────────────
+// ─── 遊戲圖層（直式：上方 66%；橫式：全畫面。帶遮罩）──────────────────────────────────────────
 function buildGameLayer(app) {
   const layer = new PIXI.Container();
   layer.label = 'gameLayer';
   const mask  = new PIXI.Graphics();
   const drawMask = () => {
     mask.clear();
-    mask.rect(0, 0, app.screen.width, Math.floor(app.screen.height * 0.66))
+    mask.rect(0, 0, app.screen.width, gameAreaHeight(app.screen.width, app.screen.height))
         .fill({ color: 0xffffff });
   };
   drawMask();
@@ -269,7 +274,7 @@ const IDLE_INPUT = Object.freeze({
 });
 
 // ─── 開發輔助旗標 ──────────────────────────────────────────────────────────
-window.SHOW_COORDS = false;
+window.SHOW_COORDS = new URLSearchParams(location.search).has('dev');
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  主程式
@@ -279,18 +284,26 @@ async function main() {
   bindResize(app);
 
   // 雪茄盒選單素材預載：與首頁顯示並行，不阻塞畫面
-  PIXI.Assets.load(['assets/ui/interface/cigar_box.png', 'assets/ui/interface/cigar_single.png'])
+  PIXI.Assets.load(['assets/ui/interface/cigar_box.webp', 'assets/ui/interface/cigar_single.webp'])
     .catch(() => console.warn('[QU-DON] CigarMenu 素材預載失敗，選單將使用佔位圖形'));
 
+  // 套用音樂設定（首頁就能切換）
+  AudioManager.setMuted(!Settings.get().music);
+
   // ── 1. 顯示首頁 ──────────────────────────────────────────────────────────
-  const homeScreen = await HomeScreen.create(app);
+  const homeScreen = await HomeScreen.create(app, { hasSave: SaveSystem.has() });
   app.stage.addChild(homeScreen);
 
-  // 等待玩家點「新遊戲」或「DEV ZONE」
-  let _devMode = false;
+  // 等待玩家點「新遊戲」「載入遊戲」或「DEV ZONE」
+  let _devMode  = false;
+  let _saveData = null;   // 載入遊戲時的存檔內容；新遊戲為 null
   await new Promise(resolve => {
     homeScreen.on('action', (id) => {
       if (id === 'new_game') resolve();
+      if (id === 'load_game') {
+        _saveData = SaveSystem.load();
+        if (_saveData) resolve();
+      }
     });
     homeScreen.on('startDevMode', () => {
       _devMode = true;
@@ -335,12 +348,14 @@ async function main() {
   const mapManager    = await MapManager.create(app, gameLayer);
   const entityManager = new EntityManager(app);
   mapManager.setEntityManager(entityManager); // loadMap 時自動呼叫 entityManager.init
+  // 讀檔：已擊敗 / 已招募的 NPC 必須在第一張地圖載入前就排除
+  for (const id of _saveData?.removedNpcs ?? []) entityManager._removed.add(id);
   app.mapManager = mapManager;               // 供 WorldMapScreen 讀取當前地圖 ID
 
   // ⚡ 平行載入：地圖 JSON、玩家貼圖、控制面板、角色資料 同時進行，
   //    大幅縮短黑屏等待時間（原本依序 await，現在同步發出所有請求）
   const [, { texMap: playerTexMap, playerJson: _playerJson }, panel, _actorsJson] = await Promise.all([
-    mapManager.loadMap(_devMode ? 'map_qu_don_room' : 'map_black_rock_street'),
+    mapManager.loadMap(_saveData?.map ?? START_MAP),
     loadPlayerSprites(),
     ControlPanel.create(app, input),
     fetch('./src/data/actors.json').then(r => r.json()).catch(() => null),
@@ -348,17 +363,19 @@ async function main() {
 
   const spawn   = mapManager.mapData.spawnPoints?.find(s => s.id === 'player_start')
                ?? mapManager.mapData.spawnPoints?.[0];
-  const spawnGx = spawn?.gx ?? 19;
-  const spawnGy = spawn?.gy ?? 12;
+  const spawnGx = _saveData?.gx ?? spawn?.gx ?? 1;
+  const spawnGy = _saveData?.gy ?? spawn?.gy ?? 1;
   // ⚡ vx/vy 直接設為出生座標，防止 ticker 第一幀用初始值 0 重設鏡頭
   const player  = { gx: spawnGx, gy: spawnGy, vx: spawnGx, vy: spawnGy };
-  let   facing  = spawn?.facing ?? 'down';
+  let   facing  = _saveData?.facing ?? spawn?.facing ?? 'down';
 
   const playerSpr = buildPlayerSprite(mapManager.tileSize, playerTexMap, _playerJson);
   playerSpr.setDir(facing);
   mapManager.entityLayer.addChild(playerSpr);
 
   // ── Lerp 動畫常數 ────────────────────────────────────────────────────────────
+  // 以下數值都以「30fps 的一幀」為單位定義，實際每幀依 deltaMS 換算（見 ticker 內的 f）
+  const BASE_FRAME_MS = 1000 / 30;
   const LERP_FACTOR = 0.30;   // 放開按鍵後的收斂比例（自然減速停步）
   const LERP_SNAP   = 0.01;   // 誤差小於此值時強制對齊
   // 按住方向鍵時的定速移動量（tiles/frame @ 30fps）
@@ -405,6 +422,8 @@ async function main() {
     // setCameraVisual 沒有 centerOn 的 early-return guard，確保 tileSize 改變後鏡頭重算
     mapManager.setCameraVisual(player.vx, player.vy);
     mapManager.render();
+    // 精靈位置以 tileSize 換算，轉向 / 縮放後必須重算，否則玩家會留在舊的像素位置
+    updateSpritePos(player.vx, player.vy);
   });
 
   app.stage.addChild(panel);
@@ -433,19 +452,24 @@ async function main() {
   worldMap.zIndex = 1100;
   app.stage.addChild(worldMap);
 
+  // ── 備忘錄 / 隊伍人脈（共用文字面板）──────────────────────────────────────
+  const textPanel = new TextPanelScreen(app);
+  textPanel.zIndex = 1100;
+  app.stage.addChild(textPanel);
+  const _journalData = await fetch('./src/data/journal.json').then(r => r.json()).catch(() => ({ quests: [] }));
+
   // ── 背包介面 ──────────────────────────────────────────────────────────────
   const inventoryScreen = await InventoryScreen.create(app);
   inventoryScreen.zIndex = 1200;
   app.stage.addChild(inventoryScreen);
 
-  // 玩家背包初始存量（之後可由存檔系統覆寫）
-  const playerInventory = [
+  // 玩家背包：讀檔時沿用存檔；新遊戲用初始存量（工地通行證在序章裡從門縫撿到）
+  const playerInventory = _saveData?.inventory?.map(e => ({ ...e })) ?? [
     { id: 'painkiller',    qty: 3 },
     { id: 'cigarette',     qty: 5 },
     { id: 'bento',         qty: 1 },
     { id: 'bandage',       qty: 2 },
     { id: 'energy_drink',  qty: 1 },
-    { id: 'id_card',       qty: 1 },
   ];
 
   // ── 戰鬥介面（地圖世界用）────────────────────────────────────────────────
@@ -481,7 +505,7 @@ async function main() {
 
   // ── 玩家當前 HP（跨戰鬥保留；之後由存檔系統接手）────────────────────────
   const playerBase = _quDonData ?? { name: '瞿董', stats: { hp: 85, maxHp: 85, atk: 10, def: 5 } };
-  let   playerHp   = playerBase.stats.hp;
+  let   playerHp   = _saveData?.hp ?? playerBase.stats.hp;
 
   const _setPlayerHp = (hp) => {
     playerHp = Math.max(0, Math.min(hp, playerBase.stats.maxHp));
@@ -507,23 +531,34 @@ async function main() {
     const cleanup = () => {
       battleUI.off('win',  onWin);
       battleUI.off('lose', onLose);
+      battleUI.off('flee', onFlee);
       battleUI.visible = false;
       panel.visible = true;
       input.unlock();
+      _autosave();
     };
-    const onWin = () => {
+    const onWin = ({ talked } = {}) => {
       _setPlayerHp(battleUI.playerHp);
       entityManager.hideNpc(npc.id);
       gsm.setFlag(`defeated_${npc.id}`); // 供對話 variants 判斷（例如「你把守衛打了？」）
+      if (talked) gsm.setFlag(`talked_down_${npc.id}`); // 談判收場（沒有動手打倒）
       cleanup();
     };
     const onLose = () => {
       cleanup();
       _wakeUpAtHome();
     };
+    // 逃跑：敵人留在原地；短暫無敵時間，避免巡邏中的敵人下一步又撞上來
+    const onFlee = () => {
+      _setPlayerHp(battleUI.playerHp);
+      _battleGraceUntil = performance.now() + 3000;
+      cleanup();
+    };
     battleUI.on('win',  onWin);
     battleUI.on('lose', onLose);
+    battleUI.on('flee', onFlee);
   }
+  let _battleGraceUntil = 0;
 
   // ── 戰敗：昏倒後在自己房間醒來，HP 回滿；擊敗你的敵人仍留在原地 ───────────
   const HOME_MAP = 'map_qu_don_room';
@@ -538,12 +573,23 @@ async function main() {
   cigarMenu.on('resume',    ()              => _hideMenu());
   cigarMenu.on('status',    ()              => { cigarMenu.hide(); statusScreen.show(); });
   cigarMenu.on('inventory', ()              => { _showInventory(); });
-  cigarMenu.on('crew',      ({ label })     => { console.log(`[Menu] ${label}`); });
-  cigarMenu.on('journal',   ({ label })     => { console.log(`[Menu] ${label}`); });
+  cigarMenu.on('crew',      ()              => { cigarMenu.hide(); textPanel.show(_buildCrewPanel()); });
+  cigarMenu.on('journal',   ()              => { cigarMenu.hide(); textPanel.show(_buildJournalPanel()); });
   cigarMenu.on('map',       ()              => { cigarMenu.hide(); worldMap.show(); });
-  cigarMenu.on('settings',  ()              => { window.SHOW_COORDS = !window.SHOW_COORDS; _hideMenu(); });
-  cigarMenu.on('save',      ({ label })     => { console.log(`[Menu] ${label}`); });
-  cigarMenu.on('quit',      ()              => { console.log('[Menu] 放棄生存'); });
+  cigarMenu.on('settings',  ()              => {
+    const { music } = Settings.set({ music: !Settings.get().music });
+    AudioManager.setMuted(!music);
+    _hideMenu();
+    interaction.showMessage(`音樂已${music ? '開啟' : '關閉'}。`, '（系統）');
+  });
+  cigarMenu.on('save',      ()              => {
+    _hideMenu();
+    const ok = SaveSystem.save(_collectSave());
+    interaction.showMessage(ok ? '進度已儲存。' : '無法儲存：這個瀏覽器不允許寫入本機儲存空間（例如無痕模式）。', '（系統）');
+  });
+  // 放棄生存：存檔後回到標題畫面
+  cigarMenu.on('quit',      ()              => { SaveSystem.save(_collectSave()); location.reload(); });
+  textPanel.on('close', () => { _showMenu(); });
 
   worldMap.on('close', () => { _showMenu(); });
 
@@ -557,11 +603,30 @@ async function main() {
 
   // 使用道具：目前支援 heal_hp（items.json 的 useProps.effects）。
   // 沒有可套用效果、或 HP 已滿時不消耗（能量飲料等留給之後的 SP 系統，也可拿來當交涉道具）
-  inventoryScreen.on('use', (itemId) => {
-    const def  = gsm.itemDef(itemId);
-    const heal = (def?.useProps?.effects ?? [])
+  /** 道具的回復量（含浮動）；不是回血道具時回傳 0 */
+  function _rollHeal(itemId) {
+    const def = gsm.itemDef(itemId);
+    if (!def?.usable) return 0;
+    return (def.useProps?.effects ?? [])
       .filter(e => e.type === 'heal_hp')
       .reduce((sum, e) => sum + e.value + Math.round((Math.random() * 2 - 1) * (e.variance ?? 0)), 0);
+  }
+
+  // 戰鬥中的物品選單：只列出回血道具；使用時扣背包、回傳回復量給 BattleUI
+  battleUI.setItemProvider({
+    list: () => gsm.inventory
+      .filter(e => e.qty > 0 && _rollHeal(e.id) > 0)
+      .map(e => ({ id: e.id, name: gsm.itemName(e.id), qty: e.qty })),
+    use:  (id) => {
+      const heal = _rollHeal(id);
+      return heal > 0 && gsm.removeItem(id, 1) ? heal : null;
+    },
+    name: (id) => gsm.itemName(id),
+  });
+
+  inventoryScreen.on('use', (itemId) => {
+    const def  = gsm.itemDef(itemId);
+    const heal = _rollHeal(itemId);
     if (!def?.usable || heal <= 0 || playerHp >= playerBase.stats.maxHp) return;
     if (!gsm.removeItem(itemId, 1)) return;
     _setPlayerHp(playerHp + heal);
@@ -573,7 +638,7 @@ async function main() {
   // 任一全螢幕介面（選單 / 狀態 / 地圖 / 背包 / 戰鬥）開啟中
   const _isUiOpen = () =>
     cigarMenu.visible || statusScreen.visible || worldMap.visible
-    || inventoryScreen.visible || battleUI.visible;
+    || inventoryScreen.visible || battleUI.visible || textPanel.visible;
 
   // 可開啟選單 / 背包：無介面、無對話、非轉場或戰鬥鎖定
   const _canOpenOverlay = () =>
@@ -629,15 +694,82 @@ async function main() {
   interaction.setEntityManager(entityManager);
   interaction.setGameStateManager(gsm);
 
+  // ── 讀檔：還原旗標 / 隊伍（NPC variants 依旗標重新套用）─────────────────────
+  if (_saveData) {
+    Object.assign(gsm.flags, _saveData.flags ?? {});
+    gsm.party.push(...(_saveData.party ?? []));
+    Object.assign(gsm.partyNames, _saveData.partyNames ?? {});
+    entityManager.refreshVariants();
+  }
+  statusScreen.updateData({ hp: playerHp });
+
+  // ── 存檔 ──────────────────────────────────────────────────────────────────
+  // 自動存檔：旗標 / 背包 / 隊伍變動、換地圖、戰鬥結束後。手機玩家隨時可能關掉分頁。
+  function _collectSave() {
+    return {
+      map:         mapManager.mapData.id,
+      gx:          player.gx,
+      gy:          player.gy,
+      facing,
+      hp:          playerHp,
+      flags:       { ...gsm.flags },
+      inventory:   gsm.inventory.map(e => ({ ...e })),
+      party:       [...gsm.party],
+      partyNames:  { ...gsm.partyNames },
+      removedNpcs: [...entityManager._removed],
+    };
+  }
+  let _saveTimer = null;
+  function _autosave() {
+    clearTimeout(_saveTimer);
+    _saveTimer = setTimeout(() => {
+      // 轉場 / 戰鬥中狀態不完整，延後到結束再存
+      if (input.isLocked || battleUI.visible) { _autosave(); return; }
+      SaveSystem.save(_collectSave());
+    }, 400);
+  }
+  gsm.on('flag:set',         _autosave);
+  gsm.on('inventory:change', _autosave);
+  gsm.on('party:join',       _autosave);
+
+  // 對話選項的回復效果（例如無牌診所）
+  gsm.on('player:heal', (amount) => {
+    _setPlayerHp(amount === 'full' ? playerBase.stats.maxHp : playerHp + amount);
+    _autosave();
+  });
+
+  // ── 備忘錄 / 隊伍人脈內容 ─────────────────────────────────────────────────
+  function _buildJournalPanel() {
+    const sections = [];
+    for (const q of _journalData.quests ?? []) {
+      const lines = (q.entries ?? []).filter(e => gsm.meets(e)).map(e => e.text);
+      if (!lines.length) continue;
+      const done = q.doneIf && gsm.meets({ if: q.doneIf });
+      sections.push({ heading: q.title, tag: done ? '［完成］' : '［進行中］', lines });
+    }
+    // 進行中的排前面
+    sections.sort((a, b) => (a.tag === b.tag ? 0 : a.tag === '［進行中］' ? -1 : 1));
+    return { title: '備忘錄', subtitle: '1986　洛城　雨季', sections, empty: '（還沒有記下任何事。）' };
+  }
+
+  function _buildCrewPanel() {
+    const sections = gsm.party.map(id => ({
+      heading: gsm.partyNames[id] ?? id,
+      lines:   ['跟著你行動。'],
+    }));
+    return { title: '隊伍人脈', sections, empty: '（現在還沒有人跟著你。在這座城市，信任比子彈還貴。）' };
+  }
+
   // ── VFD 時鐘（左下角，遊戲區底部）────────────────────────────────────────
   const clock = new VFDClock({ color: 'green', fontSize: 18, showSeconds: false });
   app.stage.addChild(clock);
 
   const positionClock = () => {
-    const safe  = getSafeArea();
-    const gameH = Math.floor(app.screen.height * 0.66);
+    const safe = getSafeArea();
+    const { width: W, height: H } = app.screen;
     clock.x = 12 + safe.left;
-    clock.y = gameH - clock.displayHeight - 8;
+    // 橫式時左下角是 D-Pad，時鐘移到左上角
+    clock.y = isLandscape(W, H) ? 8 + safe.top : gameAreaHeight(W, H) - clock.displayHeight - 8;
   };
   positionClock();
   app.stage.on('resize', positionClock);
@@ -672,7 +804,7 @@ async function main() {
       syncPlayer();
       requestUpdate();
     })
-      .then(() => input.unlock())
+      .then(() => { input.unlock(); _autosave(); })
       .catch(() => {
         console.warn(`[Warp] 目標地圖 "${targetMap}" 尚未建立，略過轉場`);
         input.unlock();
@@ -734,6 +866,20 @@ async function main() {
       mapManager.render(); // 若 _isDirty（resize 等觸發），重算 _root.x/y
       _revealOverlay.destroy();
       _revealOverlay = null;
+      // 新遊戲：序章（門縫裡的通行證）。見 docs/WORLD.md〈6.2 阿吳與通行證〉
+      if (!_saveData && !gsm.getFlag('prologue_done')) {
+        interaction.play({
+          speaker:  '（旁白）',
+          dialogue: [
+            '一九八六年，五月。洛城，雨季的第一場雨。',
+            '茶桌散了兩年。你還是每天晚上醒著，聽雨打在鐵皮屋簷上。',
+            '……門縫底下，塞著一張紙片。',
+            '是一張工地通行證。照片已經模糊，名字寫著「吳○○」。',
+            '翻到背面，有人用原子筆潦草地寫了幾個字——「西郊　救救我們」。',
+          ],
+          onEnd: { giveItem: { id: 'id_card', qty: 1 }, setFlag: 'prologue_done' },
+        });
+      }
       return; // 揭幕幀不處理輸入，避免「按新遊戲」的 pointerup 殘留觸發移動
     }
 
@@ -743,7 +889,7 @@ async function main() {
       const contact = entityManager.update(app.ticker.deltaMS, (x, y) =>
         (x === player.gx && y === player.gy) ||
         (x === Math.round(player.vx) && y === Math.round(player.vy)));
-      if (contact) _startBattle(contact);
+      if (contact && performance.now() > _battleGraceUntil) _startBattle(contact);
     }
     // 玩家精靈 zIndex 同步（與 NPC 共用 entityLayer 排序）
     playerSpr.zIndex = playerSpr.y;
@@ -783,9 +929,14 @@ async function main() {
       const dist = Math.abs(ex) + Math.abs(ey); // 軸對齊移動，兩分量僅一為非 0
       const held = state.direction;
 
+      // 以時間為準：f = 本幀經過了幾個「30fps 基準幀」。60fps 時約 0.5，掉幀時變大，
+      // 走路速度與畫面更新率無關（上限 3，避免切回分頁時一次瞬移好幾格）
+      const f    = Math.min(app.ticker.deltaMS / BASE_FRAME_MS, 3);
+      const step = MOVE_SPEED * f;
+
       // 按住：snap 門檻擴大至一步之內，到位後立刻銜接下一格
       // 放開：只在誤差極小時才 snap，讓 lerp 把最後幾幀自然收完
-      const snapAt = held ? MOVE_SPEED + LERP_SNAP : LERP_SNAP;
+      const snapAt = held ? step + LERP_SNAP : LERP_SNAP;
 
       if (dist < snapAt) {
         player.vx    = player.gx;
@@ -808,16 +959,17 @@ async function main() {
           MapManager.onActorMoveEnd(playerSpr);
         }
       } else if (held) {
-        // 定速線性：每幀推進固定 MOVE_SPEED（tiles），不會在格尾減速
-        const step  = Math.min(MOVE_SPEED, dist);
-        player.vx  += (ex / dist) * step;
-        player.vy  += (ey / dist) * step;
-        _stepPhase  = Math.min(_stepPhase + 0.14, 1);
+        // 定速線性：每個基準幀推進 MOVE_SPEED（tiles），不會在格尾減速
+        const s     = Math.min(step, dist);
+        player.vx  += (ex / dist) * s;
+        player.vy  += (ey / dist) * s;
+        _stepPhase  = Math.min(_stepPhase + 0.14 * f, 1);
       } else {
-        // 放開後：lerp 自然減速，最後幾幀會慢下來再 snap
-        player.vx  += ex * LERP_FACTOR;
-        player.vy  += ey * LERP_FACTOR;
-        _stepPhase  = Math.min(_stepPhase + 0.12, 1);
+        // 放開後：lerp 自然減速，最後幾幀會慢下來再 snap（指數衰減換算成與幀率無關）
+        const k     = 1 - Math.pow(1 - LERP_FACTOR, f);
+        player.vx  += ex * k;
+        player.vy  += ey * k;
+        _stepPhase  = Math.min(_stepPhase + 0.12 * f, 1);
       }
 
       // 精靈 & 相機同步到相同浮點視覺座標 → 地圖移動與角色完全一致，不暈
