@@ -215,6 +215,12 @@ export class InteractionManager {
     return true;
   }
 
+  /** 播放一段對話腳本（序章、劇情事件用；格式同 _runScript）。對話中呼叫時忽略。 */
+  play(script) {
+    if (this._active) return false;
+    return this._runScript(script);
+  }
+
   /** 對話框是否正在顯示中（用於 main.js 封鎖移動輸入） */
   get isActive() { return this._active; }
 
@@ -288,7 +294,7 @@ export class InteractionManager {
       switch (choice.action) {
         case 'RECRUIT':
           if (this._gsm && npc) {
-            this._gsm.recruitNpc(npc.id);
+            this._gsm.recruitNpc(npc.id, npc.entityData?.name ?? npc.id);
             this._playQueue(
               [{ text: `${npc.entityData?.name ?? npc.id} 加入了你的隊伍。`, speaker: '（系統）' }],
               () => this._close(),

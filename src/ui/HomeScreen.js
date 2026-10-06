@@ -8,6 +8,8 @@
  *   • 主標題「瞿董默示錄」紅色輝光
  *   • 三個薄膜按鍵：新遊戲 / 載入遊戲 / 設定
  *
+ * 依賴：Settings（音樂開關）、AudioManager
+ *
  * 使用：
  *   const hs = await HomeScreen.create(app);
  *   app.stage.addChild(hs);
@@ -17,32 +19,42 @@
  *   'action'  (actionId: string)
  *     actionId: 'new_game' | 'load_game' | 'settings'
  */
+import { Settings }     from '../core/SaveSystem.js';
+import { AudioManager } from '../core/AudioManager.js';
+
 export class HomeScreen extends PIXI.Container {
 
   /** 非同步工廠（預先載入背景圖）*/
-  static async create(app) {
+  static async create(app, opts = {}) {
     let bgTex = null;
     try {
       bgTex = await PIXI.Assets.load('./assets/images/home_bg.jpg');
     } catch {
       console.warn('[HomeScreen] home_bg.jpg 載入失敗，使用純色背景');
     }
-    return new HomeScreen(app, bgTex);
+    return new HomeScreen(app, bgTex, opts);
   }
 
-  constructor(app, bgTex = null) {
+  /**
+   * @param {object}  opts
+   * @param {boolean} opts.hasSave  有存檔時「載入遊戲」才可按
+   */
+  constructor(app, bgTex = null, opts = {}) {
     super();
-    this._app   = app;
-    this._bgTex = bgTex;
+    this._app     = app;
+    this._bgTex   = bgTex;
+    this._hasSave = !!opts.hasSave;
     this._build();
     this._bindResize();
   }
 
   // ─── 建置 ──────────────────────────────────────────────────────────────────
 
+  _rebuild() { this._build(); }
+
   _build() {
     const { width: W, height: H } = this._app.screen;
-    this.removeChildren();
+    for (const child of this.removeChildren()) child.destroy({ children: true });
 
     this._buildBackground(W, H);
     this._buildNeon(W, H);
@@ -205,10 +217,11 @@ export class HomeScreen extends PIXI.Container {
   // ── 選單按鍵 ─────────────────────────────────────────────────────────────
 
   _buildMenu(W, H) {
+    const music = Settings.get().music;
     const DEFS = [
       { label: '▶  新遊戲', action: 'new_game',  accent: true  },
-      { label: '載入遊戲',  action: 'load_game', accent: false },
-      { label: '設定',      action: 'settings',  accent: false },
+      { label: '載入遊戲',  action: 'load_game', accent: false, disabled: !this._hasSave },
+      { label: `音樂：${music ? '開' : '關'}`, action: 'toggle_music', accent: false },
     ];
 
     const btnW   = Math.min(Math.floor(W * 0.513), 200);
@@ -216,11 +229,22 @@ export class HomeScreen extends PIXI.Container {
     const gap    = Math.max(6, Math.floor(H * 0.009));
     let   startY = Math.floor(H * 0.51);
 
-    DEFS.forEach(({ label, action, accent }) => {
+    DEFS.forEach(({ label, action, accent, disabled }) => {
       const btn = this._makeBtn(label, btnW, btnH, accent);
       btn.x = (W - btnW) / 2;
       btn.y = startY;
-      btn.on('_tap', () => this.emit('action', action));
+      if (disabled) {
+        btn.alpha     = 0.35;   // 沒有存檔：灰掉、不可按
+        btn.eventMode = 'none';
+      } else if (action === 'toggle_music') {
+        btn.on('_tap', () => {
+          const next = Settings.set({ music: !Settings.get().music });
+          AudioManager.setMuted(!next.music);
+          this._rebuild();
+        });
+      } else {
+        btn.on('_tap', () => this.emit('action', action));
+      }
       this.addChild(btn);
       startY += btnH + gap;
     });

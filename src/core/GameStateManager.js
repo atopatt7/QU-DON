@@ -20,6 +20,7 @@ export class GameStateManager extends PIXI.EventEmitter {
 
     // ── 隊伍與劇情旗標（主要欄位）────────────────────────────────────────────
     this.party  = [];   // 已招募 NPC id 陣列（新標準欄位）
+    this.partyNames = {}; // id → 顯示名稱（隊伍人脈介面用）
     this.flags  = {};   // 劇情布林旗標，例如 { "met_lena": true, "office_unlocked": false }
     this.inventory = []; // [{ id, qty }]
     this.itemDefs  = []; // items.json 的 items 陣列
@@ -53,9 +54,10 @@ export class GameStateManager extends PIXI.EventEmitter {
    * 將 NPC 加入隊伍，並 emit 'party:join' 通知訂閱者（例如 EntityManager 切換跟隨行為）。
    * @param {string} id  — NPC 實例 id（對應 npcs_*.json 的 "id" 欄位）
    */
-  recruitNpc(id) {
+  recruitNpc(id, name = id) {
     if (this.party.includes(id)) return;
     this.party.push(id);
+    this.partyNames[id] = name;
     // EntityManager / WorldMapScreen 可訂閱此事件切換 AI 行為
     this.emit('party:join', { id });
     console.log(`[GSM] 招募 → ${id}  隊伍人數：${this.party.length}`);

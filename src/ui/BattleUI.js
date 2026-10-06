@@ -26,8 +26,12 @@ export class BattleUI extends PIXI.Container {
     this._isLocked      = false;
     this._actHandler    = null;
     this._portraitCache = { player: null, enemy: null }; // null=未載入, false=失敗, Sprite=就緒
+    this._menu          = 'main';  // 'main' | 'items'
+    this._cursor        = 0;       // 鍵盤游標所在的行動按鈕
+    this._itemProvider  = null;
     this._build();
     this._bindResize();
+    this._bindKeyboard();
   }
 
   // ─── 建置 ──────────────────────────────────────────────────────────────────
@@ -243,21 +247,39 @@ export class BattleUI extends PIXI.Container {
 
   // ── 行動面板 2×2 ────────────────────────────────────────────────────────
 
+  /** 目前選單的按鈕定義（主選單 2×2，或物品清單 + 返回） */
+  _actionDefs() {
+    if (this._menu === 'items') {
+      const items = (this._itemProvider?.list() ?? []).slice(0, 5);
+      const defs  = items.map(it => ({
+        label: `${it.name} ×${it.qty}`, sub: 'USE', action: `use:${it.id}`,
+        fill: 0x1A1405, border: 0xE6B200, text: 0xE6B200,
+      }));
+      if (!defs.length) {
+        defs.push({ label: '（沒有能用的東西）', sub: '', action: 'noop', fill: 0x111111, border: 0x333333, text: 0x555555 });
+      }
+      defs.push({ label: '返回', sub: 'BACK', action: 'back', fill: 0x1A1A1A, border: 0x555555, text: 0x888888 });
+      return defs;
+    }
+    return [
+      { label:'[ 攻 擊 ]', sub:'ATTACK',    action:'attack', fill:0x4D0D0D, border:0xFF0040, text:0xFF5555 },
+      { label:'[ 談 判 ]', sub:'NEGOTIATE', action:'skill',  fill:0x071A0D, border:0x00FF41, text:0x00FF41 },
+      { label:'[ 物 品 ]', sub:'ITEM',      action:'item',   fill:0x1A1405, border:0xE6B200, text:0xE6B200 },
+      { label:'[ 逃 跑 ]', sub:'RUN',       action:'escape', fill:0x1A1A1A, border:0x555555, text:0x888888 },
+    ];
+  }
+
   _buildActionPanel(W, y, h) {
     const bg = new PIXI.Graphics();
     bg.rect(0, y, W, h).fill({ color: 0x1A1208 });
     this.addChild(bg);
 
-    const DEFS = [
-      { label:'[ 攻 擊 ]', sub:'ATTACK',  action:'attack',  fill:0x4D0D0D, border:0xFF0040, text:0xFF5555 },
-      { label:'技能',      sub:'SKILL',   action:'skill',   fill:0x071A0D, border:0x00FF41, text:0x00FF41 },
-      { label:'[ 物 品 ]', sub:'ITEM',    action:'item',    fill:0x1A1405, border:0xE6B200, text:0xE6B200 },
-      { label:'[ 逃 跑 ]', sub:'RUN',     action:'escape',  fill:0x1A1A1A, border:0x555555, text:0x888888 },
-    ];
+    const DEFS = this._actionDefs();
+    this._cursor = Math.min(this._cursor ?? 0, DEFS.length - 1);
 
     const pad  = 8;
     const cols = 2;
-    const rows = 2;
+    const rows = Math.ceil(DEFS.length / cols);
     const bW   = Math.floor((W - pad * (cols + 1)) / cols);
     const bH   = Math.floor((h - pad * (rows + 1)) / rows);
 
@@ -271,8 +293,54 @@ export class BattleUI extends PIXI.Container {
       btn.x = bx;
       btn.y = by;
       btn.on('_tap', () => this.emit('action', action));
+      btn.on('pointerover', () => { if (this._cursor !== i) { this._cursor = i; this._build(); } });
       this.addChild(btn);
+
+      // 游標高亮（鍵盤 / 滑鼠目前所在的按鈕）
+      if (i === this._cursor && !this._isLocked) {
+        const hl = new PIXI.Graphics();
+        hl.roundRect(bx - 3, by - 3, bW + 6, bH + 6, 6).stroke({ color: 0xFFFFFF, width: 2, alpha: 0.85 });
+        hl.eventMode = 'none';
+        this.addChild(hl);
+      }
     });
+
+    // 敵人回合中：面板變暗，提示不能操作
+    if (this._isLocked) {
+      const dim = new PIXI.Graphics();
+      dim.rect(0, y, W, h).fill({ color: 0x000000, alpha: 0.45 });
+      this.addChild(dim);
+    }
+    this._actionCount = DEFS.length;
+  }
+
+  /** 鍵盤：方向鍵移動游標（2 欄），Enter / 空白鍵執行，Esc 從物品清單返回 */
+  _bindKeyboard() {
+    this._keyHandler = (e) => {
+      if (!this.visible || this._isLocked || !this._actionCount) return;
+      const n = this._actionCount;
+      let c = this._cursor ?? 0;
+      switch (e.key) {
+        case 'ArrowLeft':  c = Math.max(0, c - 1); break;
+        case 'ArrowRight': c = Math.min(n - 1, c + 1); break;
+        case 'ArrowUp':    c = c - 2 >= 0 ? c - 2 : c; break;
+        case 'ArrowDown':  c = c + 2 < n ? c + 2 : c; break;
+        case 'Enter':
+        case ' ':
+          e.preventDefault();
+          this.emit('action', this._actionDefs()[c]?.action);
+          return;
+        case 'Escape':
+          e.preventDefault();
+          if (this._menu === 'items') this.emit('action', 'back');
+          return;
+        default:
+          return;
+      }
+      e.preventDefault();
+      if (c !== this._cursor) { this._cursor = c; this._build(); }
+    };
+    window.addEventListener('keydown', this._keyHandler);
   }
 
   _makeActionBtn(label, sub, W, H, fillColor, borderColor, textColor) {
@@ -370,6 +438,8 @@ export class BattleUI extends PIXI.Container {
 
     this._log             = [`${enemyData.name} 擋住了去路！`];
     this._isLocked        = false;
+    this._menu            = 'main';
+    this._cursor          = 0;
     // 重置頭像快取：上一場的頭像是 canvas 裁切出的專屬貼圖，連同貼圖一起釋放
     for (const spr of Object.values(this._portraitCache)) {
       if (spr) spr.destroy({ texture: true, textureSource: true });
@@ -504,53 +574,103 @@ export class BattleUI extends PIXI.Container {
    * 僅處理 'attack'；其餘行動預留給未來擴充。
    */
   _onAction(action) {
-    if (action !== 'attack') return;
     if (this._isLocked) return;
-    this._isLocked = true;
+
+    // 選單切換不消耗回合
+    if (action === 'item')      { this._menu = 'items'; this._cursor = 0; this._build(); return; }
+    if (action === 'back')      { this._menu = 'main';  this._cursor = 2; this._build(); return; }
 
     const p = this._data.player;
     const e = this._data.enemy;
 
-    // ── 玩家攻擊 ────────────────────────────────────────────────────────────
-    const dmg = BattleUI.rollDamage(p.atk, e.def);
-    e.hp = Math.max(0, e.hp - dmg);
-    this._pushLog(`瞿董 攻擊了 ${e.name}，造成 ${dmg} 點傷害！`);
-    this.flashHit('enemy');
+    switch (action) {
+      // ── 攻擊 ──────────────────────────────────────────────────────────────
+      case 'attack': {
+        this._isLocked = true;
+        const dmg = BattleUI.rollDamage(p.atk, e.def);
+        e.hp = Math.max(0, e.hp - dmg);
+        this._pushLog(`瞿董 攻擊了 ${e.name}，造成 ${dmg} 點傷害！`);
+        this.flashHit('enemy');
+        if (e.hp === 0) { this._end('win', '🏆 戰鬥勝利！'); return; }
+        this._enemyTurn();
+        return;
+      }
 
-    // ── 勝利判定 ────────────────────────────────────────────────────────────
-    if (e.hp === 0) {
-      this._pushLog('🏆 戰鬥勝利！');
-      setTimeout(() => {
-        this._isLocked = false;
-        this.visible = false;
-        this.emit('win');
-        this.emit('close');
-      }, 1500);
-      return;
+      // ── 談判：對方越狼狽越聽得進去（瞿董的本行，見 docs/WORLD.md）──────────
+      case 'skill': {
+        this._isLocked = true;
+        const chance = 0.15 + 0.65 * (1 - e.hp / e.maxHp);
+        this._pushLog(`瞿董：「……夠了。我們談談。」`);
+        if (Math.random() < chance) {
+          this._end('win', `${e.name} 收手了。`, { talked: true });
+        } else {
+          this._pushLog(`${e.name} 根本不想聽。`);
+          this._enemyTurn();
+        }
+        return;
+      }
+
+      // ── 逃跑 ──────────────────────────────────────────────────────────────
+      case 'escape': {
+        this._isLocked = true;
+        if (Math.random() < 0.6) {
+          this._end('flee', '你趁隙脫身，鑽進了巷子裡。');
+        } else {
+          this._pushLog('退路被堵住了！');
+          this._enemyTurn();
+        }
+        return;
+      }
+
+      default: {
+        // 物品：action = "use:<itemId>"
+        if (!action?.startsWith('use:')) return;
+        const id   = action.slice(4);
+        const heal = this._itemProvider?.use(id);
+        if (!heal) return;
+        this._isLocked = true;
+        this._menu     = 'main';
+        this._cursor   = 2;
+        p.hp = Math.min(p.maxHp, p.hp + heal);
+        this._pushLog(`使用了 ${this._itemProvider.name(id)}，恢復 ${heal} HP。`);
+        this._enemyTurn();
+      }
     }
+  }
 
-    // ── 敵人反擊（延遲 1 秒） ─────────────────────────────────────────────
+  /** 敵人回合（延遲 1 秒），結束後解鎖或判定敗北 */
+  _enemyTurn() {
     setTimeout(() => {
+      const p = this._data.player;
+      const e = this._data.enemy;
       const eDmg = BattleUI.rollDamage(e.atk, p.def);
       p.hp = Math.max(0, p.hp - eDmg);
       this._pushLog(`${e.name} 反擊，造成 ${eDmg} 點傷害！`);
       this.flashHit('player');
-      this._updateHealthUI();
-
-      // ── 敗北判定 ──────────────────────────────────────────────────────────
-      if (p.hp === 0) {
-        this._pushLog('💀 戰鬥失敗...');
-        setTimeout(() => {
-          this._isLocked = false;
-          this.visible = false;
-          this.emit('lose');
-          this.emit('close');
-        }, 1500);
-        return;
-      }
-
+      if (p.hp === 0) { this._end('lose', '💀 戰鬥失敗...'); return; }
       this._isLocked = false; // 解鎖，等待玩家下一回合
+      this._build();
     }, 1000);
+  }
+
+  /** 結束戰鬥：顯示訊息，1.5 秒後關閉並發出 'win' | 'lose' | 'flee' */
+  _end(result, msg, detail = {}) {
+    this._pushLog(msg);
+    setTimeout(() => {
+      this._isLocked = false;
+      this.visible   = false;
+      this.emit(result, detail);
+      this.emit('close');
+    }, 1500);
+  }
+
+  /**
+   * 注入戰鬥中可用的道具（由 main.js 提供，BattleUI 不直接碰背包）。
+   * @param {{ list: () => {id:string,name:string,qty:number}[], use: (id:string) => number|null, name: (id:string) => string }} provider
+   *   use() 扣除道具並回傳回復量；不能用時回傳 null
+   */
+  setItemProvider(provider) {
+    this._itemProvider = provider;
   }
 
   /**
@@ -585,7 +705,8 @@ export class BattleUI extends PIXI.Container {
   }
 
   destroy(opts) {
-    if (this._rh) this._app.stage.off('resize', this._rh);
+    if (this._rh)         this._app.stage.off('resize', this._rh);
+    if (this._keyHandler) window.removeEventListener('keydown', this._keyHandler);
     super.destroy(opts);
   }
 }

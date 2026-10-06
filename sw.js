@@ -10,7 +10,7 @@
  *    只改 JS / JSON 的話，線上玩家下次開啟就會拿到新版。
  */
 
-const CACHE_NAME = 'qudon-v90';
+const CACHE_NAME = 'qudon-v91';
 const NETWORK_TIMEOUT_MS = 3000;
 
 // ── 安裝時預快取：讓第一次開啟後就能離線遊玩 ──────────────────────────────────
@@ -26,6 +26,7 @@ const PRECACHE = [
   './src/core/AudioManager.js',
   './src/core/GameStateManager.js',
   './src/core/Layout.js',
+  './src/core/SaveSystem.js',
   // ── UI 模組 ────────────────────────────────────────────────────────────────
   './src/ui/HomeScreen.js',
   './src/ui/ControlPanel.js',
@@ -37,12 +38,14 @@ const PRECACHE = [
   './src/ui/InventoryScreen.js',
   './src/ui/DialogueOverlay.js',
   './src/ui/VFDClock.js',
+  './src/ui/TextPanelScreen.js',
   // ── 遊戲模組 ───────────────────────────────────────────────────────────────
   './src/modules/MapManager.js',
   './src/modules/InteractionManager.js',
   // ── 資料 JSON ──────────────────────────────────────────────────────────────
   './src/data/actors.json',
   './src/data/items.json',
+  './src/data/journal.json',
   './src/data/entities/registry.json',
   './src/data/entities/actors/player.json',
   './src/data/entities/actors/enemy_thug.json',
