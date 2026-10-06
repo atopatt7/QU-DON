@@ -156,6 +156,19 @@ export class InteractionManager {
     this._dlg.advance();
   }
 
+  /**
+   * 顯示一則單行訊息（系統提示 / 劇情旁白），確認鍵關閉。
+   * 對話中呼叫時忽略（不打斷進行中的對話）。
+   */
+  showMessage(text, speaker = '（系統）') {
+    if (this._active) return false;
+    this._active      = true;
+    this._dlg.visible = true;
+    this._dlg.show(text, speaker);
+    this._dlg.once('next', () => this._close());
+    return true;
+  }
+
   /** 對話框是否正在顯示中（用於 main.js 封鎖移動輸入） */
   get isActive() { return this._active; }
 
@@ -260,24 +273,13 @@ export class InteractionManager {
   _checkObjectTrigger(tileId) {
     // ── 路徑一：TILE_EXAMINE 精確對應（lore 優先）────────────────────────────
     const examine = TILE_EXAMINE[tileId];
-    if (examine) {
-      this._active      = true;
-      this._dlg.visible = true;
-      this._dlg.show(examine.text, examine.speaker);
-      this._dlg.once('next', () => this._close());
-      return true;
-    }
+    if (examine) return this.showMessage(examine.text, examine.speaker);
 
     // ── 路徑二：config.json 動態描述（collides=true + desc）─────────────────
     // _tileConfig 由建構式非同步載入；尚未就緒時靜默跳過（不阻塞玩家操作）
     const tileDef = this._tileConfig?.[String(tileId)];
     if (tileDef?.collides === true && tileDef.desc) {
-      const text = `* 檢查此處的環境…\n發現【${tileDef.desc}】。`;
-      this._active      = true;
-      this._dlg.visible = true;
-      this._dlg.show(text, '（環境）');
-      this._dlg.once('next', () => this._close());
-      return true;
+      return this.showMessage(`* 檢查此處的環境…\n發現【${tileDef.desc}】。`, '（環境）');
     }
 
     return false;

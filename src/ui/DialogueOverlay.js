@@ -34,7 +34,8 @@ export class DialogueOverlay extends PIXI.Container {
 
   _build() {
     const { width: W, height: H } = this._app.screen;
-    this.removeChildren();
+    // 重繪時銷毀舊節點，避免每次重建都洩漏一批 Text / Graphics
+    for (const child of this.removeChildren()) child.destroy({ children: true });
 
     // ── 重置舊打字機 ──────────────────────────────────────────────────────────
     if (this._typeTimer) { clearTimeout(this._typeTimer); this._typeTimer = null; }

@@ -401,6 +401,7 @@ async function main() {
   app.stage.on('resize', () => {
     mapManager.onResize(player.gx, player.gy);
     playerSpr.resizeTo?.(mapManager.tileSize);
+    entityManager.resize(mapManager.tileSize);
     // setCameraVisual 沒有 centerOn 的 early-return guard，確保 tileSize 改變後鏡頭重算
     mapManager.setCameraVisual(player.vx, player.vy);
     mapManager.render();
@@ -478,31 +479,58 @@ async function main() {
     _showMenu(); // 關閉狀態介面後回到雪茄選單
   });
 
+  // ── 玩家當前 HP（跨戰鬥保留；之後由存檔系統接手）────────────────────────
+  const playerBase = _quDonData ?? { name: '瞿董', stats: { hp: 85, maxHp: 85, atk: 10, def: 5 } };
+  let   playerHp   = playerBase.stats.hp;
+
+  const _setPlayerHp = (hp) => {
+    playerHp = Math.max(0, Math.min(hp, playerBase.stats.maxHp));
+    statusScreen.updateData({ hp: playerHp });
+  };
+
   // ── 觸發戰鬥：鎖定輸入、顯示 BattleUI、戰後處理 NPC ─────────────────────
   function _startBattle(npc) {
-    if (!npc.entityData) return;
+    if (!npc.entityData || battleUI.visible) return;
     AudioManager.stopBGM();
     input.lock();
     panel.visible = false;
     MapManager.onActorMoveEnd(playerSpr);
 
-    const playerBase = _quDonData ?? { name: '瞿董', stats: { hp: 85, maxHp: 85, atk: 10, def: 5 } };
-    const playerData = { ...playerBase, visuals: _playerJson?.visuals ?? null };
+    const playerData = {
+      ...playerBase,
+      stats:   { ...playerBase.stats, hp: playerHp },
+      visuals: _playerJson?.visuals ?? null,
+    };
     battleUI.visible = true;
     battleUI.startBattle(playerData, npc.entityData);
 
-    const cleanup = (isWin) => {
+    const cleanup = () => {
       battleUI.off('win',  onWin);
       battleUI.off('lose', onLose);
       battleUI.visible = false;
       panel.visible = true;
-      if (isWin) entityManager.hideNpc(npc.id);
       input.unlock();
     };
-    const onWin  = () => cleanup(true);
-    const onLose = () => cleanup(false);
+    const onWin = () => {
+      _setPlayerHp(battleUI.playerHp);
+      entityManager.hideNpc(npc.id);
+      cleanup();
+    };
+    const onLose = () => {
+      cleanup();
+      _wakeUpAtHome();
+    };
     battleUI.on('win',  onWin);
     battleUI.on('lose', onLose);
+  }
+
+  // ── 戰敗：昏倒後在自己房間醒來，HP 回滿；擊敗你的敵人仍留在原地 ───────────
+  const HOME_MAP = 'map_qu_don_room';
+  function _wakeUpAtHome() {
+    _setPlayerHp(playerBase.stats.maxHp);
+    _warpTo(HOME_MAP, null, null).then(() => {
+      interaction.showMessage('……你在自己房間的床上醒來。渾身痠痛，但還活著。', '（系統）');
+    });
   }
 
   // ── 具名事件 Stubs（功能待實作）──────────────────────────────────────────
@@ -614,8 +642,33 @@ async function main() {
     mapManager.render();
   }
 
+  // ── _warpTo：轉場到指定地圖座標（gx/gy 為 null 時使用該地圖的 player_start）──
+  function _warpTo(targetMap, gx, gy) {
+    input.lock();
+    _isAnimating = false;
+    _stepPhase   = 0;
+    MapManager.onActorMoveEnd(playerSpr);
+    return mapManager.transitionTo(targetMap, () => {
+      const spawn = mapManager.mapData.spawnPoints?.find(s => s.id === 'player_start')
+                 ?? mapManager.mapData.spawnPoints?.[0];
+      player.gx = gx ?? spawn?.gx ?? 0;
+      player.gy = gy ?? spawn?.gy ?? 0;
+      if (!mapManager.entityLayer.children.includes(playerSpr)) {
+        mapManager.entityLayer.addChild(playerSpr);
+      }
+      clock.updateLocation(getMapLabel(mapManager.mapData));
+      syncPlayer();
+      requestUpdate();
+    })
+      .then(() => input.unlock())
+      .catch(() => {
+        console.warn(`[Warp] 目標地圖 "${targetMap}" 尚未建立，略過轉場`);
+        input.unlock();
+      });
+  }
+
   // ── tryMovePlayer：嘗試向 dir 方向移動一格 ────────────────────────────────
-  // 回傳 'moved' | 'blocked' | 'warping'
+  // 回傳 'moved' | 'blocked' | 'warping' | 'battle'
   // 連鎖移動（連續按住）與初次移動共用同一段邏輯，避免重複。
   function tryMovePlayer(dir) {
     facing = dir;
@@ -624,6 +677,16 @@ async function main() {
     const nx = player.gx + dx;
     const ny = player.gy + dy;
     if (!mapManager.isWalkable(nx, ny)) return 'blocked';
+
+    // NPC 佔據的格子不可進入；撞上敵對 NPC 直接開戰（玩家留在原格）
+    const npc = entityManager.getNpcAt(nx, ny);
+    if (npc) {
+      if (npc.combatCollidable) {
+        _startBattle(npc);
+        return 'battle';
+      }
+      return 'blocked';
+    }
 
     player.gx = nx;
     player.gy = ny;
@@ -635,25 +698,8 @@ async function main() {
 
     const warp = mapManager.checkWarp(player.gx, player.gy);
     if (warp) {
-      input.lock();
-      _isAnimating = false;
-      _stepPhase   = 0;
       console.log(`[Warp] "${warp.label ?? warp.id}" → ${warp.targetMap}`);
-      mapManager.transitionTo(warp.targetMap, () => {
-        player.gx = warp.targetGx;
-        player.gy = warp.targetGy;
-        if (!mapManager.entityLayer.children.includes(playerSpr)) {
-          mapManager.entityLayer.addChild(playerSpr);
-        }
-        clock.updateLocation(getMapLabel(mapManager.mapData));
-        syncPlayer();
-        requestUpdate();
-      })
-        .then(() => input.unlock())
-        .catch(() => {
-          console.warn(`[Warp] 目標地圖 "${warp.targetMap}" 尚未建立，略過轉場`);
-          input.unlock();
-        });
+      _warpTo(warp.targetMap, warp.targetGx, warp.targetGy);
       return 'warping';
     }
     return 'moved';
@@ -679,8 +725,14 @@ async function main() {
       return; // 揭幕幀不處理輸入，避免「按新遊戲」的 pointerup 殘留觸發移動
     }
 
-    // NPC 巡邏動畫（背包或其他全螢幕 UI 開啟時暫停）
-    if (!inventoryScreen.visible) entityManager.update(app.ticker.deltaMS);
+    // NPC 巡邏（任何介面 / 對話 / 轉場 / 戰鬥期間暫停）
+    // 玩家佔據邏輯格與目前視覺所在格（移動途中兩格都算），避免 NPC 穿過玩家
+    if (!_isUiOpen() && !interaction.isActive && !input.isLocked) {
+      const contact = entityManager.update(app.ticker.deltaMS, (x, y) =>
+        (x === player.gx && y === player.gy) ||
+        (x === Math.round(player.vx) && y === Math.round(player.vy)));
+      if (contact) _startBattle(contact);
+    }
     // 玩家精靈 zIndex 同步（與 NPC 共用 entityLayer 排序）
     playerSpr.zIndex = playerSpr.y;
 
@@ -727,20 +779,16 @@ async function main() {
         _isAnimating = false;
         _stepPhase   = 0;
 
-        // ── NPC 碰撞檢定：踏入格子時若有敵對 NPC → 觸發戰鬥 ─────────────────
-        const landedNpc = entityManager.getNpcAt(player.gx, player.gy);
-        if (landedNpc?.combatCollidable) {
-          updateSpritePos(player.vx, player.vy);
-          mapManager.setCameraVisual(player.vx, player.vy);
-          mapManager.render();
-          _startBattle(landedNpc);
-          return;
-        }
-
         if (held && !interaction.isActive) {
           const result = tryMovePlayer(held);
           if (result === 'warping') return;
           if (result === 'blocked') MapManager.onActorMoveEnd(playerSpr);
+          if (result === 'battle') {
+            updateSpritePos(player.vx, player.vy);
+            mapManager.setCameraVisual(player.vx, player.vy);
+            mapManager.render();
+            return;
+          }
           // 'moved'：_isAnimating 已重置為 true，AnimatedSprite 持續播放不重啟
         } else {
           MapManager.onActorMoveEnd(playerSpr);

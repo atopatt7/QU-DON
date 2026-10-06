@@ -11,26 +11,93 @@
  *     "position":  { "x": 10, "y": 16 },      // 初始格子座標
  *     "direction": "right",                    // 初始朝向
  *     "behavior":  "patrol",                   // idle | patrol
- *     "path":      [[10,16],[14,16],[14,15],[10,15]],  // 巡邏路徑（循環）
+ *     "path":      [[10,16],[14,16],[14,15],[10,15]],  // 巡邏路徑點（循環，點與點之間逐格行走）
  *     "moveSpeed": 0.5                         // 格/秒（0.5 = 每 2 秒一格）
  *   }
  * ]
  *
- * 每幀呼叫 update(deltaMS) 以驅動 patrol 動畫插值。
+ * 每幀呼叫 update(deltaMS, isPlayerAt) 以驅動 patrol 動畫插值。
+ *
+ * 佔位規則：
+ *   - NPC 佔據 position 格；移動中同時佔據目標格（npc._target）
+ *   - getNpcAt() 兩者都會命中，玩家不能走進正在被 NPC 進入的格子
  */
+
+// ─── 跨地圖共用快取（registry / 角色 JSON / 裁切後的幀貼圖）────────────────────
+// 貼圖以 spriteSheet 路徑為鍵永久保留：角色種類有限，重複進出地圖不再重新裁切，
+// 也就不會每次換圖都產生一批無人釋放的 canvas 貼圖
+let   _registryPromise = null;
+const _entityCache     = new Map();  // entityRef → Promise<entityData|null>
+const _sheetCache      = new Map();  // `${path}|${fw}|${fh}` → Promise<texMap|null>
+
+const DIR_COLS   = { down: 0, up: 1, left: 2, right: 3 };
+const FRAME_ROWS = 3;   // 0=idle 1=walkA 2=walkB
+const WALK_SEQ   = [1, 0, 2, 0];
+
+function _loadRegistry() {
+  _registryPromise ??= fetch('./src/data/entities/registry.json')
+    .then(r => r.json())
+    .catch(() => ({}));
+  return _registryPromise;
+}
+
+function _loadEntity(entityRef) {
+  if (!_entityCache.has(entityRef)) {
+    _entityCache.set(entityRef, (async () => {
+      const registry   = await _loadRegistry();
+      const entityPath = registry[entityRef];
+      if (!entityPath) return null;
+      const res = await fetch(`./src/data/entities/${entityPath}`);
+      return res.ok ? res.json() : null;
+    })().catch(() => null));
+  }
+  return _entityCache.get(entityRef);
+}
+
+// X 軸（col）= 方向：0=down 1=up 2=left 3=right
+// Y 軸（row）= 動作：0=idle 1=walkA 2=walkB
+function _loadSheetFrames(path, fw, fh) {
+  const key = `${path}|${fw}|${fh}`;
+  if (!_sheetCache.has(key)) {
+    _sheetCache.set(key, (async () => {
+      const sheet = await PIXI.Assets.load(`./${path}`);
+      const src   = sheet.source;
+      const img   = src?.resource ?? src?.htmlElement ?? src?.bitmap ?? src;
+      if (!img || !(img.width > 0 || img.naturalWidth > 0)) return null;
+
+      const texMap = {};
+      for (const [dir, col] of Object.entries(DIR_COLS)) {
+        const frames = [];
+        for (let row = 0; row < FRAME_ROWS; row++) {
+          const canvas = document.createElement('canvas');
+          canvas.width  = fw;
+          canvas.height = fh;
+          canvas.getContext('2d').drawImage(img, col * fw, row * fh, fw, fh, 0, 0, fw, fh);
+          frames.push(PIXI.Texture.from(canvas));
+        }
+        texMap[dir] = frames;
+      }
+      return texMap;
+    })().catch(() => null));
+  }
+  return _sheetCache.get(key);
+}
 
 export class EntityManager {
   constructor(app) {
-    this.app      = app;
-    this.npcs     = [];
-    this.sprites  = new Map();
+    this.app       = app;
+    this.npcs      = [];
+    this.sprites   = new Map();
     this.container = null;
     this._tileSize = 48;
+    this._removed  = new Set();  // 已擊敗 / 已招募的 NPC id（跨地圖保留，重回地圖不再生成）
+    this._initSeq  = 0;          // 防止快速連續換圖時，舊的 init 把 NPC 加進新地圖
   }
 
   // ─── 切換地圖時呼叫 ────────────────────────────────────────────────────────
   async init(mapId, parentContainer, tileSize = 48) {
     this.clear();
+    const seq = ++this._initSeq;
     this._tileSize = tileSize;
 
     // NPC 精靈直接掛在 entityLayer（與玩家精靈同層），
@@ -38,11 +105,15 @@ export class EntityManager {
     this.container = parentContainer;
     parentContainer.sortableChildren = true;
 
-    const npcData = await this._loadNpcData(mapId);
+    const npcData = (await this._loadNpcData(mapId)).filter(n => !this._removed.has(n.id));
+    if (seq !== this._initSeq) return;
     this.npcs = npcData;
 
-    for (const npc of this.npcs) {
-      await this._createSprite(npc);
+    for (const npc of npcData) {
+      const spr = await this._createSprite(npc);
+      if (seq !== this._initSeq) { spr.destroy(); return; }
+      this.container.addChild(spr);
+      this.sprites.set(npc.id, spr);
     }
   }
 
@@ -75,17 +146,16 @@ export class EntityManager {
     }
   }
 
-  // ─── 建立單一 NPC 精靈 ─────────────────────────────────────────────────────
+  // ─── 建立單一 NPC 精靈（回傳精靈，由 init 掛載）──────────────────────────────
   async _createSprite(npc) {
-    const s = this._tileSize;
     this._applyCategory(npc);
 
     let spr = null;
 
     if (npc.entityRef) {
-      const result = await this._buildEntitySprite(npc.entityRef, npc.direction ?? 'down', s);
-      spr = result.sprite;
-      npc.entityData = result.entityData; // 供戰鬥系統使用
+      const entData = await _loadEntity(npc.entityRef);
+      npc.entityData = entData; // 供戰鬥系統使用
+      spr = await this._buildEntitySprite(entData, npc.direction ?? 'down');
     }
 
     // 實例欄位覆寫 / 補足實體資料（例如同一實體在不同地圖說不同台詞；
@@ -99,195 +169,207 @@ export class EntityManager {
     }
 
     // Fallback：色塊佔位（entityRef 缺失或貼圖載入失敗時使用）
-    // 高度與玩家精靈一致（tileSize × 1.7），寬度取 0.5 倍
+    // 高度與玩家精靈一致（1.7 格），寬度 0.5 格；以 1 格 = 1px 繪製再縮放，resize 只需改 scale
     if (!spr) {
       const colorMap = { hostile: 0xff4444, recruitable: 0x00ccff, system: 0xffcc00 };
-      const fillColor = colorMap[npc.category] ?? 0xaaaaaa;
-      const fbW = Math.floor(s * 0.5);
-      const fbH = Math.floor(s * 1.7);
-      const gfx = new PIXI.Graphics();
-      gfx.rect(0, 0, fbW, fbH).fill({ color: fillColor });
-      const tex = this.app.renderer.generateTexture({ target: gfx });
-      gfx.destroy();
-      spr = new PIXI.Sprite(tex);
-      spr.anchor.set(0.5, 1.0);
+      spr = new PIXI.Graphics();
+      spr.rect(-0.25, -1.7, 0.5, 1.7).fill({ color: colorMap[npc.category] ?? 0xaaaaaa });
+      spr.resizeTo = (s) => spr.scale.set(s);
     }
 
-    // 格子座標 → entityLayer 局部像素座標（anchor 底部對齊格子底邊）
-    spr.x = npc.position.x * s + s * 0.5;
-    spr.y = npc.position.y * s + s;
-    spr.zIndex = spr.y;
-
-    this.container.addChild(spr);
-    this.sprites.set(npc.id, spr);
+    spr.resizeTo(this._tileSize);
+    this._placeSprite(npc, spr);
+    return spr;
   }
 
-  // ─── registry → entity JSON → spriteSheet 裁切 → 建立精靈 ────────────────
-  // X 軸（col）= 方向：0=down 1=up 2=left 3=right
-  // Y 軸（row）= 動作：0=idle 1=walkA 2=walkB
-  // 找不到 vis.spriteSheet 時回傳 { sprite: null }，由呼叫端降級至色塊佔位
-  // 回傳 { sprite, entityData }
-  async _buildEntitySprite(entityRef, direction, tileSize) {
-    try {
-      const regRes     = await fetch('./src/data/entities/registry.json');
-      const registry   = await regRes.json();
-      const entityPath = registry[entityRef];
-      if (!entityPath) return { sprite: null, entityData: null };
+  // ─── entityData → spriteSheet 幀 → AnimatedSprite ─────────────────────────
+  // 找不到 vis.spriteSheet 或貼圖載入失敗時回傳 null，由呼叫端降級至色塊佔位
+  async _buildEntitySprite(entData, direction) {
+    const vis = entData?.visuals ?? {};
+    if (!vis.spriteSheet) return null;
 
-      const entRes        = await fetch(`./src/data/entities/${entityPath}`);
-      const entData       = await entRes.json();
-      const vis           = entData?.visuals ?? {};
-      const heightInTiles = vis.heightInTiles ?? 1.7;
+    const fw     = vis.frameWidth  ?? 128;
+    const fh     = vis.frameHeight ?? 256;
+    const texMap = await _loadSheetFrames(vis.spriteSheet, fw, fh);
+    if (!texMap) return null;
 
-      if (!vis.spriteSheet) return { sprite: null, entityData: entData };
+    const heightInTiles = vis.heightInTiles ?? 1.7;
+    const base     = texMap[direction] ?? texMap.down;
+    let   _dir     = direction;
+    let   _walking = false;
 
-      const sheet = await PIXI.Assets.load(`./${vis.spriteSheet}`);
-      const src   = sheet.source;
-      const img   = src?.resource ?? src?.htmlElement ?? src?.bitmap ?? src;
-      const fw    = vis.frameWidth  ?? 128;
-      const fh    = vis.frameHeight ?? 256;
+    const getFrames = (dir, walk) => {
+      const t = texMap[dir] ?? texMap.down ?? base;
+      return walk ? WALK_SEQ.map(row => t[row]) : [t[0]];
+    };
 
-      if (!img || !(img.width > 0 || img.naturalWidth > 0)) {
-        return { sprite: null, entityData: entData };
-      }
+    const spr = new PIXI.AnimatedSprite([base[0]]);
+    spr.animationSpeed = 0.1;
+    spr.loop           = true;
+    spr.gotoAndStop(0);
+    spr.anchor.set(0.5, 1.0);
+    spr.resizeTo = (s) => spr.scale.set((s * heightInTiles) / fh);
 
-      const DIR_COLS   = { down: 0, up: 1, left: 2, right: 3 };
-      const FRAME_ROWS = 3;
-      const texMap     = {};
+    spr.startWalk = () => {
+      if (_walking) return;
+      _walking = true;
+      spr.textures = getFrames(_dir, true);
+      spr.play();
+    };
 
-      for (const [dir, col] of Object.entries(DIR_COLS)) {
-        const frames = [];
-        for (let row = 0; row < FRAME_ROWS; row++) {
-          const canvas = document.createElement('canvas');
-          canvas.width  = fw;
-          canvas.height = fh;
-          canvas.getContext('2d').drawImage(img, col * fw, row * fh, fw, fh, 0, 0, fw, fh);
-          frames.push(PIXI.Texture.from(canvas));
-        }
-        texMap[dir] = frames;
-      }
-
-      const base = texMap[direction] ?? texMap.down;
-      let _dir     = direction;
-      let _walking = false;
-
-      const walkSequence = [1, 0, 2, 0];
-      const getFrames = (dir, walk) => {
-        const t = texMap[dir] ?? texMap.down ?? base;
-        return walk ? walkSequence.map(row => t[row]) : [t[0]];
-      };
-
-      const spr = new PIXI.AnimatedSprite([base[0]]);
-      spr.animationSpeed = 0.1;
-      spr.loop           = true;
+    spr.stopWalk = () => {
+      _walking = false;
+      spr.textures = getFrames(_dir, false);
       spr.gotoAndStop(0);
-      spr.scale.set((tileSize * heightInTiles) / fh);
-      spr.anchor.set(0.5, 1.0);
+    };
 
-      spr.startWalk = () => {
-        if (_walking) return;
-        _walking = true;
-        spr.textures = getFrames(_dir, true);
-        spr.play();
-      };
+    spr.setDir = (dir) => {
+      _dir = dir;
+      spr.textures = getFrames(dir, _walking);
+      if (_walking) spr.play(); else spr.gotoAndStop(0);
+    };
 
-      spr.stopWalk = () => {
-        _walking = false;
-        spr.textures = getFrames(_dir, false);
-        spr.gotoAndStop(0);
-      };
+    return spr;
+  }
 
-      spr.setDir = (dir) => {
-        _dir = dir;
-        spr.textures = getFrames(dir, _walking);
-        if (_walking) spr.play(); else spr.gotoAndStop(0);
-      };
-
-      return { sprite: spr, entityData: entData };
-
-    } catch {
-      return { sprite: null, entityData: null };
+  // ─── 依邏輯座標（+ 移動進度）放置精靈：anchor 底部對齊格子底邊 ────────────
+  _placeSprite(npc, spr = this.sprites.get(npc.id)) {
+    if (!spr) return;
+    const s = this._tileSize;
+    const p = npc._patrol;
+    let gx = npc.position.x;
+    let gy = npc.position.y;
+    if (p?.moving && npc._target) {
+      const t = Math.min(p.timer / p.walkDur, 1);
+      gx += (npc._target.x - gx) * t;
+      gy += (npc._target.y - gy) * t;
     }
+    spr.x = gx * s + s * 0.5;
+    spr.y = gy * s + s;
+    spr.zIndex = spr.y;
   }
 
   // ─── 每幀驅動巡邏動畫（由 main.js ticker 呼叫）────────────────────────────
-  // deltaMS：自上一幀的毫秒數（app.ticker.deltaMS）
-  update(deltaMS) {
-    const s = this._tileSize;
+  /**
+   * @param {number}   deltaMS     自上一幀的毫秒數（app.ticker.deltaMS）
+   * @param {Function} isPlayerAt  (gx, gy) => boolean，玩家是否佔據該格
+   * @returns {object|null}  本幀試圖走進玩家格子的敵對 NPC（由呼叫端觸發戰鬥）
+   */
+  update(deltaMS, isPlayerAt = () => false) {
+    let contact = null;
+
     for (const npc of this.npcs) {
       if (npc.behavior !== 'patrol' || !npc.path?.length) continue;
 
-      if (!npc._patrol) npc._patrol = this._initPatrol(npc);
+      npc._patrol ??= this._initPatrol(npc);
       const p   = npc._patrol;
       const spr = this.sprites.get(npc.id);
+      if (p.steps.length < 2) continue;
 
       p.timer += deltaMS;
 
       if (p.moving) {
-        // 插值移動：0→1 映射至 fromXY → toXY
-        const t = Math.min(p.timer / p.walkDur, 1);
-        if (spr) {
-          spr.x = p.fromX + (p.toX - p.fromX) * t;
-          spr.y = p.fromY + (p.toY - p.fromY) * t;
-        }
-        if (t >= 1) {
-          // 抵達路徑點：更新邏輯座標，停止動畫
-          p.idx          = (p.idx + 1) % npc.path.length;
-          npc.position.x = npc.path[p.idx][0];
-          npc.position.y = npc.path[p.idx][1];
-          if (spr) { spr.x = p.toX; spr.y = p.toY; spr.stopWalk?.(); }
+        if (p.timer >= p.walkDur) {
+          // 抵達下一格：更新邏輯座標
+          p.idx          = (p.idx + 1) % p.steps.length;
+          npc.position.x = npc._target.x;
+          npc.position.y = npc._target.y;
+          npc._target    = null;
           p.moving = false;
-          p.timer  = 0;
+          // 路徑點停頓；路徑點之間的格子直接銜接下一步
+          p.timer  = p.waypoints.has(p.idx) ? 0 : p.pauseDur;
+          if (p.timer === 0) spr?.stopWalk?.();
         }
-      } else {
-        // 在路徑點等待 pauseDur 後啟動下一步
-        if (p.timer >= p.pauseDur) {
-          const nextIdx    = (p.idx + 1) % npc.path.length;
-          const [nx, ny]   = npc.path[nextIdx];
-          const [cx, cy]   = [npc.position.x, npc.position.y];
-          const dir        = nx > cx ? 'right' : nx < cx ? 'left'
-                           : ny < cy ? 'up'    : 'down';
-          p.fromX  = cx * s + s * 0.5;
-          p.fromY  = cy * s + s;
-          p.toX    = nx * s + s * 0.5;
-          p.toY    = ny * s + s;
-          p.moving = true;
-          p.timer  = 0;
-          if (spr) { spr.setDir?.(dir); spr.startWalk?.(); }
+      } else if (p.timer >= p.pauseDur) {
+        const [nx, ny] = p.steps[(p.idx + 1) % p.steps.length];
+        const [cx, cy] = [npc.position.x, npc.position.y];
+        const dir      = nx > cx ? 'right' : nx < cx ? 'left'
+                       : ny < cy ? 'up'    : 'down';
+
+        if (isPlayerAt(nx, ny)) {
+          // 玩家擋路：敵對 NPC 撲上去開戰；其他 NPC 轉身等待
+          spr?.setDir?.(dir);
+          spr?.stopWalk?.();
+          if (npc.combatCollidable && !contact) contact = npc;
+          continue;
         }
+        if (this.getNpcAt(nx, ny, npc)) {
+          spr?.stopWalk?.();
+          continue; // 其他 NPC 擋路：下一幀再試
+        }
+
+        npc._target = { x: nx, y: ny };
+        p.moving = true;
+        p.timer  = 0;
+        if (spr) { spr.setDir?.(dir); spr.startWalk?.(); }
+      }
+
+      this._placeSprite(npc, spr);
+    }
+
+    return contact;
+  }
+
+  // ─── 初始化巡邏狀態：把路徑點展開成逐格步驟 ─────────────────────────────────
+  _initPatrol(npc) {
+    const speed   = npc.moveSpeed ?? npc.entityData?.stats?.moveSpeed ?? 0.5;
+    const tileMs  = 1000 / speed; // ms per tile（0.5 格/秒 → 2000 ms/格）
+
+    // 路徑點之間逐格展開（先走 X 再走 Y），閉合回起點
+    const steps     = [];
+    const waypoints = new Set();
+    const pts = npc.path;
+    for (let i = 0; i < pts.length; i++) {
+      let [x, y]     = pts[i];
+      const [tx, ty] = pts[(i + 1) % pts.length];
+      waypoints.add(steps.length);
+      steps.push([x, y]);
+      while (x !== tx || y !== ty) {
+        if (x !== tx) x += Math.sign(tx - x); else y += Math.sign(ty - y);
+        if (x === tx && y === ty) break; // 下一個路徑點由下一輪加入
+        steps.push([x, y]);
       }
     }
 
-    // ── 所有 NPC 按像素 Y 排序（Y 越大 = 越靠下 = 圖層越高）──────────────
-    for (const npc of this.npcs) {
-      const spr = this.sprites.get(npc.id);
-      if (spr) spr.zIndex = spr.y;
+    // 從 NPC 目前所在格開始巡邏；不在路徑上則瞬移到起點
+    let idx = steps.findIndex(([x, y]) => x === npc.position.x && y === npc.position.y);
+    if (idx < 0) {
+      idx = 0;
+      npc.position.x = steps[0][0];
+      npc.position.y = steps[0][1];
     }
-    // sortableChildren 會在 render 前依 zIndex 自動排序（含玩家精靈）
-  }
 
-  // ─── 初始化巡邏狀態物件 ────────────────────────────────────────────────────
-  _initPatrol(npc) {
-    const speed   = npc.moveSpeed ?? npc.entityData?.stats?.moveSpeed ?? 0.5;
-    const totalMs = 1000 / speed; // ms per tile（0.5 格/秒 → 2000 ms/格）
     return {
-      idx:      0,            // 當前所在路徑點索引
-      timer:    0,            // 計時器（ms）
-      walkDur:  totalMs * 0.65, // 移動佔 65% 時間
-      pauseDur: totalMs * 0.35, // 停頓佔 35% 時間
+      steps, waypoints, idx,
+      timer:    0,
+      walkDur:  tileMs * 0.65,  // 每格移動時間
+      pauseDur: tileMs * 0.35,  // 路徑點停頓時間
       moving:   false,
-      fromX: 0, fromY: 0,
-      toX:   0, toY:   0,
     };
   }
 
-  // ─── 查詢指定格子的 NPC ───────────────────────────────────────────────────
-  getNpcAt(gx, gy) {
-    return this.npcs.find(n => n.position.x === gx && n.position.y === gy) ?? null;
+  // ─── 視窗縮放：重算精靈大小與位置 ─────────────────────────────────────────
+  resize(tileSize) {
+    this._tileSize = tileSize;
+    for (const npc of this.npcs) {
+      const spr = this.sprites.get(npc.id);
+      if (!spr) continue;
+      spr.resizeTo?.(tileSize);
+      this._placeSprite(npc, spr);
+    }
   }
 
-  // ─── 戰後隱藏 NPC（精靈不可見，從碰撞列表移除）────────────────────────────
+  // ─── 查詢指定格子的 NPC（含移動中正在進入該格的 NPC）──────────────────────
+  getNpcAt(gx, gy, exclude = null) {
+    return this.npcs.find(n => n !== exclude && (
+      (n.position.x === gx && n.position.y === gy) ||
+      (n._target && n._target.x === gx && n._target.y === gy)
+    )) ?? null;
+  }
+
+  // ─── 戰後 / 招募後移除 NPC（記住 id，重回地圖不再生成）─────────────────────
   hideNpc(id) {
+    this._removed.add(id);
     const spr = this.sprites.get(id);
     if (spr) spr.visible = false;
     this.npcs = this.npcs.filter(n => n.id !== id);
@@ -295,7 +377,8 @@ export class EntityManager {
 
   // ─── 清除當前地圖所有 NPC ─────────────────────────────────────────────────
   clear() {
-    // container 是共用的 entityLayer（含玩家精靈），只銷毀自己建立的 NPC 精靈
+    // container 是共用的 entityLayer（含玩家精靈），只銷毀自己建立的 NPC 精靈；
+    // 幀貼圖由模組層快取共用，不隨精靈銷毀
     for (const spr of this.sprites.values()) spr.destroy();
     this.container = null;
     this.npcs = [];

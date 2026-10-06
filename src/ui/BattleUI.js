@@ -34,7 +34,12 @@ export class BattleUI extends PIXI.Container {
 
   _build() {
     const { width: W, height: H } = this._app.screen;
-    this.removeChildren();
+    // 每次重繪都整批重建：舊節點必須 destroy，否則每推一行 log 就洩漏一批 Text / Graphics。
+    // 頭像精靈由 _portraitCache 跨重繪重用，不能在這裡銷毀
+    const keep = new Set(Object.values(this._portraitCache).filter(Boolean));
+    for (const child of this.removeChildren()) {
+      if (!keep.has(child)) child.destroy({ children: true });
+    }
 
     const eH  = Math.floor(H * 0.25);   // 敵方上半
     const pH  = Math.floor(H * 0.25);   // 我方下半
@@ -365,7 +370,11 @@ export class BattleUI extends PIXI.Container {
 
     this._log             = [`${enemyData.name} 擋住了去路！`];
     this._isLocked        = false;
-    this._portraitCache   = { player: null, enemy: null }; // 重置快取
+    // 重置頭像快取：上一場的頭像是 canvas 裁切出的專屬貼圖，連同貼圖一起釋放
+    for (const spr of Object.values(this._portraitCache)) {
+      if (spr) spr.destroy({ texture: true, textureSource: true });
+    }
+    this._portraitCache   = { player: null, enemy: null };
 
     // 重新綁定內部戰鬥邏輯（移除舊監聽器後再掛）
     if (this._actHandler) this.off('action', this._actHandler);
@@ -544,6 +553,9 @@ export class BattleUI extends PIXI.Container {
       this._isLocked = false; // 解鎖，等待玩家下一回合
     }, 1000);
   }
+
+  /** 戰鬥結束時玩家剩餘 HP（供呼叫端保存，下一場延續） */
+  get playerHp() { return this._data?.player?.hp ?? 0; }
 
   /** 推入 Log 並刷新（公開版，供外部呼叫） */
   pushLog(msg) {

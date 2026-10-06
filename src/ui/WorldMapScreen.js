@@ -59,7 +59,8 @@ export class WorldMapScreen extends PIXI.Container {
       this._activeTickers = [];
     }
     const { width: W, height: H } = this._app.screen;
-    this.removeChildren();
+    // 重繪時銷毀舊節點，避免每次重建都洩漏一批 Text / Graphics
+    for (const child of this.removeChildren()) child.destroy({ children: true });
 
     this._buildDim(W, H);
     this._buildPanel(W, H);

@@ -2,6 +2,7 @@
   "id": "npc_const_guard",
   "name": "工地守衛",
   "type": "npc",
+  "level": 2,
   "visuals": {
     "spriteSheet":   "assets/sprites/entities/const_guard_sheet.png",
     "frameWidth":    128,
@@ -9,6 +10,8 @@
     "heightInTiles": 1.7
   },
   "stats": {
+    "hp": 60, "maxHp": 60, "atk": 9, "def": 4, "eva": 0.05,
     "moveSpeed": 0.5
-  }
+  },
+  "description": "建商雇來看守工地的保全，拿錢辦事，不問緣由。"
 }
