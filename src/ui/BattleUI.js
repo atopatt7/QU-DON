@@ -512,8 +512,7 @@ export class BattleUI extends PIXI.Container {
     const e = this._data.enemy;
 
     // ── 玩家攻擊 ────────────────────────────────────────────────────────────
-    let dmg = Math.max(1, p.atk - e.def);
-    dmg = Math.floor(dmg * (0.9 + Math.random() * 0.2));
+    const dmg = BattleUI.rollDamage(p.atk, e.def);
     e.hp = Math.max(0, e.hp - dmg);
     this._pushLog(`瞿董 攻擊了 ${e.name}，造成 ${dmg} 點傷害！`);
     this.flashHit('enemy');
@@ -532,7 +531,7 @@ export class BattleUI extends PIXI.Container {
 
     // ── 敵人反擊（延遲 1 秒） ─────────────────────────────────────────────
     setTimeout(() => {
-      let eDmg = Math.floor(Math.max(1, e.atk - p.def) * (0.9 + Math.random() * 0.2));
+      const eDmg = BattleUI.rollDamage(e.atk, p.def);
       p.hp = Math.max(0, p.hp - eDmg);
       this._pushLog(`${e.name} 反擊，造成 ${eDmg} 點傷害！`);
       this.flashHit('player');
@@ -552,6 +551,14 @@ export class BattleUI extends PIXI.Container {
 
       this._isLocked = false; // 解鎖，等待玩家下一回合
     }, 1000);
+  }
+
+  /**
+   * 傷害公式：(攻 − 防) × 0.9～1.1 浮動，取整後最少 1 點。
+   * 下限必須在浮動與取整「之後」套用，否則攻防接近時 1 × 0.9 會被 floor 成 0。
+   */
+  static rollDamage(atk, def) {
+    return Math.max(1, Math.floor((atk - def) * (0.9 + Math.random() * 0.2)));
   }
 
   /** 戰鬥結束時玩家剩餘 HP（供呼叫端保存，下一場延續） */
