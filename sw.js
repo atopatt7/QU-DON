@@ -10,7 +10,7 @@
  *    只改 JS / JSON 的話，線上玩家下次開啟就會拿到新版。
  */
 
-const CACHE_NAME = 'qudon-v93';
+const CACHE_NAME = 'qudon-v94';
 const NETWORK_TIMEOUT_MS = 3000;
 
 // ── 安裝時預快取：讓第一次開啟後就能離線遊玩 ──────────────────────────────────
@@ -82,6 +82,9 @@ const PRECACHE = [
   './src/data/npcs/npcs_map_neon_bar.json',
   './src/data/npcs/npcs_map_hakka_east_suburb.json',
   './src/data/npcs/npcs_map_hakka_street.json',
+  './src/data/npcs/npcs_map_qu_don_room.json',
+  './src/data/npcs/npcs_map_underground_parking.json',
+  './src/data/npcs/npcs_map_const_office.json',
   // ── 圖片 / 音訊 ────────────────────────────────────────────────────────────
   './assets/sounds/bgm/neon_bar_theme.webm',
   './assets/images/home_bg.jpg',
