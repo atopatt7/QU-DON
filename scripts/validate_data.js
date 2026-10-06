@@ -101,6 +101,54 @@ for (const id of reachable) {
   }
 }
 
+// ─── 可走到性：從進入地圖的位置出發，每個出口 / NPC / 調查點都要走得到 ─────────
+// NPC 視為可通過（守衛會讓開、敵人可以打倒），只看地形。避免玩家被地形卡死。
+{
+  const entries = {};
+  for (const id of reachable) {
+    for (const w of maps[id].warps ?? []) {
+      if (reachable.has(w.targetMap)) (entries[w.targetMap] ??= []).push([w.targetGx, w.targetGy]);
+    }
+  }
+  for (const id of ENTRY_MAPS) {
+    const sp = maps[id]?.spawnPoints?.find(s => s.id === 'player_start') ?? maps[id]?.spawnPoints?.[0];
+    if (sp) (entries[id] ??= []).push([sp.gx, sp.gy]);
+  }
+
+  for (const id of reachable) {
+    const m = maps[id];
+    const seen = new Uint8Array(m.width * m.height);
+    const queue = (entries[id] ?? []).filter(([x, y]) => walkable(id, x, y));
+    for (const [x, y] of queue) seen[y * m.width + x] = 1;
+    while (queue.length) {
+      const [x, y] = queue.shift();
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const nx = x + dx, ny = y + dy;
+        if (!walkable(id, nx, ny) || seen[ny * m.width + nx]) continue;
+        // 傳送點本身走得到，但會被傳走，不從它往外擴散
+        seen[ny * m.width + nx] = 1;
+        if (!warpAt(m, nx, ny)) queue.push([nx, ny]);
+      }
+    }
+    const at   = (x, y) => inBounds(m, x, y) && seen[y * m.width + x];
+    const near = (x, y) => [[0, 1], [0, -1], [1, 0], [-1, 0]].some(([dx, dy]) => at(x + dx, y + dy));
+
+    for (const w of m.warps ?? []) {
+      if (!at(w.gx, w.gy)) err(`${id} warp "${w.id}"：從進入點走不到 (${w.gx},${w.gy})`);
+    }
+    for (const t of m.triggers ?? []) {
+      if (t.type === 'examine' && !near(t.gx, t.gy)) err(`${id} trigger "${t.id}"：從進入點走不到旁邊 (${t.gx},${t.gy})`);
+    }
+    let npcs = [];
+    try { npcs = readJson(path.join(NPCS_DIR, `npcs_${id}.json`)); } catch { /* 沒有 NPC 檔 */ }
+    for (const n of npcs) {
+      for (const pos of [n.position, ...(n.variants ?? []).map(v => v.position).filter(Boolean)]) {
+        if (!at(pos.x, pos.y) && !near(pos.x, pos.y)) err(`${id} NPC "${n.id}"：從進入點走不到 (${pos.x},${pos.y})`);
+      }
+    }
+  }
+}
+
 // ─── 物品參照（choices / onEnd / variants 中的 requiresItem、takeItem、giveItem）──
 const itemIds = new Set(readJson(path.join(ROOT, 'src/data/items.json')).items.map(i => i.id));
 const asList  = v => (v == null ? [] : Array.isArray(v) ? v : [v]);
