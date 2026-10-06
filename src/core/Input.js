@@ -306,4 +306,7 @@ export class InputManager {
 
   /** 解除鎖定（轉場完成後呼叫）。 */
   unlock() { this._locked = false; }
+
+  /** 目前是否鎖定中（轉場 / 戰鬥）。 */
+  get isLocked() { return this._locked; }
 }

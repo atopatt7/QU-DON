@@ -33,10 +33,10 @@ export class EntityManager {
     this.clear();
     this._tileSize = tileSize;
 
-    this.container = new PIXI.Container();
-    this.container.sortableChildren = true;  // 啟用 Y 軸深度排序
-    parentContainer.sortableChildren = true; // 讓玩家精靈也參與同層排序
-    parentContainer.addChild(this.container);
+    // NPC 精靈直接掛在 entityLayer（與玩家精靈同層），
+    // 才能以 zIndex = y 和玩家互相排序；若包在子容器內，玩家只會跟整個容器比較
+    this.container = parentContainer;
+    parentContainer.sortableChildren = true;
 
     const npcData = await this._loadNpcData(mapId);
     this.npcs = npcData;
@@ -88,6 +88,16 @@ export class EntityManager {
       npc.entityData = result.entityData; // 供戰鬥系統使用
     }
 
+    // 實例欄位覆寫 / 補足實體資料（例如同一實體在不同地圖說不同台詞；
+    // 無 entityRef 的 NPC 也能靠實例上的 name / dialogue 進行對話）
+    const overrides = {};
+    for (const key of ['name', 'dialogue', 'choices', 'stats']) {
+      if (npc[key] !== undefined) overrides[key] = npc[key];
+    }
+    if (npc.entityData || Object.keys(overrides).length) {
+      npc.entityData = { ...(npc.entityData ?? {}), ...overrides };
+    }
+
     // Fallback：色塊佔位（entityRef 缺失或貼圖載入失敗時使用）
     // 高度與玩家精靈一致（tileSize × 1.7），寬度取 0.5 倍
     if (!spr) {
@@ -106,6 +116,7 @@ export class EntityManager {
     // 格子座標 → entityLayer 局部像素座標（anchor 底部對齊格子底邊）
     spr.x = npc.position.x * s + s * 0.5;
     spr.y = npc.position.y * s + s;
+    spr.zIndex = spr.y;
 
     this.container.addChild(spr);
     this.sprites.set(npc.id, spr);
@@ -252,7 +263,7 @@ export class EntityManager {
       const spr = this.sprites.get(npc.id);
       if (spr) spr.zIndex = spr.y;
     }
-    this.container.sortChildren();
+    // sortableChildren 會在 render 前依 zIndex 自動排序（含玩家精靈）
   }
 
   // ─── 初始化巡邏狀態物件 ────────────────────────────────────────────────────
@@ -284,10 +295,9 @@ export class EntityManager {
 
   // ─── 清除當前地圖所有 NPC ─────────────────────────────────────────────────
   clear() {
-    if (this.container) {
-      this.container.destroy({ children: true });
-      this.container = null;
-    }
+    // container 是共用的 entityLayer（含玩家精靈），只銷毀自己建立的 NPC 精靈
+    for (const spr of this.sprites.values()) spr.destroy();
+    this.container = null;
     this.npcs = [];
     this.sprites.clear();
   }

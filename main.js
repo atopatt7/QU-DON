@@ -262,6 +262,12 @@ function fadeOut(app, duration = 600) {
   });
 }
 
+// ─── 無輸入快照（全螢幕介面開啟時取代 input.update() 結果）────────────────
+const IDLE_INPUT = Object.freeze({
+  direction: null, justMoved: false, justDir: null, tileTarget: null,
+  confirmJust: false, cancelJust: false, action: {}, raw: {},
+});
+
 // ─── 開發輔助旗標 ──────────────────────────────────────────────────────────
 window.SHOW_COORDS = false;
 
@@ -531,24 +537,30 @@ async function main() {
   });
   // ────────────────────────────────────────────────────────────────────────
 
+  // 任一全螢幕介面（選單 / 狀態 / 地圖 / 背包 / 戰鬥）開啟中
+  const _isUiOpen = () =>
+    cigarMenu.visible || statusScreen.visible || worldMap.visible
+    || inventoryScreen.visible || battleUI.visible;
+
+  // 可開啟選單 / 背包：無介面、無對話、非轉場或戰鬥鎖定
+  const _canOpenOverlay = () =>
+    !_isUiOpen() && !interaction.isActive && !input.isLocked;
+
   // 控制面板實體選單按鈕
   panel.on('menu', () => {
-    if (!cigarMenu.visible && !interaction.isActive) {
-      _showMenu();
-    }
+    if (_canOpenOverlay()) _showMenu();
   });
 
   // Escape 開啟選單；I 鍵開啟背包；各介面自身的 handler 負責關閉
   window.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && !cigarMenu.visible && !interaction.isActive
-        && !inventoryScreen.visible) {
+    // 介面自身的 handler 先註冊、先執行；已處理（preventDefault）的按鍵不再重開選單，
+    // 否則 Esc 關閉選單後會在同一個事件內被這裡立刻重新打開
+    if (e.defaultPrevented) return;
+    if (e.key === 'Escape' && _canOpenOverlay()) {
       e.preventDefault();
       _showMenu();
     }
-    if ((e.key === 'i' || e.key === 'I')
-        && !cigarMenu.visible && !interaction.isActive
-        && !inventoryScreen.visible && !statusScreen.visible
-        && !worldMap.visible) {
+    if ((e.key === 'i' || e.key === 'I') && _canOpenOverlay()) {
       e.preventDefault();
       _showInventory();
     }
@@ -672,7 +684,10 @@ async function main() {
     // 玩家精靈 zIndex 同步（與 NPC 共用 entityLayer 排序）
     playerSpr.zIndex = playerSpr.y;
 
-    const state = input.update();
+    // 介面開啟時仍需消費輸入佇列，但丟棄結果：
+    // 選單用方向鍵 / Enter 操作時，不得同時移動玩家或觸發調查
+    const rawState = input.update();
+    const state    = _isUiOpen() ? IDLE_INPUT : rawState;
 
     // ── 座標顯示更新 ──────────────────────────────────────────────────────────
     panel.updateCoordinates(player.gx, player.gy);

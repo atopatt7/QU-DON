@@ -346,16 +346,17 @@ export class BattleUI extends PIXI.Container {
         maxHp: pStats.maxHp ?? 100,
         sp:    pStats.sp    ?? 80,
         maxSp: pStats.maxSp ?? 80,
-        atk:   pStats.atk   ?? 10,
-        def:   pStats.def   ?? 5,
+        // actors.json 用 attack/defense，entities/*.json 用 atk/def，兩者皆接受
+        atk:   pStats.atk   ?? pStats.attack  ?? 10,
+        def:   pStats.def   ?? pStats.defense ?? 5,
       },
       enemy: {
         name:  enemyData.name,
         level: enemyData.level ?? 1,
         hp:    eStats.hp    ?? 50,
         maxHp: eStats.maxHp ?? 50,
-        atk:   eStats.atk   ?? 6,
-        def:   eStats.def   ?? 2,
+        atk:   eStats.atk   ?? eStats.attack  ?? 6,
+        def:   eStats.def   ?? eStats.defense ?? 2,
       },
     };
     // 保存 visuals 供頭像系統使用
