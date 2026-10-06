@@ -21,6 +21,7 @@ import { StatusScreen }          from './src/ui/StatusScreen.js';
 import { WorldMapScreen }        from './src/ui/WorldMapScreen.js';
 import { InventoryScreen }       from './src/ui/InventoryScreen.js';
 import { GameStateManager }      from './src/core/GameStateManager.js';
+import { gameAreaHeight, isLandscape } from './src/core/Layout.js';
 
 // ─── VT323 字型 ────────────────────────────────────────────────────────────
 const fontLink = document.createElement('link');
@@ -77,19 +78,18 @@ async function initPixi() {
     width:           W,
     height:          H,
     backgroundColor: 0x080610,
-    resolution:      window.devicePixelRatio || 1,
+    // 解析度上限 2：像素風畫面在 3x 螢幕上看不出差別，但要填的像素多 2.25 倍（手機 GPU 的主要負擔）
+    resolution:      Math.min(window.devicePixelRatio || 1, 2),
     autoDensity:     true,
     antialias:       false,
     eventMode:       'static',
   });
 
-  // ⚡ Stage 3/4 效能：30fps 上限，減半 ticker 喚醒次數
-  app.ticker.maxFPS = 30;
+  // 60fps 上限：移動已改為以時間計算（見 BASE_FRAME_MS），高刷新率螢幕不會多燒電
+  app.ticker.maxFPS = 60;
 
   _appInstance = app;
   document.getElementById('game-container').appendChild(app.canvas);
-  const htmlCtrl = document.getElementById('touch-controls');
-  if (htmlCtrl) htmlCtrl.style.display = 'none';
   return app;
 }
 
@@ -102,14 +102,14 @@ function bindResize(app) {
   });
 }
 
-// ─── 遊戲圖層（上方 66%，帶遮罩）──────────────────────────────────────────
+// ─── 遊戲圖層（直式：上方 66%；橫式：全畫面。帶遮罩）──────────────────────────────────────────
 function buildGameLayer(app) {
   const layer = new PIXI.Container();
   layer.label = 'gameLayer';
   const mask  = new PIXI.Graphics();
   const drawMask = () => {
     mask.clear();
-    mask.rect(0, 0, app.screen.width, Math.floor(app.screen.height * 0.66))
+    mask.rect(0, 0, app.screen.width, gameAreaHeight(app.screen.width, app.screen.height))
         .fill({ color: 0xffffff });
   };
   drawMask();
@@ -279,7 +279,7 @@ async function main() {
   bindResize(app);
 
   // 雪茄盒選單素材預載：與首頁顯示並行，不阻塞畫面
-  PIXI.Assets.load(['assets/ui/interface/cigar_box.png', 'assets/ui/interface/cigar_single.png'])
+  PIXI.Assets.load(['assets/ui/interface/cigar_box.webp', 'assets/ui/interface/cigar_single.webp'])
     .catch(() => console.warn('[QU-DON] CigarMenu 素材預載失敗，選單將使用佔位圖形'));
 
   // ── 1. 顯示首頁 ──────────────────────────────────────────────────────────
@@ -359,6 +359,8 @@ async function main() {
   mapManager.entityLayer.addChild(playerSpr);
 
   // ── Lerp 動畫常數 ────────────────────────────────────────────────────────────
+  // 以下數值都以「30fps 的一幀」為單位定義，實際每幀依 deltaMS 換算（見 ticker 內的 f）
+  const BASE_FRAME_MS = 1000 / 30;
   const LERP_FACTOR = 0.30;   // 放開按鍵後的收斂比例（自然減速停步）
   const LERP_SNAP   = 0.01;   // 誤差小於此值時強制對齊
   // 按住方向鍵時的定速移動量（tiles/frame @ 30fps）
@@ -405,6 +407,8 @@ async function main() {
     // setCameraVisual 沒有 centerOn 的 early-return guard，確保 tileSize 改變後鏡頭重算
     mapManager.setCameraVisual(player.vx, player.vy);
     mapManager.render();
+    // 精靈位置以 tileSize 換算，轉向 / 縮放後必須重算，否則玩家會留在舊的像素位置
+    updateSpritePos(player.vx, player.vy);
   });
 
   app.stage.addChild(panel);
@@ -634,10 +638,11 @@ async function main() {
   app.stage.addChild(clock);
 
   const positionClock = () => {
-    const safe  = getSafeArea();
-    const gameH = Math.floor(app.screen.height * 0.66);
+    const safe = getSafeArea();
+    const { width: W, height: H } = app.screen;
     clock.x = 12 + safe.left;
-    clock.y = gameH - clock.displayHeight - 8;
+    // 橫式時左下角是 D-Pad，時鐘移到左上角
+    clock.y = isLandscape(W, H) ? 8 + safe.top : gameAreaHeight(W, H) - clock.displayHeight - 8;
   };
   positionClock();
   app.stage.on('resize', positionClock);
@@ -783,9 +788,14 @@ async function main() {
       const dist = Math.abs(ex) + Math.abs(ey); // 軸對齊移動，兩分量僅一為非 0
       const held = state.direction;
 
+      // 以時間為準：f = 本幀經過了幾個「30fps 基準幀」。60fps 時約 0.5，掉幀時變大，
+      // 走路速度與畫面更新率無關（上限 3，避免切回分頁時一次瞬移好幾格）
+      const f    = Math.min(app.ticker.deltaMS / BASE_FRAME_MS, 3);
+      const step = MOVE_SPEED * f;
+
       // 按住：snap 門檻擴大至一步之內，到位後立刻銜接下一格
       // 放開：只在誤差極小時才 snap，讓 lerp 把最後幾幀自然收完
-      const snapAt = held ? MOVE_SPEED + LERP_SNAP : LERP_SNAP;
+      const snapAt = held ? step + LERP_SNAP : LERP_SNAP;
 
       if (dist < snapAt) {
         player.vx    = player.gx;
@@ -808,16 +818,17 @@ async function main() {
           MapManager.onActorMoveEnd(playerSpr);
         }
       } else if (held) {
-        // 定速線性：每幀推進固定 MOVE_SPEED（tiles），不會在格尾減速
-        const step  = Math.min(MOVE_SPEED, dist);
-        player.vx  += (ex / dist) * step;
-        player.vy  += (ey / dist) * step;
-        _stepPhase  = Math.min(_stepPhase + 0.14, 1);
+        // 定速線性：每個基準幀推進 MOVE_SPEED（tiles），不會在格尾減速
+        const s     = Math.min(step, dist);
+        player.vx  += (ex / dist) * s;
+        player.vy  += (ey / dist) * s;
+        _stepPhase  = Math.min(_stepPhase + 0.14 * f, 1);
       } else {
-        // 放開後：lerp 自然減速，最後幾幀會慢下來再 snap
-        player.vx  += ex * LERP_FACTOR;
-        player.vy  += ey * LERP_FACTOR;
-        _stepPhase  = Math.min(_stepPhase + 0.12, 1);
+        // 放開後：lerp 自然減速，最後幾幀會慢下來再 snap（指數衰減換算成與幀率無關）
+        const k     = 1 - Math.pow(1 - LERP_FACTOR, f);
+        player.vx  += ex * k;
+        player.vy  += ey * k;
+        _stepPhase  = Math.min(_stepPhase + 0.12 * f, 1);
       }
 
       // 精靈 & 相機同步到相同浮點視覺座標 → 地圖移動與角色完全一致，不暈

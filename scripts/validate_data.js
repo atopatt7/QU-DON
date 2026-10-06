@@ -207,6 +207,29 @@ for (const f of fs.readdirSync(NPCS_DIR)) {
   }
 }
 
+// ─── Service Worker 預快取：main.js 匯入的每個模組都要在清單上（否則離線時無法啟動）──
+{
+  const swSrc    = fs.readFileSync(path.join(ROOT, 'sw.js'), 'utf8');
+  const listSrc  = swSrc.slice(swSrc.indexOf('const PRECACHE'), swSrc.indexOf('];', swSrc.indexOf('const PRECACHE')));
+  const precache = new Set([...listSrc.matchAll(/'\.\/([^']+)'/g)].map(m => m[1]));
+  for (const p of precache) if (p && !exists(p)) err(`sw.js PRECACHE：檔案不存在 ${p}`);
+
+  const seen  = new Set();
+  const stack = ['main.js'];
+  while (stack.length) {
+    const rel = stack.pop();
+    if (seen.has(rel)) continue;
+    seen.add(rel);
+    const src = fs.readFileSync(path.join(ROOT, rel), 'utf8');
+    for (const m of src.matchAll(/^\s*import\s[^'"]*['"](\.{1,2}\/[^'"]+)['"]/gm)) {
+      stack.push(path.posix.normalize(path.posix.join(path.posix.dirname(rel), m[1])));
+    }
+  }
+  for (const mod of seen) {
+    if (!precache.has(mod)) warn(`sw.js PRECACHE 缺少模組 ${mod}（離線第一次啟動會失敗）`);
+  }
+}
+
 // ─── 輸出 ───────────────────────────────────────────────────────────────────
 for (const w of warns)  console.log(`WARN   ${w}`);
 for (const e of errors) console.log(`ERROR  ${e}`);

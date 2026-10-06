@@ -3,8 +3,8 @@
  * 主選單 — 雪茄盒 + 雪茄影像合成（RWD 動態縮放版）
  *
  * 素材（由 main.js 預載）：
- *   assets/ui/cigar_box.png     雪茄盒外殼（背景）
- *   assets/ui/cigar_single.png  單支雪茄（疊加於盒內刻槽）
+ *   assets/ui/cigar_box.webp     雪茄盒外殼（背景）
+ *   assets/ui/cigar_single.webp  單支雪茄（疊加於盒內刻槽）
  *
  * 發出的具名事件：
  *   'resume' | 'status' | 'inventory' | 'crew'
@@ -27,13 +27,13 @@ const MENU_ITEMS = [
 ];
 
 // ╔══════════════════════════════════════════════════════════════════════════╗
-// ║  美術提供的精確幾何常數 — 對應 cigar_box.png 內框尺寸                    ║
+// ║  美術提供的精確幾何常數 — 對應 cigar_box.webp 內框尺寸                    ║
 // ║                                                                          ║
 // ║  BOX_INNER_OFFSET_X   盒子左邊界到第一支雪茄左緣的內縮距離（原生 px）    ║
 // ║  BOX_INNER_OFFSET_Y   盒子上邊界到第一支雪茄上緣的內縮距離（原生 px）    ║
 // ║  BOX_INNER_WIDTH      盒子內部可排列雪茄的總寬度（原生 px）               ║
-// ║  CIGAR_NATIVE_WIDTH   cigar_single.png 的原生寬度（px）                  ║
-// ║  CIGAR_NATIVE_HEIGHT  cigar_single.png 的原生高度（px）                  ║
+// ║  CIGAR_NATIVE_WIDTH   cigar_single.webp 的原生寬度（px）                  ║
+// ║  CIGAR_NATIVE_HEIGHT  cigar_single.webp 的原生高度（px）                  ║
 // ║                                                                          ║
 // ║  BOX_HEIGHT_RATIO     雪茄盒高度佔螢幕高度的比例（0.85 = 85%）           ║
 // ╚══════════════════════════════════════════════════════════════════════════╝
@@ -88,8 +88,8 @@ export class CigarMenuOverlay extends PIXI.Container {
 
     this._buildDim(W, H);
 
-    const boxTex   = PIXI.Assets.get('assets/ui/interface/cigar_box.png')    ?? null;
-    const cigarTex = PIXI.Assets.get('assets/ui/interface/cigar_single.png') ?? null;
+    const boxTex   = PIXI.Assets.get('assets/ui/interface/cigar_box.webp')    ?? null;
+    const cigarTex = PIXI.Assets.get('assets/ui/interface/cigar_single.webp') ?? null;
 
     // ── 全域縮放：讓盒子高度佔螢幕 BOX_HEIGHT_RATIO ──────────────────────────
     const boxNativeW = boxTex ? boxTex.width  : 900;

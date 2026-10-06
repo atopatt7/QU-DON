@@ -248,7 +248,8 @@ export class WorldMapScreen extends PIXI.Container {
            .stroke({ color: C.border, width: 2 });
         // 緩慢呼吸閃爍
         let _t = 0;
-        const ticker = (dt) => { _t += dt * 0.05; box.alpha = 0.72 + Math.sin(_t) * 0.28; };
+        // Pixi v8 的 ticker 回呼收到的是 Ticker 物件（不是數字），取 deltaTime 才是幀數
+        const ticker = (t) => { _t += t.deltaTime * 0.05; box.alpha = 0.72 + Math.sin(_t) * 0.28; };
         this._app.ticker.add(ticker);
         this._activeTickers.push(ticker);
       } else {

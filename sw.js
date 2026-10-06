@@ -1,16 +1,21 @@
 /**
  * QU-DON | sw.js — Service Worker
- * 快取策略：Cache First（靜態資源），Network First（動態資料）
  *
- * ⚠️ 每次修改任何遊戲檔案後，必須更新 CACHE_NAME 版本號，
- *    才能讓舊快取失效、手機端取得最新版本。
+ * 快取策略：
+ *   程式與資料（HTML / JS / JSON）→ Network First（3 秒逾時退回快取）
+ *     連得上網就一定拿到最新版，離線或網路很慢時用上次的版本。
+ *   圖片 / 音訊 / 字型 → Cache First（檔案大、很少改，先用快取省流量）
+ *
+ * ⚠️ 修改圖片或音訊時仍要更新 CACHE_NAME（Cache First 的檔案靠換版本號失效）。
+ *    只改 JS / JSON 的話，線上玩家下次開啟就會拿到新版。
  */
 
-const CACHE_NAME = 'qudon-v89';
+const CACHE_NAME = 'qudon-v90';
+const NETWORK_TIMEOUT_MS = 3000;
 
-// ── 本機檔案：安裝時全數預快取 ────────────────────────────────────────────────
-// 包含所有 JS 模組、資料檔與圖片資源，確保離線 / 弱網路環境也能正常啟動
-const LOCAL_FILES = [
+// ── 安裝時預快取：讓第一次開啟後就能離線遊玩 ──────────────────────────────────
+// 不在清單上的同源檔案，第一次被請求時也會自動存進快取。
+const PRECACHE = [
   './',
   './index.html',
   './main.js',
@@ -20,6 +25,7 @@ const LOCAL_FILES = [
   './src/core/EntityManager.js',
   './src/core/AudioManager.js',
   './src/core/GameStateManager.js',
+  './src/core/Layout.js',
   // ── UI 模組 ────────────────────────────────────────────────────────────────
   './src/ui/HomeScreen.js',
   './src/ui/ControlPanel.js',
@@ -34,11 +40,9 @@ const LOCAL_FILES = [
   // ── 遊戲模組 ───────────────────────────────────────────────────────────────
   './src/modules/MapManager.js',
   './src/modules/InteractionManager.js',
-  './src/modules/DataManager.js',
   // ── 資料 JSON ──────────────────────────────────────────────────────────────
   './src/data/actors.json',
   './src/data/items.json',
-  // ── 實體系統（registry + 獨立角色檔）──────────────────────────────────────
   './src/data/entities/registry.json',
   './src/data/entities/actors/player.json',
   './src/data/entities/actors/enemy_thug.json',
@@ -64,55 +68,40 @@ const LOCAL_FILES = [
   './src/data/npcs/npcs_map_back_alley.json',
   './src/data/npcs/npcs_map_convenience_store.json',
   './src/data/npcs/npcs_map_black_rock_west_suburb.json',
-  // ── 圖片資源（預快取後載入速度大幅提升）────────────────────────────────────
+  // ── 圖片 / 音訊 ────────────────────────────────────────────────────────────
   './assets/sounds/bgm/neon_bar_theme.webm',
   './assets/images/home_bg.jpg',
-  './assets/ui/interface/cigar_box.png',
-  './assets/ui/interface/cigar_single.png',
+  './assets/ui/interface/cigar_box.webp',
+  './assets/ui/interface/cigar_single.webp',
+  './assets/ui/interface/dark_wood_texture.jpg',
   './assets/ui/interface/warp_arrow_base.png',
   './assets/ui/interface/warp_door.png',
   './assets/ui/interface/warp_shutter.png',
-  './assets/ui/interface/mag_base.png',
-  './assets/ui/interface/Wood067_1K-PNG_Color.png',
-  './assets/ui/interface/bullet_single.png',
   './assets/maps/tilesets/tileset_1000.png',
-];
-
-// ── 實體雪碧圖：失敗不阻塞安裝（缺圖時遊戲以色塊佔位精靈替代）──────────────
-const ENTITY_SPRITES = [
   './assets/sprites/entities/player_sheet.png',
   './assets/sprites/entities/pickpocket_sheet.png',
   './assets/sprites/entities/clerk_sheet.png',
   './assets/sprites/entities/const_guard_sheet.png',
+  './assets/icons/icon-192.png',
+  './assets/icons/icon-512.png',
 ];
 
-// ── CDN 資源：嘗試快取，失敗不阻塞安裝（網路可用時仍可從 CDN 抓取）────────────
+// ── CDN：嘗試快取，失敗不阻塞安裝 ────────────────────────────────────────────
 const CDN_FILES = [
   'https://cdnjs.cloudflare.com/ajax/libs/pixi.js/8.2.6/pixi.min.js',
 ];
 
-// ─── Install：預快取所有本機資源 ──────────────────────────────────────────────
+// ─── Install ──────────────────────────────────────────────────────────────────
 self.addEventListener('install', (event) => {
   event.waitUntil((async () => {
     const cache = await caches.open(CACHE_NAME);
-
-    // 本地檔案：全數快取（任一失敗則 SW 安裝中止，舊版 SW 繼續服務）
-    await cache.addAll(LOCAL_FILES);
-
-    // 實體貼圖：製作中，缺圖不阻塞安裝
+    // 逐一快取：單一檔案失敗不會讓整個 SW 安裝失敗（之後用到時會再抓）
     await Promise.allSettled(
-      ENTITY_SPRITES.map(url =>
-        cache.add(url).catch(() => console.warn('[SW] 實體貼圖尚未製作，跳過快取:', url))
+      [...PRECACHE, ...CDN_FILES].map(url =>
+        cache.add(new Request(url, { cache: 'reload' }))
+          .catch(() => console.warn('[SW] 預快取失敗，之後再試:', url))
       )
     );
-
-    // CDN 檔案：逐一嘗試，失敗靜默忽略（不阻塞安裝）
-    await Promise.allSettled(
-      CDN_FILES.map(url =>
-        cache.add(url).catch(e => console.warn('[SW] CDN 快取失敗，將在使用時即時載入:', url))
-      )
-    );
-
     await self.skipWaiting();
   })());
 });
@@ -120,34 +109,53 @@ self.addEventListener('install', (event) => {
 // ─── Activate：清除舊版快取 ───────────────────────────────────────────────────
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(
-        keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k))
-      )
-    ).then(() => self.clients.claim())
+    caches.keys()
+      .then(keys => Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k))))
+      .then(() => self.clients.claim())
   );
 });
 
-// ─── Fetch：Cache First 策略 ──────────────────────────────────────────────────
+// ─── Fetch ────────────────────────────────────────────────────────────────────
+const isCodeOrData = (url) =>
+  url.origin === self.location.origin &&
+  (url.pathname.endsWith('/') || /\.(html|js|json)$/.test(url.pathname));
+
+async function putInCache(request, response) {
+  if (response && response.status === 200 && response.type !== 'opaque') {
+    const cache = await caches.open(CACHE_NAME);
+    await cache.put(request, response.clone());
+  }
+  return response;
+}
+
+// Network First：逾時或離線時退回快取
+async function networkFirst(request) {
+  const network = fetch(request, { cache: 'no-cache' }).then(res => putInCache(request, res));
+  network.catch(() => {}); // 逾時後才失敗的請求不算未處理錯誤（已經用快取回應了）
+  const timeout = new Promise(resolve => setTimeout(resolve, NETWORK_TIMEOUT_MS, null));
+  try {
+    const res = await Promise.race([network, timeout]);
+    if (res) return res;
+  } catch { /* 離線：往下用快取 */ }
+  const cached = await caches.match(request);
+  return cached ?? network; // 沒有快取就繼續等網路
+}
+
+// Cache First：快取沒有才上網抓，抓到後存起來
+async function cacheFirst(request) {
+  const cached = await caches.match(request);
+  if (cached) return cached;
+  const res = await fetch(request);
+  return putInCache(request, res);
+}
+
 self.addEventListener('fetch', (event) => {
-  // 略過非 GET 請求
   if (event.request.method !== 'GET') return;
+  const url = new URL(event.request.url);
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') return;
 
   event.respondWith(
-    caches.match(event.request).then(cached => {
-      if (cached) return cached;
-      return fetch(event.request).then(response => {
-        // 只快取成功的 2xx 回應
-        if (!response || response.status !== 200 || response.type === 'error') {
-          return response;
-        }
-        const toCache = response.clone();
-        caches.open(CACHE_NAME).then(cache => cache.put(event.request, toCache));
-        return response;
-      }).catch(() => {
-        // 網路請求失敗（離線），靜默返回 undefined（瀏覽器顯示原生錯誤）
-        console.warn('[SW] 網路請求失敗:', event.request.url);
-      });
-    })
+    (isCodeOrData(url) ? networkFirst(event.request) : cacheFirst(event.request))
+      .catch(() => Response.error())
   );
 });

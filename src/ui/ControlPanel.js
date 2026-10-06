@@ -25,10 +25,11 @@
  */
 
 import { MembraneButton } from './MembraneButton.js';
+import { panelLayout }    from '../core/Layout.js';
 
 // ─── 常數 ──────────────────────────────────────────────────────────────────────
 
-const PANEL_RATIO   = 0.34;   // 面板佔螢幕高度比例
+
 const DPAD_MARGIN_L = 28;     // D-Pad 左邊距（px）
 const ACT_MARGIN_R  = 28;     // Action 按鈕右邊距（px）
 
@@ -86,34 +87,48 @@ export class ControlPanel extends PIXI.Container {
       }
     };
 
-    [this._texWood, this._texBtnUp, this._texBtnDn] = await Promise.all([
-      tryLoad('assets/ui/interface/dark_wood_texture.jpg'),
-      tryLoad('assets/ui/interface/btn_membrane_up.png'),
-      tryLoad('assets/ui/interface/btn_membrane_down.png'),
-    ]);
+    // 薄膜按鍵目前沒有美術圖，直接用程式繪製（不發出注定 404 的請求，手機啟動少等兩個來回）
+    this._texWood  = await tryLoad('assets/ui/interface/dark_wood_texture.jpg');
+    this._texBtnUp = null;
+    this._texBtnDn = null;
   }
 
   // ─── 建置面板 ──────────────────────────────────────────────────────────────
 
   _build() {
     const { width: W, height: H } = this._app.screen;
-    const panelH = Math.floor(H * PANEL_RATIO);
+    // 直式：下方木紋底板；橫式：無底板，按鈕直接疊在地圖左右下角
+    const { overlay, height: panelH } = panelLayout(W, H);
     this.x = 0;
     this.y = H - panelH;
 
     // 計算自適應按鈕尺寸（限制最大值避免 PC 端過大）
-    const btnSize = Math.min(Math.floor(panelH * 0.27), 62);
-    const gap     = Math.max(3, Math.floor(btnSize * 0.07));
-    const actSize = Math.min(Math.floor(panelH * 0.31), 68);
+    let btnSize = Math.min(Math.floor(panelH * 0.27), 62);
+    let gap     = Math.max(3, Math.floor(btnSize * 0.07));
+    let actSize = Math.min(Math.floor(panelH * 0.31), 68);
+
+    // 寬度約束：直立的窄手機（如 375px）上，依高度算出的尺寸會讓 D-Pad 右鍵被確認鍵蓋住。
+    // D-Pad（3 鍵寬）+ 中間留白 + 兩顆圓鍵 必須放得進螢幕寬度，放不下就等比縮小
+    const MID_GAP = 16;
+    const fixedW  = DPAD_MARGIN_L + MID_GAP + 14 + ACT_MARGIN_R;
+    const scaledW = 3 * btnSize + 2 * gap + 2 * actSize;
+    if (fixedW + scaledW > W) {
+      const k = Math.max(0.5, (W - fixedW) / scaledW);
+      btnSize = Math.floor(btnSize * k);
+      gap     = Math.max(3, Math.floor(btnSize * 0.07));
+      actSize = Math.floor(actSize * k);
+    }
 
     // ── 層序 ──────────────────────────────────────────────────────────────
-    this.addChild(this._buildBackground(W, panelH));    // 最底層
-    this.addChild(this._buildTopDivider(W));            // 金邊分隔線
+    if (!overlay) {
+      this.addChild(this._buildBackground(W, panelH));  // 最底層
+      this.addChild(this._buildTopDivider(W));          // 金邊分隔線
+    }
     this.addChild(this._buildDPad(btnSize, gap, panelH)); // D-Pad
     this.addChild(this._buildActionCluster(actSize, panelH, W)); // 右側按鈕
     const menuBtn = this._buildMenuBtn(panelH, W, actSize);
     if (menuBtn) this.addChild(menuBtn);
-    this.addChild(this._buildScanlines(W, panelH));     // 最頂層（不攔截事件）
+    if (!overlay) this.addChild(this._buildScanlines(W, panelH)); // 最頂層（不攔截事件）
 
     this._coordText = this._buildCoordDisplay(W, panelH);
     this.addChild(this._coordText);
@@ -461,7 +476,7 @@ export class ControlPanel extends PIXI.Container {
         this._clock = null;
       }
       this._buttons = [];
-      this.removeChildren();
+      for (const child of this.removeChildren()) child.destroy({ children: true });
       this._build();
     };
     this._app.stage.on('resize', handler);

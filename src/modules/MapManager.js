@@ -24,6 +24,7 @@
  */
 
 import { AudioManager } from '../core/AudioManager.js';
+import { gameAreaHeight } from '../core/Layout.js';
 
 // ─── BGM 設定：各地圖 ID → 音訊路徑（無設定 = 靜音）──────────────────────────
 const MAP_BGM = {
@@ -40,6 +41,9 @@ export const DIR_DELTA = {
 
 // ─── 霧狀態常數 ────────────────────────────────────────────────────────────────
 const FOG = { HIDDEN: 0, EXPLORED: 1, VISIBLE: 2 };
+
+// 區塊裁切的區塊邊長（格）：見 _addTile / _cullChunks
+const CHUNK = 8;
 
 // ─── 霧視野透明度 ──────────────────────────────────────────────────────────────
 const FOG_ALPHA = {
@@ -257,7 +261,7 @@ export class MapManager {
   _adaptTileSize(_mapSize) {
     const W     = this._app.screen.width;
     const H     = this._app.screen.height;
-    const gameH = Math.floor(H * 0.66);
+    const gameH = gameAreaHeight(W, H);
     // 11×11 tile 可視範圍（玩家四周各 5 格）
     // 取 W 與 gameH 較小值除以 11，確保兩個方向都能裝下 11 格
     return Math.max(16, Math.floor(Math.min(W, gameH) / 11));
@@ -266,11 +270,11 @@ export class MapManager {
   // ─── 清除舊地圖 ────────────────────────────────────────────────────────────
 
   _clearMap(preserveEntities = false) {
-    this._groundLayer.removeChildren();
-    this._objectLayer.removeChildren();
+    this._clearLayer(this._groundLayer);
+    this._clearLayer(this._objectLayer);
     this._warpLayer.removeChildren();
     if (!preserveEntities) this.entityLayer.removeChildren();
-    this._fogLayer.removeChildren();
+    this._clearLayer(this._fogLayer);
 
     const destroyTex = t => t.destroy(true);
     this._texCache.forEach(t => {
@@ -1372,7 +1376,7 @@ export class MapManager {
   //     所有貼圖均來自 _texCache（loadMap 預先生成），
   //     快取 miss 時使用 _defaultTex 備援，永不在此處呼叫 generateTexture。
   _renderLayer(container, tileArray, layerType) {
-    container.removeChildren();
+    this._clearLayer(container);
     const s = this._tileSize;
 
     for (let y = 0; y < this._H; y++) {
@@ -1394,7 +1398,53 @@ export class MapManager {
         spr.height = s;
         spr.x = x * s;
         spr.y = y * s;
-        container.addChild(spr);
+        this._addTile(container, spr, x, y);
+      }
+    }
+  }
+
+  // ─── 區塊裁切（chunk culling）──────────────────────────────────────────────
+  // 每層的格子精靈依 CHUNK×CHUNK 分組記錄；鏡頭移動時（render()）只讓畫面內區塊的精靈參與繪製。
+  // 40×40 地圖每層 1600 個精靈，畫面上通常只需要其中 4～9 個區塊。
+  //
+  // ⚠️ 精靈必須直接放在 layer 底下，不能包進子容器：PixiJS 8.2.6 在這種巢狀結構下
+  //    會畫出破碎的三角形。用 renderable（而非 visible）切換，霧精靈的 visible 另有用途。
+
+  /** 把格子精靈加入 layer，並記錄到所屬區塊 */
+  _addTile(layer, spr, x, y) {
+    layer.addChild(spr);
+    const cx  = Math.floor(x / CHUNK);
+    const cy  = Math.floor(y / CHUNK);
+    layer._chunks ??= new Map();
+    const key = cy * 4096 + cx;
+    let c = layer._chunks.get(key);
+    if (!c) {
+      c = { cx, cy, on: true, sprites: [] };
+      layer._chunks.set(key, c);
+    }
+    c.sprites.push(spr);
+  }
+
+  /** 清空並銷毀 layer 的所有格子精靈（貼圖由 _texCache 共用，不在此銷毀） */
+  _clearLayer(layer) {
+    for (const child of layer.removeChildren()) child.destroy();
+    layer._chunks = new Map();
+  }
+
+  /** 依目前鏡頭位置切換各區塊的繪製狀態（只處理狀態有改變的區塊） */
+  _cullChunks(gameW, gameH) {
+    const s  = this._tileSize;
+    const x0 = Math.floor((-this._root.x) / s / CHUNK);
+    const x1 = Math.floor((gameW - this._root.x) / s / CHUNK);
+    const y0 = Math.floor((-this._root.y) / s / CHUNK);
+    const y1 = Math.floor((gameH - this._root.y) / s / CHUNK);
+    for (const layer of [this._groundLayer, this._objectLayer, this._fogLayer]) {
+      if (!layer._chunks) continue;
+      for (const c of layer._chunks.values()) {
+        const on = c.cx >= x0 && c.cx <= x1 && c.cy >= y0 && c.cy <= y1;
+        if (on === c.on) continue;
+        c.on = on;
+        for (const spr of c.sprites) spr.renderable = on;
       }
     }
   }
@@ -1402,27 +1452,8 @@ export class MapManager {
   // ─── 霧視野層 ─────────────────────────────────────────────────────────────
 
   _buildFogLayer() {
-    this._fogLayer.removeChildren();
-    const s     = this._tileSize;
-    const total = this._W * this._H;
-
-    this._fogState   = new Uint8Array(total); // 全 HIDDEN = 0
-    this._fogSprites = [];
-
-    for (let y = 0; y < this._H; y++) {
-      const row = [];
-      for (let x = 0; x < this._W; x++) {
-        const spr  = new PIXI.Sprite(this._fogTex);
-        spr.x      = x * s;
-        spr.y      = y * s;
-        spr.width  = s;
-        spr.height = s;
-        spr.alpha  = FOG_ALPHA[FOG.HIDDEN];
-        this._fogLayer.addChild(spr);
-        row.push(spr);
-      }
-      this._fogSprites.push(row);
-    }
+    this._fogState = new Uint8Array(this._W * this._H); // 全 HIDDEN = 0
+    this._rebuildFogSprites();
   }
 
   // ─── 公開 API ─────────────────────────────────────────────────────────────
@@ -1560,11 +1591,12 @@ export class MapManager {
     const s     = this._tileSize;
     const W     = this._app.screen.width;
     const H     = this._app.screen.height;
-    const gameH = Math.floor(H * 0.66);
+    const gameH = gameAreaHeight(W, H);
 
     // 使用視覺浮點座標 (_camVx/_camVy)：lerp 期間平滑，snap 時與邏輯座標相同
     this._root.x = W     / 2 - (this._camVx + 0.5) * s;
     this._root.y = gameH / 2 - (this._camVy + 0.5) * s;
+    this._cullChunks(W, gameH);
   }
 
   // ─── Getter ────────────────────────────────────────────────────────────────
@@ -1577,7 +1609,7 @@ export class MapManager {
   }
   get rootY() {
     const s     = this._tileSize;
-    const gameH = Math.floor(this._app.screen.height * 0.66);
+    const gameH = gameAreaHeight(this._app.screen.width, this._app.screen.height);
     return gameH / 2 - (this._camVy + 0.5) * s;
   }
   get mapWidth()      { return this._W; }
@@ -1740,8 +1772,8 @@ export class MapManager {
     if (this._fogTex) { this._fogTex.destroy(true); this._fogTex = null; }
 
     // 重建地板 / 物件層
-    this._groundLayer.removeChildren();
-    this._objectLayer.removeChildren();
+    this._clearLayer(this._groundLayer);
+    this._clearLayer(this._objectLayer);
     this._buildTexCache();
     this._renderLayer(this._groundLayer, this._mapData.layers.ground,  'ground');
     this._renderLayer(this._objectLayer, this._mapData.layers.objects, 'object');
@@ -1761,7 +1793,7 @@ export class MapManager {
     // 備份狀態
     const savedState = this._fogState ? new Uint8Array(this._fogState) : null;
 
-    this._fogLayer.removeChildren();
+    this._clearLayer(this._fogLayer);
     this._fogSprites = [];
     const s = this._tileSize;
 
@@ -1778,7 +1810,7 @@ export class MapManager {
         spr.alpha    = FOG_ALPHA[state];
         spr.visible  = state !== FOG.VISIBLE;
 
-        this._fogLayer.addChild(spr);
+        this._addTile(this._fogLayer, spr, x, y);
         row.push(spr);
       }
       this._fogSprites.push(row);

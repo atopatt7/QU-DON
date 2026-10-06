@@ -225,7 +225,8 @@ export class HomeScreen extends PIXI.Container {
       startY += btnH + gap;
     });
 
-    // ── 開發者專區 ─────────────────────────────────────────────────────────
+    // ── 開發者專區（只在網址帶 ?dev 時顯示，玩家看不到）─────────────────────
+    if (!new URLSearchParams(location.search).has('dev')) return;
     // 額外間距，與一般選單形成視覺分隔
     startY += Math.max(6, Math.floor(H * 0.014));
     const devBtn = this._makeBtn('[ DEV ZONE ]', btnW, btnH, false, 'dev');
